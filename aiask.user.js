@@ -6806,17 +6806,11 @@
     return hashable;
   };
 
-  function rulePackageContentHashInput(input) {
-    const pkg = RulePackageSchema.parse(input);
-    return canonicalize(withoutContentHashAndSignature(pkg));
-  }
+  const canonicalRulePackageContentHashInput = pkg => canonicalize(withoutContentHashAndSignature(pkg));
 
-  function rulePackageSignatureInput(input) {
-    const pkg = RulePackageSchema.parse(input);
-    return canonicalize(withoutSignature(pkg));
-  }
+  const canonicalRulePackageSignatureInput = pkg => canonicalize(withoutSignature(pkg));
 
-  const computeRulePackageContentHash = input => sha256Base64Url(utf8Bytes(rulePackageContentHashInput(input)));
+  const computeVerifiedRulePackageContentHash = pkg => sha256Base64Url(utf8Bytes(canonicalRulePackageContentHashInput(pkg)));
 
   function parseVersion$1(value) {
     const withoutBuild = value.split("+", 1)[0] ?? value;
@@ -11745,12 +11739,12 @@
       this.verifyEngineRange(pkg);
       this.verifyCapabilitiesAndLimits(pkg);
       this.verifyPrimitives(pkg);
-      const contentHash = await computeRulePackageContentHash(pkg);
+      const contentHash = await computeVerifiedRulePackageContentHash(pkg);
       if (contentHash !== pkg.contentHash) throw new RuleVerificationError("content_hash_mismatch", "rule package content hash mismatch");
       const signingKey = this.keyset.keys.find(key => key.kid === pkg.signingKid && key.use === "rule-signing" && key.notBefore <= now && key.expiresAt > now && this.keyset.issuedAt <= now && this.keyset.expiresAt > now);
       if (!signingKey) throw new RuleVerificationError("invalid_signing_key", "active rule-signing key not found");
       const publicKey = await importEcdsaPublicJwk(signingKey.publicJwk);
-      if (!(await verifyEcdsaP1363(publicKey, utf8Bytes(rulePackageSignatureInput(pkg)), pkg.signature))) throw new RuleVerificationError("invalid_signature", "rule package signature rejected");
+      if (!(await verifyEcdsaP1363(publicKey, utf8Bytes(canonicalRulePackageSignatureInput(pkg)), pkg.signature))) throw new RuleVerificationError("invalid_signature", "rule package signature rejected");
       await this.verifySequenceAndRollback(pkg);
       return pkg;
     }
@@ -11850,7 +11844,7 @@
       return pkg;
     }
     async stageRemote(input, verifier) {
-      const pkg = freezeJson(RulePackageSchema.parse(await verifier.verify(input)));
+      const pkg = freezeJson(await verifier.verify(input));
       const state = this.state(pkg.packageId);
       if (pkg.releaseSequence < state.highestSequence) throw new RuleStoreError("sequence_downgrade", "rule release sequence cannot decrease");
       if (pkg.releaseSequence === state.highestSequence && state.highestHash !== pkg.contentHash) throw new RuleStoreError("sequence_reuse", "rule release sequence cannot be reused for different content");
@@ -11935,7 +11929,7 @@
         if (restored.has(entry.packageId)) throw this.snapshotError("duplicate rule snapshot package");
         const verifyPackage = async value => {
           if (value == null) return null;
-          const pkg = freezeJson(RulePackageSchema.parse(await verifier.verify(value)));
+          const pkg = freezeJson(await verifier.verify(value));
           if (pkg.packageId !== entry.packageId) throw this.snapshotError("rule snapshot packageId mismatch");
           return pkg;
         };
@@ -20510,6 +20504,38 @@
     return result;
   }
 
+  const restoredListeners = new Set;
+
+  let restoreInFlight = false;
+
+  let restoreSettledOnce = false;
+
+  function subscribeRuleStoreRestored(listener) {
+    restoredListeners.add(listener);
+    if (restoreSettledOnce && !restoreInFlight) {
+      try {
+        listener();
+      } catch {}
+    }
+    return () => restoredListeners.delete(listener);
+  }
+
+  const ruleStoreRestorePending = () => restoreInFlight;
+
+  function markRuleStoreRestoreStarted() {
+    restoreInFlight = true;
+  }
+
+  function notifyRuleStoreRestored() {
+    restoreInFlight = false;
+    restoreSettledOnce = true;
+    for (const listener of [ ...restoredListeners ]) {
+      try {
+        listener();
+      } catch {}
+    }
+  }
+
   function ruleUpdateReadout(result, packageCount) {
     if (result.status === "skipped") return packageCount === 0 ? {
       note: "\u672c\u5730\u6ca1\u6709\u4efb\u4f55\u89c4\u5219\u5305",
@@ -20658,6 +20684,17 @@
     };
   }
 
+  const yieldToEventLoop = () => new Promise(resolve => {
+    setTimeout(resolve, 0);
+  });
+
+  const yieldingVerifier = (inner, yieldFn = yieldToEventLoop) => ({
+    async verify(input) {
+      await yieldFn();
+      return inner.verify(input);
+    }
+  });
+
   const keysetPersistence = new GmRuleKeysetPersistence(gmRuleStorage);
 
   const verifierFor = (keyset, store, releaseSummaries = new GmRuleReleaseContextPersistence(gmRuleStorage).load()) => createUserscriptRuleVerifier({
@@ -20685,14 +20722,21 @@
     createVerifier: verifierFor
   });
 
-  const initializeRuleStoreRuntime = () => restoreCachedRuleStore({
-    storage: gmRuleStorage,
-    runtime: ruleStoreRuntime,
-    baseUrl: BACKEND_BASE_URL,
-    inheritLegacyKeysetWatermark: IS_DEFAULT_BACKEND,
-    rootPublicJwk: SECURITY_ROOT_PUBLIC_JWK,
-    createVerifier: keyset => verifierFor(keyset, ruleStoreRuntime.snapshot().store)
-  });
+  let restorePending = null;
+
+  const initializeRuleStoreRuntime = () => {
+    if (restorePending) return restorePending;
+    markRuleStoreRestoreStarted();
+    restorePending = restoreCachedRuleStore({
+      storage: gmRuleStorage,
+      runtime: ruleStoreRuntime,
+      baseUrl: BACKEND_BASE_URL,
+      inheritLegacyKeysetWatermark: IS_DEFAULT_BACKEND,
+      rootPublicJwk: SECURITY_ROOT_PUBLIC_JWK,
+      createVerifier: keyset => yieldingVerifier(verifierFor(keyset, ruleStoreRuntime.snapshot().store))
+    }).finally(notifyRuleStoreRestored);
+    return restorePending;
+  };
 
   const checkRuleUpdates = (force = false) => checkRulesAndNotify(() => updater.check({
     force: force
@@ -22941,6 +22985,8 @@
       let autoResumeStarted = false;
       let stopFrameReady = null;
       let stopRuleStoreUpdates = null;
+      let stopRuleStoreRestored = null;
+      const rulesRestoring = vue.ref(ruleStoreRestorePending());
       let stopPageChanges = null;
       let stopDomChanges = null;
       let stopUrlChanges = null;
@@ -23020,6 +23066,7 @@
         return `\u672c\u8f6e ${hit} \u547d\u4e2d / ${detectedCount.value} \u9898`;
       });
       const standbyHint = vue.computed(() => {
+        if (rulesRestoring.value) return "\u89c4\u5219\u52a0\u8f7d\u4e2d \xb7 \u6b63\u5728\u6821\u9a8c\u672c\u5730\u89c4\u5219\u5305\uff0c\u7a0d\u5019\u3002";
         const missing = missingRulePackage();
         if (missing) return missing.routed ? "\u672c\u9875\u5e94\u7531\u4e91\u7aef\u89c4\u5219\u63a5\u7ba1\uff0c\u4f46\u89c4\u5219\u5305\u8fd8\u6ca1\u4e0b\u8f7d\u3002\u70b9\u300c\u68c0\u67e5\u66f4\u65b0\u300d\u3002" : "\u672c\u9875\u6682\u672a\u652f\u6301 \xb7 \u5df2\u8bb0\u5f55\u3002\u7ae0\u8282\u6d4b\u9a8c\u4e0e\u4f5c\u4e1a\u9875\u53ef\u6b63\u5e38\u7b54\u9898\u3002";
         return hasFeature("answer") ? "\u5f53\u524d\u9875\u672a\u53d1\u73b0\u9898\u76ee\u3002\u7ffb\u5230\u4f5c\u4e1a\u6216\u6d4b\u9a8c\u9875\u5373\u81ea\u52a8\u8bc6\u522b\u3002" : "\u5f53\u524d\u9875\u672a\u53d1\u73b0\u9898\u76ee\u3002\u6253\u5f00\u5df2\u6279\u9605\u7684\u4f5c\u4e1a\u7ed3\u679c\u9875\u5373\u81ea\u52a8\u6536\u5f55\u6b63\u786e\u7b54\u6848\u3002";
@@ -23196,6 +23243,13 @@
           discard();
           void detectQuestions();
         });
+        stopRuleStoreRestored = subscribeRuleStoreRestored(() => {
+          rulesRestoring.value = false;
+          refreshRuleStoreVersions();
+          if (running.value) return;
+          discard();
+          void detectQuestions();
+        });
         refreshRuleStoreVersions();
         void devAutoLogin().finally(() => {
           void detectQuestions();
@@ -23215,6 +23269,8 @@
         stopFrameReady = null;
         stopRuleStoreUpdates == null ? void 0 : stopRuleStoreUpdates();
         stopRuleStoreUpdates = null;
+        stopRuleStoreRestored == null ? void 0 : stopRuleStoreRestored();
+        stopRuleStoreRestored = null;
         stopPageChanges == null ? void 0 : stopPageChanges();
         stopPageChanges = null;
         stopDomChanges == null ? void 0 : stopDomChanges();
@@ -23565,6 +23621,11 @@
           emit: onEvent
         });
         if (!r.session) {
+          if (rulesRestoring.value) {
+            missingRule.value = null;
+            tip.value = "\u89c4\u5219\u52a0\u8f7d\u4e2d\u2026";
+            return false;
+          }
           const missing = missingRulePackage();
           missingRule.value = missing;
           tip.value = !missing ? "\u5f53\u524d\u9875\u9762\u672a\u8bc6\u522b\u5230\u9898\u76ee" : missing.routed ? "\u89c4\u5219\u5305\u5c1a\u672a\u4e0b\u8f7d \xb7 \u8bf7\u70b9\u300c\u68c0\u67e5\u66f4\u65b0\u300d" : "\u672c\u9875\u6682\u672a\u652f\u6301";
@@ -24768,12 +24829,12 @@
       supportedHostPattern: SUPPORTED_HOST_PATTERN
     });
     if (role === "mount") {
-      const run = async () => {
-        await initializeRuleStoreRuntime();
+      const run = () => {
+        const restored = initializeRuleStoreRuntime();
         mountPanel();
-        void checkRuleUpdates();
+        void restored.then(() => void checkRuleUpdates()).catch(() => {});
       };
-      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => void run()); else void run();
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", run); else run();
     } else if (role === "relay-f9") {
       if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => notifyFrameReady(highest)); else notifyFrameReady(highest);
       addEventListener("keydown", e => {
