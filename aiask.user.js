@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.2.0
+// @version      3.2.1
 // @author       爱问答
 // @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
@@ -77,7 +77,7 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.2.0";
+  const SCRIPT_VERSION = "3.2.1";
 
   const DEFAULT_ROOT_PUBLIC_JWK = {
     kty: "EC",
@@ -91,6 +91,12 @@
   }
 
   const SECURITY_ROOT_PUBLIC_JWK = resolveRootPublicJwk();
+
+  const INT32_MAX = 2147483647;
+
+  const EPOCH_MS_MAX = 41024448e5;
+
+  const SAFE_INT_MAX = Number.MAX_SAFE_INTEGER;
 
   const QuestionType = {
     Single: "single",
@@ -5139,7 +5145,7 @@
     variant: stringType().max(128).optional(),
     ruleVersion: stringType().max(128).optional(),
     sourceType: stringType().max(128).optional(),
-    score: numberType().finite().optional()
+    score: numberType().finite().max(1e4).optional()
   }).strict();
 
   function addDuplicateIdIssue(values, ctx, path) {
@@ -5699,7 +5705,7 @@
 
   objectType({
     code: nativeEnumType(AiAskCode),
-    reason: enumType([ "changed", "wrong_password" ]).optional()
+    reason: enumType([ "changed", "wrong_password", "raced" ]).optional()
   }).strict();
 
   const EVIDENCE_PATH = "/api/evidence";
@@ -5727,7 +5733,7 @@
     fpHash: stringType().min(1).max(64),
     host: stringType().min(1).max(64),
     path: stringType().min(1).max(128),
-    expiresAt: numberType().int().nonnegative().max(41024448e5)
+    expiresAt: numberType().int().nonnegative().max(EPOCH_MS_MAX)
   }).strict();
 
   const RULE_HARD_LIMITS = {
@@ -5772,7 +5778,7 @@
     }
   }));
 
-  const JsonRuleValueSchema = lazyOnce(() => unionType([ nullType(), booleanType(), numberType().finite(), stringType(), arrayType(JsonRuleValueSchema).max(RULE_HARD_LIMITS.maxSteps), JsonObjectSchema ]));
+  const JsonRuleValueSchema = lazyOnce(() => unionType([ nullType(), booleanType(), numberType().finite().max(SAFE_INT_MAX), stringType(), arrayType(JsonRuleValueSchema).max(RULE_HARD_LIMITS.maxSteps), JsonObjectSchema ]));
 
   const ExprRecordSchema = () => recordType(SafeObjectKeySchema, ExprSchema);
 
@@ -5787,7 +5793,7 @@
   }).strict(), objectType({
     op: literalType("path"),
     from: ExprSchema,
-    path: arrayType(unionType([ SafeObjectKeySchema, numberType().int().nonnegative() ])).max(256)
+    path: arrayType(unionType([ SafeObjectKeySchema, numberType().int().nonnegative().max(INT32_MAX) ])).max(256)
   }).strict(), objectType({
     op: literalType("coalesce"),
     values: arrayType(ExprSchema).min(1).max(256)
@@ -6000,13 +6006,13 @@
     packageId: StableIdSchema,
     platform: StableIdSchema,
     version: VersionSchema,
-    releaseSequence: numberType().int().nonnegative(),
+    releaseSequence: numberType().int().nonnegative().max(INT32_MAX),
     engineRange: objectType({
       min: VersionSchema,
       maxExclusive: VersionSchema.optional()
     }).strict(),
-    issuedAt: numberType().int().nonnegative(),
-    expiresAt: numberType().int().nonnegative().optional(),
+    issuedAt: numberType().int().nonnegative().max(EPOCH_MS_MAX),
+    expiresAt: numberType().int().nonnegative().max(EPOCH_MS_MAX).optional(),
     signingKid: StableIdSchema,
     rollbackAuthorization: RuleRollbackAuthorizationSchema.optional(),
     capabilities: arrayType(RuleCapabilitySchema).max(16),
@@ -6059,7 +6065,7 @@
 
   const RuleSyncKnownPackageSchema = objectType({
     packageId: StableIdSchema,
-    releaseSequence: numberType().int().nonnegative(),
+    releaseSequence: numberType().int().nonnegative().max(INT32_MAX),
     contentHash: RuleContentHashSchema
   }).strict();
 
@@ -6149,6 +6155,8 @@
 
   const REPORT_PATH = "/api/report";
 
+  const SENTINEL_PACKAGE_IDS = Object.freeze([ "chaoxing-unrouted" ]);
+
   const ReportStageSchema = enumType([ "resolve", "match", "lifecycle", "capture", "decode", "query", "safety", "fill", "verify", "update" ]);
 
   const ReportReasonSchema = enumType([ "no_match", "invalid_match_result", "zero_question", "selector_zero", "selector_many", "decode_failed", "query_failed", "unsafe_answer", "missing_binding", "disconnected", "stale_dom", "ambiguous_binding", "shape_mismatch", "partial_not_allowed", "adapter_rejected", "fill_failed", "verify_failed", "timeout", "budget_exceeded", "unknown_primitive", "rule_failed", "update_failed", "unsupported_question" ]);
@@ -6160,7 +6168,7 @@
     variantId: stringType().min(1).max(128),
     source: ReportRuleSourceSchema,
     version: stringType().min(1).max(64),
-    releaseSequence: numberType().int().nonnegative(),
+    releaseSequence: numberType().int().nonnegative().max(INT32_MAX),
     contentHash: stringType().min(1).max(64),
     release: RuleReleaseContextSchema.optional()
   });
@@ -6276,6 +6284,13 @@
     durationBucket: DurationBucketSchema
   }).strict();
 
+  const CourseStopReasonSchema = enumType([ "course-done", "section-done", "finished", "section-stalled", "budget-exhausted", "advance-failed", "locked" ]);
+
+  const CourseStopEventSchema = objectType({
+    type: literalType("course_stop"),
+    reason: CourseStopReasonSchema
+  }).strict();
+
   const FeatureEventSchema = objectType({
     type: literalType("feature"),
     feature: UsageFeatureSchema,
@@ -6300,7 +6315,7 @@
     step: enumType([ "view", "captcha", "success" ])
   }).strict();
 
-  const UsageEventSchema = discriminatedUnionType("type", [ HeartbeatEventSchema, AnswerRoundEventSchema, SubmitEventSchema, CourseTaskEventSchema, FeatureEventSchema, RuleMissingEventSchema, DiagnosticEventSchema, RegisterStepEventSchema ]);
+  const UsageEventSchema = discriminatedUnionType("type", [ HeartbeatEventSchema, AnswerRoundEventSchema, SubmitEventSchema, CourseTaskEventSchema, CourseStopEventSchema, FeatureEventSchema, RuleMissingEventSchema, DiagnosticEventSchema, RegisterStepEventSchema ]);
 
   objectType({
     schemaVersion: literalType(1),
@@ -6359,7 +6374,7 @@
     title: stringType().max(ANNOUNCEMENT_TITLE_MAX),
     html: stringType().max(ANNOUNCEMENT_HTML_MAX),
     active: booleanType(),
-    expectedSeq: numberType().int().nonnegative(),
+    expectedSeq: numberType().int().nonnegative().max(INT32_MAX),
     reason: stringType().trim().min(3).max(500),
     confirmation: literalType(ADMIN_ANNOUNCEMENT_CONFIRMATION)
   }).strict().refine(value => !value.active || value.title.trim().length > 0, {
@@ -6409,7 +6424,7 @@
 
   const signature = base64Url(86, 86);
 
-  const timestamp = numberType().int().nonnegative();
+  const timestamp = numberType().int().nonnegative().max(EPOCH_MS_MAX);
 
   const kid = stringType().min(1).max(64).regex(/^[A-Za-z0-9._-]+$/u);
 
@@ -16495,12 +16510,24 @@
     return pauseAllMedia(readableDocuments(document2));
   }
 
-  const STOPPING_BLOCK_REASONS = new Set([ "budget-exhausted", "advance-failed", "locked" ]);
+  const STOPPING_BLOCK_REASONS = [ "budget-exhausted", "advance-failed", "locked" ];
 
-  function isRunnerStopped(state) {
-    if (state.kind === "course-done" || state.kind === "section-done") return true;
-    if (state.kind === "finished" || state.kind === "section-stalled") return true;
-    return state.kind === "blocked" && STOPPING_BLOCK_REASONS.has(state.reason);
+  const isStoppingBlockReason = reason => STOPPING_BLOCK_REASONS.includes(reason);
+
+  function courseStopReason(state) {
+    switch (state.kind) {
+     case "course-done":
+     case "section-done":
+     case "finished":
+     case "section-stalled":
+      return state.kind;
+
+     case "blocked":
+      return isStoppingBlockReason(state.reason) ? state.reason : null;
+
+     default:
+      return null;
+    }
   }
 
   const DEFAULT_INTERVAL_MS = 3e3;
@@ -17284,7 +17311,7 @@
 
   const CHA0XING_ANSWERABLE_PATH = /work\/(doHomeWork|dowork|view)|studentstudy|exam|test\//iu;
 
-  const CHA0XING_UNROUTED_PACKAGE_ID = "chaoxing-unrouted";
+  const CHA0XING_UNROUTED_PACKAGE_ID = SENTINEL_PACKAGE_IDS[0];
 
   const CHA0XING_STUDENTSTUDY_PATHS = [ "/mycourse/studentstudy", "/mooc-ans/mycourse/studentstudy" ];
 
@@ -19068,6 +19095,29 @@
     };
   }
 
+  function createCourseStopReporter(emit) {
+    let reported = false;
+    return {
+      observe(state) {
+        const reason = courseStopReason(state);
+        if (!reason) return false;
+        if (!reported) {
+          reported = true;
+          try {
+            emit({
+              type: "course_stop",
+              reason: reason
+            });
+          } catch {}
+        }
+        return true;
+      },
+      reset() {
+        reported = false;
+      }
+    };
+  }
+
   const EVENT_QUEUE_LIMITS = {
     maxBatch: 20,
     flushIntervalMs: 3e4,
@@ -19320,6 +19370,7 @@
   function redactSnapshotHtml(html, mode = "fixture") {
     let redactions = 0;
     const doc = (new DOMParser).parseFromString(html, "text/html");
+    const stripped = new Map;
     const redactRoot = (root, depth) => {
       const owner = root.ownerDocument ?? doc;
       const commentWalker = owner.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
@@ -19336,7 +19387,14 @@
       const templates = [];
       for (const el of Array.from(root.querySelectorAll("*"))) {
         const tag = el.tagName.toLowerCase();
-        if (tag === "script" || tag === "style" || tag === "noscript") {
+        const isInlineAsset = tag === "script" || tag === "style" || tag === "noscript";
+        if (mode === "evidence" && (isInlineAsset || tag === "link")) {
+          stripped.set(tag, (stripped.get(tag) ?? 0) + 1);
+          el.remove();
+          redactions += 1;
+          continue;
+        }
+        if (isInlineAsset) {
           if (el.textContent) {
             el.textContent = "";
             redactions += 1;
@@ -19366,9 +19424,9 @@
             continue;
           }
           if (/^(?:https?:)?\/\//iu.test(attr.value) || attr.value.includes("?")) {
-            const stripped = stripUrlQuery(attr.value);
-            if (stripped !== attr.value) {
-              el.setAttribute(attr.name, stripped);
+            const stripped2 = stripUrlQuery(attr.value);
+            if (stripped2 !== attr.value) {
+              el.setAttribute(attr.name, stripped2);
               redactions += 1;
             }
           }
@@ -19403,6 +19461,8 @@
       }
     };
     redactRoot(doc, 0);
+    const strippedNote = [ "script", "style", "noscript", "link" ].map(tag => [ tag, stripped.get(tag) ?? 0 ]).filter(([, n]) => n > 0).map(([tag, n]) => `${tag}:${n}`).join(",");
+    if (strippedNote) doc.documentElement.setAttribute("data-aiask-stripped", strippedNote);
     return {
       html: doc.documentElement.outerHTML,
       redactions: redactions
@@ -19642,12 +19702,16 @@
         item.slot.used = Math.min(item.html.length, quota);
         spent += item.slot.used;
       }
-      const needy = renderable.filter(item => item.slot.used < item.html.length);
-      const leftover = contentBudget - spent;
-      if (leftover > 0 && needy.length > 0) {
+      let leftover = contentBudget - spent;
+      while (leftover > 0) {
+        const needy = renderable.filter(item => item.slot.used < item.html.length);
+        if (needy.length === 0) break;
         const extra = Math.floor(leftover / needy.length);
+        if (extra === 0) break;
         for (const item of needy) {
-          item.slot.used = Math.min(item.html.length, item.slot.used + extra);
+          const give = Math.min(item.html.length - item.slot.used, extra);
+          item.slot.used += give;
+          leftover -= give;
         }
       }
       for (const item of renderable) {
@@ -22293,6 +22357,7 @@
       function trackUsage(event) {
         usageEvents.push(event);
       }
+      const courseStopReporter = createCourseStopReporter(trackUsage);
       function onPageHide() {
         localAnswerCache.flush();
         usageEvents.persist();
@@ -22675,6 +22740,7 @@
         }
         if (mediaRunner) return;
         syncCourseConfig();
+        courseStopReporter.reset();
         mediaRunner = runMediaTask(document, {
           adapter: courseAdapter,
           memoryGuard: createMemoryGuard({
@@ -22703,7 +22769,7 @@
           onState: state => {
             mediaState.value = state;
             if (state.kind === "answering") onAnsweringTick(state);
-            if (isRunnerStopped(state)) courseProgress2.value = null;
+            if (courseStopReporter.observe(state)) courseProgress2.value = null;
             if (state.kind === "reading") pushLog(`\u6587\u6863\u4efb\u52a1\u70b9 \xb7 \u626b\u5230 ${state.summary.frames} \u5e27 \xb7 \u62c9\u5230\u5e95 ${state.summary.scrolled} \u5904 \xb7 \u7ffb\u9875 ${state.summary.pagers} \u6b21`, state.summary.scrolled || state.summary.pagers ? "info" : "warning");
             if (state.kind === "section-stalled") pushLog(`\u672c\u8282\u4ecd\u6709 ${state.unfinished} \u4e2a\u4efb\u52a1\u70b9\u672a\u88ab\u7ad9\u70b9\u8ba4\u53ef \xb7 ${state.names.join("\u3001")}`, "warning");
             if (state.kind === "course-done") pushLog("\u4fa7\u680f\u6240\u6709\u7ae0\u8282\u7684\u672a\u5b8c\u6210\u8ba1\u6570\u5df2\u5f52\u96f6", "info");
