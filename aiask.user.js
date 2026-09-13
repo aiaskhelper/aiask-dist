@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.2.1
+// @version      3.3.0
 // @author       爱问答
 // @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
@@ -9,11 +9,13 @@
 // @supportURL   https://www.aiask.site/contact.html
 // @match        *://*.chaoxing.com/*
 // @match        *://xatu.168wangxiao.com/*
+// @match        *://ctapp.hubuzkw.com/*
 // @match        https://www.aiask.site/import.html
 // @match        https://www.aiask.site/import
 // @match        https://www.aiask.site/feedback.html
 // @match        https://www.aiask.site/feedback
 // @require      https://registry.npmmirror.com/vue/3.5.39/files/dist/vue.global.prod.js
+// @require      https://www.aiask.site/engine/aiask-engine-341192f5c6ff764b.js#sha256=341192f5c6ff764b6066e60b6f6af17e19aaa6ef0cc427f1d7614f423bb14fac
 // @resource     chaoxingFontTable  https://www.aiask.site/assets/chaoxing-font-table.json
 // @connect      www.aiask.site
 // @connect      cx.icodef.com
@@ -28,9 +30,10 @@
 // @antifeature  tracking  匿名上报故障诊断，可关闭
 // ==/UserScript==
 
-(function (vue) {
+(function (protocol, core, vue) {
   'use strict';
 
+  /*! typr.js 1.0.0 (MIT) https://github.com/photopea/Typr.js */
   var __defProp = Object.defineProperty;
 
   var __typeError = msg => {
@@ -59,7 +62,62 @@
   var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), 
   method);
 
-  var _a, _deps, _pending, _dropped, _timer, _sending, _enabled, _EventQueue_instances, arm_fn, cancel_fn, trim_fn, envelope_fn, take_fn, flush_fn, send_fn;
+  var _deps, _pending, _dropped, _timer, _sending, _enabled, _EventQueue_instances, arm_fn, cancel_fn, trim_fn, envelope_fn, take_fn, flush_fn, send_fn;
+
+  const REQUIRED_GLOBALS = [ "Vue", "AiaskEngine.core", "AiaskEngine.protocol" ];
+
+  const LABEL = {
+    Vue: "Vue",
+    "AiaskEngine.core": "\u5f15\u64ce",
+    "AiaskEngine.protocol": "\u5f15\u64ce"
+  };
+
+  function probe() {
+    const engine = typeof AiaskEngine === "undefined" ? void 0 : AiaskEngine;
+    return {
+      Vue: typeof Vue !== "undefined",
+      "AiaskEngine.core": (engine == null ? void 0 : engine.core) != null,
+      "AiaskEngine.protocol": (engine == null ? void 0 : engine.protocol) != null
+    };
+  }
+
+  function missingGlobals(present) {
+    return REQUIRED_GLOBALS.filter(key => !present[key]);
+  }
+
+  function mountMissingBanner(doc, missing) {
+    const labels = [ ...new Set(missing.map(key => LABEL[key])) ].join("\u3001");
+    const mount = () => {
+      if (doc.querySelector("[data-aiask-engine-guard]")) return;
+      const bar = doc.createElement("div");
+      bar.setAttribute("data-aiask-engine-guard", "");
+      bar.setAttribute("style", "position:fixed;top:0;left:0;right:0;z-index:2147483647;padding:10px 16px;background:#c7391b;color:#fff;font:14px/1.5 system-ui,sans-serif;text-align:center");
+      bar.textContent = `\u7231\u95ee\u7b54\uff1a\u811a\u672c\u4f9d\u8d56\u672a\u80fd\u52a0\u8f7d\uff08\u7f3a ${labels}\uff09\uff0c\u8bf7\u68c0\u67e5\u7f51\u7edc\u540e\u91cd\u65b0\u5b89\u88c5\u811a\u672c\u3002`;
+      const link = doc.createElement("a");
+      link.href = "https://www.aiask.site/";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.setAttribute("style", "color:#fff;text-decoration:underline;margin-left:8px");
+      link.textContent = "\u5b98\u7f51";
+      bar.append(link);
+      (doc.body ?? doc.documentElement).append(bar);
+    };
+    if (doc.readyState === "loading") doc.addEventListener("DOMContentLoaded", mount, {
+      once: true
+    }); else mount();
+  }
+
+  function assertEngineGlobals(input) {
+    const missing = missingGlobals(input.present);
+    if (missing.length === 0) return;
+    if (input.doc) mountMissingBanner(input.doc, missing);
+    throw new Error(`aiask: missing ${missing.join(", ")}`);
+  }
+
+  assertEngineGlobals({
+    present: probe(),
+    doc: typeof document === "undefined" ? void 0 : document
+  });
 
   var _GM_deleteValue = (() => typeof GM_deleteValue != "undefined" ? GM_deleteValue : void 0)();
 
@@ -77,14 +135,11 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.2.1";
+  const SCRIPT_VERSION = "3.3.0";
 
-  const DEFAULT_ROOT_PUBLIC_JWK = {
-    kty: "EC",
-    crv: "P-256",
-    x: "gitEZjf_WTbJYGhpmmUzKE3zUdiMsgchpxfgSdZ3WDE",
-    y: "n_cLcQdM4-bPQAGHvxMULiETvAu6kJl8YvIwPFGWasc"
-  };
+  const ENGINE_ID = "341192f5c6ff764b";
+
+  const DEFAULT_ROOT_PUBLIC_JWK = protocol.PRODUCTION_ROOT_PUBLIC_JWK;
 
   function resolveRootPublicJwk() {
     return DEFAULT_ROOT_PUBLIC_JWK;
@@ -92,12595 +147,10 @@
 
   const SECURITY_ROOT_PUBLIC_JWK = resolveRootPublicJwk();
 
-  const INT32_MAX = 2147483647;
-
-  const EPOCH_MS_MAX = 41024448e5;
-
-  const SAFE_INT_MAX = Number.MAX_SAFE_INTEGER;
-
-  const QuestionType = {
-    Single: "single",
-    Multiple: "multiple",
-    Judge: "judge",
-    Fill: "fill"
-  };
-
-  const AiAskCode = {
-    Ok: 0,
-    Unauthorized: 1,
-    Insufficient: 2,
-    Busy: 3,
-    Invalid: 4,
-    RateLimited: 5
-  };
-
-  var commonjsGlobal = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : {};
-
-  function getDefaultExportFromCjs(x) {
-    return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
-  }
-
-  function getAugmentedNamespace(n) {
-    if (n.__esModule) return n;
-    var f = n.default;
-    if (typeof f == "function") {
-      var a = function a2() {
-        if (this instanceof a2) {
-          return Reflect.construct(f, arguments, this.constructor);
-        }
-        return f.apply(this, arguments);
-      };
-      a.prototype = f.prototype;
-    } else a = {};
-    Object.defineProperty(a, "__esModule", {
-      value: true
-    });
-    Object.keys(n).forEach(function(k) {
-      var d = Object.getOwnPropertyDescriptor(n, k);
-      Object.defineProperty(a, k, d.get ? d : {
-        enumerable: true,
-        get: function() {
-          return n[k];
-        }
-      });
-    });
-    return a;
-  }
-
-  var md5 = {
-    exports: {}
-  };
-
-  const __viteBrowserExternal = {};
-
-  const __viteBrowserExternal$1 = Object.freeze(Object.defineProperty({
-    __proto__: null,
-    default: __viteBrowserExternal
-  }, Symbol.toStringTag, {
-    value: "Module"
-  }));
-
-  const require$$1 = getAugmentedNamespace(__viteBrowserExternal$1);
-
-  (function(module) {
-    (function() {
-      var INPUT_ERROR = "input is invalid type";
-      var FINALIZE_ERROR = "finalize already called";
-      var WINDOW = typeof window === "object";
-      var root = WINDOW ? window : {};
-      if (root.JS_MD5_NO_WINDOW) {
-        WINDOW = false;
-      }
-      var WEB_WORKER = !WINDOW && typeof self === "object";
-      var NODE_JS = !root.JS_MD5_NO_NODE_JS && typeof process === "object" && process.versions && process.versions.node;
-      if (NODE_JS) {
-        root = commonjsGlobal;
-      } else if (WEB_WORKER) {
-        root = self;
-      }
-      var COMMON_JS = !root.JS_MD5_NO_COMMON_JS && true && module.exports;
-      var ARRAY_BUFFER = !root.JS_MD5_NO_ARRAY_BUFFER && typeof ArrayBuffer !== "undefined";
-      var HEX_CHARS = "0123456789abcdef".split("");
-      var EXTRA = [ 128, 32768, 8388608, -2147483648 ];
-      var SHIFT = [ 0, 8, 16, 24 ];
-      var OUTPUT_TYPES = [ "hex", "array", "digest", "buffer", "arrayBuffer", "base64" ];
-      var BASE64_ENCODE_CHAR = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".split("");
-      var blocks = [], buffer8;
-      if (ARRAY_BUFFER) {
-        var buffer = new ArrayBuffer(68);
-        buffer8 = new Uint8Array(buffer);
-        blocks = new Uint32Array(buffer);
-      }
-      var isArray = Array.isArray;
-      if (root.JS_MD5_NO_NODE_JS || !isArray) {
-        isArray = function(obj) {
-          return Object.prototype.toString.call(obj) === "[object Array]";
-        };
-      }
-      var isView = ArrayBuffer.isView;
-      if (ARRAY_BUFFER && (root.JS_MD5_NO_ARRAY_BUFFER_IS_VIEW || !isView)) {
-        isView = function(obj) {
-          return typeof obj === "object" && obj.buffer && obj.buffer.constructor === ArrayBuffer;
-        };
-      }
-      var formatMessage = function(message) {
-        var type = typeof message;
-        if (type === "string") {
-          return [ message, true ];
-        }
-        if (type !== "object" || message === null) {
-          throw new Error(INPUT_ERROR);
-        }
-        if (ARRAY_BUFFER && message.constructor === ArrayBuffer) {
-          return [ new Uint8Array(message), false ];
-        }
-        if (!isArray(message) && !isView(message)) {
-          throw new Error(INPUT_ERROR);
-        }
-        return [ message, false ];
-      };
-      var createOutputMethod = function(outputType) {
-        return function(message) {
-          return new Md5(true).update(message)[outputType]();
-        };
-      };
-      var createMethod = function() {
-        var method = createOutputMethod("hex");
-        if (NODE_JS) {
-          method = nodeWrap(method);
-        }
-        method.create = function() {
-          return new Md5;
-        };
-        method.update = function(message) {
-          return method.create().update(message);
-        };
-        for (var i = 0; i < OUTPUT_TYPES.length; ++i) {
-          var type = OUTPUT_TYPES[i];
-          method[type] = createOutputMethod(type);
-        }
-        return method;
-      };
-      var nodeWrap = function(method) {
-        var crypto2 = require$$1;
-        var Buffer2 = require$$1.Buffer;
-        var bufferFrom;
-        if (Buffer2.from && !root.JS_MD5_NO_BUFFER_FROM) {
-          bufferFrom = Buffer2.from;
-        } else {
-          bufferFrom = function(message) {
-            return new Buffer2(message);
-          };
-        }
-        var nodeMethod = function(message) {
-          if (typeof message === "string") {
-            return crypto2.createHash("md5").update(message, "utf8").digest("hex");
-          } else {
-            if (message === null || message === void 0) {
-              throw new Error(INPUT_ERROR);
-            } else if (message.constructor === ArrayBuffer) {
-              message = new Uint8Array(message);
-            }
-          }
-          if (isArray(message) || isView(message) || message.constructor === Buffer2) {
-            return crypto2.createHash("md5").update(bufferFrom(message)).digest("hex");
-          } else {
-            return method(message);
-          }
-        };
-        return nodeMethod;
-      };
-      var createHmacOutputMethod = function(outputType) {
-        return function(key, message) {
-          return new HmacMd5(key, true).update(message)[outputType]();
-        };
-      };
-      var createHmacMethod = function() {
-        var method = createHmacOutputMethod("hex");
-        method.create = function(key) {
-          return new HmacMd5(key);
-        };
-        method.update = function(key, message) {
-          return method.create(key).update(message);
-        };
-        for (var i = 0; i < OUTPUT_TYPES.length; ++i) {
-          var type = OUTPUT_TYPES[i];
-          method[type] = createHmacOutputMethod(type);
-        }
-        return method;
-      };
-      function Md5(sharedMemory) {
-        if (sharedMemory) {
-          blocks[0] = blocks[16] = blocks[1] = blocks[2] = blocks[3] = blocks[4] = blocks[5] = blocks[6] = blocks[7] = blocks[8] = blocks[9] = blocks[10] = blocks[11] = blocks[12] = blocks[13] = blocks[14] = blocks[15] = 0;
-          this.blocks = blocks;
-          this.buffer8 = buffer8;
-        } else {
-          if (ARRAY_BUFFER) {
-            var buffer2 = new ArrayBuffer(68);
-            this.buffer8 = new Uint8Array(buffer2);
-            this.blocks = new Uint32Array(buffer2);
-          } else {
-            this.blocks = [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
-          }
-        }
-        this.h0 = this.h1 = this.h2 = this.h3 = this.start = this.bytes = this.hBytes = 0;
-        this.finalized = this.hashed = false;
-        this.first = true;
-      }
-      Md5.prototype.update = function(message) {
-        if (this.finalized) {
-          throw new Error(FINALIZE_ERROR);
-        }
-        var result = formatMessage(message);
-        message = result[0];
-        var isString = result[1];
-        var code, index = 0, i, length = message.length, blocks2 = this.blocks;
-        var buffer82 = this.buffer8;
-        while (index < length) {
-          if (this.hashed) {
-            this.hashed = false;
-            blocks2[0] = blocks2[16];
-            blocks2[16] = blocks2[1] = blocks2[2] = blocks2[3] = blocks2[4] = blocks2[5] = blocks2[6] = blocks2[7] = blocks2[8] = blocks2[9] = blocks2[10] = blocks2[11] = blocks2[12] = blocks2[13] = blocks2[14] = blocks2[15] = 0;
-          }
-          if (isString) {
-            if (ARRAY_BUFFER) {
-              for (i = this.start; index < length && i < 64; ++index) {
-                code = message.charCodeAt(index);
-                if (code < 128) {
-                  buffer82[i++] = code;
-                } else if (code < 2048) {
-                  buffer82[i++] = 192 | code >>> 6;
-                  buffer82[i++] = 128 | code & 63;
-                } else if (code < 55296 || code >= 57344) {
-                  buffer82[i++] = 224 | code >>> 12;
-                  buffer82[i++] = 128 | code >>> 6 & 63;
-                  buffer82[i++] = 128 | code & 63;
-                } else {
-                  code = 65536 + ((code & 1023) << 10 | message.charCodeAt(++index) & 1023);
-                  buffer82[i++] = 240 | code >>> 18;
-                  buffer82[i++] = 128 | code >>> 12 & 63;
-                  buffer82[i++] = 128 | code >>> 6 & 63;
-                  buffer82[i++] = 128 | code & 63;
-                }
-              }
-            } else {
-              for (i = this.start; index < length && i < 64; ++index) {
-                code = message.charCodeAt(index);
-                if (code < 128) {
-                  blocks2[i >>> 2] |= code << SHIFT[i++ & 3];
-                } else if (code < 2048) {
-                  blocks2[i >>> 2] |= (192 | code >>> 6) << SHIFT[i++ & 3];
-                  blocks2[i >>> 2] |= (128 | code & 63) << SHIFT[i++ & 3];
-                } else if (code < 55296 || code >= 57344) {
-                  blocks2[i >>> 2] |= (224 | code >>> 12) << SHIFT[i++ & 3];
-                  blocks2[i >>> 2] |= (128 | code >>> 6 & 63) << SHIFT[i++ & 3];
-                  blocks2[i >>> 2] |= (128 | code & 63) << SHIFT[i++ & 3];
-                } else {
-                  code = 65536 + ((code & 1023) << 10 | message.charCodeAt(++index) & 1023);
-                  blocks2[i >>> 2] |= (240 | code >>> 18) << SHIFT[i++ & 3];
-                  blocks2[i >>> 2] |= (128 | code >>> 12 & 63) << SHIFT[i++ & 3];
-                  blocks2[i >>> 2] |= (128 | code >>> 6 & 63) << SHIFT[i++ & 3];
-                  blocks2[i >>> 2] |= (128 | code & 63) << SHIFT[i++ & 3];
-                }
-              }
-            }
-          } else {
-            if (ARRAY_BUFFER) {
-              for (i = this.start; index < length && i < 64; ++index) {
-                buffer82[i++] = message[index];
-              }
-            } else {
-              for (i = this.start; index < length && i < 64; ++index) {
-                blocks2[i >>> 2] |= message[index] << SHIFT[i++ & 3];
-              }
-            }
-          }
-          this.lastByteIndex = i;
-          this.bytes += i - this.start;
-          if (i >= 64) {
-            this.start = i - 64;
-            this.hash();
-            this.hashed = true;
-          } else {
-            this.start = i;
-          }
-        }
-        if (this.bytes > 4294967295) {
-          this.hBytes += this.bytes / 4294967296 << 0;
-          this.bytes = this.bytes % 4294967296;
-        }
-        return this;
-      };
-      Md5.prototype.finalize = function() {
-        if (this.finalized) {
-          return;
-        }
-        this.finalized = true;
-        var blocks2 = this.blocks, i = this.lastByteIndex;
-        blocks2[i >>> 2] |= EXTRA[i & 3];
-        if (i >= 56) {
-          if (!this.hashed) {
-            this.hash();
-          }
-          blocks2[0] = blocks2[16];
-          blocks2[16] = blocks2[1] = blocks2[2] = blocks2[3] = blocks2[4] = blocks2[5] = blocks2[6] = blocks2[7] = blocks2[8] = blocks2[9] = blocks2[10] = blocks2[11] = blocks2[12] = blocks2[13] = blocks2[14] = blocks2[15] = 0;
-        }
-        blocks2[14] = this.bytes << 3;
-        blocks2[15] = this.hBytes << 3 | this.bytes >>> 29;
-        this.hash();
-      };
-      Md5.prototype.hash = function() {
-        var a, b, c, d, bc, da, blocks2 = this.blocks;
-        if (this.first) {
-          a = blocks2[0] - 680876937;
-          a = (a << 7 | a >>> 25) - 271733879 << 0;
-          d = (-1732584194 ^ a & 2004318071) + blocks2[1] - 117830708;
-          d = (d << 12 | d >>> 20) + a << 0;
-          c = (-271733879 ^ d & (a ^ -271733879)) + blocks2[2] - 1126478375;
-          c = (c << 17 | c >>> 15) + d << 0;
-          b = (a ^ c & (d ^ a)) + blocks2[3] - 1316259209;
-          b = (b << 22 | b >>> 10) + c << 0;
-        } else {
-          a = this.h0;
-          b = this.h1;
-          c = this.h2;
-          d = this.h3;
-          a += (d ^ b & (c ^ d)) + blocks2[0] - 680876936;
-          a = (a << 7 | a >>> 25) + b << 0;
-          d += (c ^ a & (b ^ c)) + blocks2[1] - 389564586;
-          d = (d << 12 | d >>> 20) + a << 0;
-          c += (b ^ d & (a ^ b)) + blocks2[2] + 606105819;
-          c = (c << 17 | c >>> 15) + d << 0;
-          b += (a ^ c & (d ^ a)) + blocks2[3] - 1044525330;
-          b = (b << 22 | b >>> 10) + c << 0;
-        }
-        a += (d ^ b & (c ^ d)) + blocks2[4] - 176418897;
-        a = (a << 7 | a >>> 25) + b << 0;
-        d += (c ^ a & (b ^ c)) + blocks2[5] + 1200080426;
-        d = (d << 12 | d >>> 20) + a << 0;
-        c += (b ^ d & (a ^ b)) + blocks2[6] - 1473231341;
-        c = (c << 17 | c >>> 15) + d << 0;
-        b += (a ^ c & (d ^ a)) + blocks2[7] - 45705983;
-        b = (b << 22 | b >>> 10) + c << 0;
-        a += (d ^ b & (c ^ d)) + blocks2[8] + 1770035416;
-        a = (a << 7 | a >>> 25) + b << 0;
-        d += (c ^ a & (b ^ c)) + blocks2[9] - 1958414417;
-        d = (d << 12 | d >>> 20) + a << 0;
-        c += (b ^ d & (a ^ b)) + blocks2[10] - 42063;
-        c = (c << 17 | c >>> 15) + d << 0;
-        b += (a ^ c & (d ^ a)) + blocks2[11] - 1990404162;
-        b = (b << 22 | b >>> 10) + c << 0;
-        a += (d ^ b & (c ^ d)) + blocks2[12] + 1804603682;
-        a = (a << 7 | a >>> 25) + b << 0;
-        d += (c ^ a & (b ^ c)) + blocks2[13] - 40341101;
-        d = (d << 12 | d >>> 20) + a << 0;
-        c += (b ^ d & (a ^ b)) + blocks2[14] - 1502002290;
-        c = (c << 17 | c >>> 15) + d << 0;
-        b += (a ^ c & (d ^ a)) + blocks2[15] + 1236535329;
-        b = (b << 22 | b >>> 10) + c << 0;
-        a += (c ^ d & (b ^ c)) + blocks2[1] - 165796510;
-        a = (a << 5 | a >>> 27) + b << 0;
-        d += (b ^ c & (a ^ b)) + blocks2[6] - 1069501632;
-        d = (d << 9 | d >>> 23) + a << 0;
-        c += (a ^ b & (d ^ a)) + blocks2[11] + 643717713;
-        c = (c << 14 | c >>> 18) + d << 0;
-        b += (d ^ a & (c ^ d)) + blocks2[0] - 373897302;
-        b = (b << 20 | b >>> 12) + c << 0;
-        a += (c ^ d & (b ^ c)) + blocks2[5] - 701558691;
-        a = (a << 5 | a >>> 27) + b << 0;
-        d += (b ^ c & (a ^ b)) + blocks2[10] + 38016083;
-        d = (d << 9 | d >>> 23) + a << 0;
-        c += (a ^ b & (d ^ a)) + blocks2[15] - 660478335;
-        c = (c << 14 | c >>> 18) + d << 0;
-        b += (d ^ a & (c ^ d)) + blocks2[4] - 405537848;
-        b = (b << 20 | b >>> 12) + c << 0;
-        a += (c ^ d & (b ^ c)) + blocks2[9] + 568446438;
-        a = (a << 5 | a >>> 27) + b << 0;
-        d += (b ^ c & (a ^ b)) + blocks2[14] - 1019803690;
-        d = (d << 9 | d >>> 23) + a << 0;
-        c += (a ^ b & (d ^ a)) + blocks2[3] - 187363961;
-        c = (c << 14 | c >>> 18) + d << 0;
-        b += (d ^ a & (c ^ d)) + blocks2[8] + 1163531501;
-        b = (b << 20 | b >>> 12) + c << 0;
-        a += (c ^ d & (b ^ c)) + blocks2[13] - 1444681467;
-        a = (a << 5 | a >>> 27) + b << 0;
-        d += (b ^ c & (a ^ b)) + blocks2[2] - 51403784;
-        d = (d << 9 | d >>> 23) + a << 0;
-        c += (a ^ b & (d ^ a)) + blocks2[7] + 1735328473;
-        c = (c << 14 | c >>> 18) + d << 0;
-        b += (d ^ a & (c ^ d)) + blocks2[12] - 1926607734;
-        b = (b << 20 | b >>> 12) + c << 0;
-        bc = b ^ c;
-        a += (bc ^ d) + blocks2[5] - 378558;
-        a = (a << 4 | a >>> 28) + b << 0;
-        d += (bc ^ a) + blocks2[8] - 2022574463;
-        d = (d << 11 | d >>> 21) + a << 0;
-        da = d ^ a;
-        c += (da ^ b) + blocks2[11] + 1839030562;
-        c = (c << 16 | c >>> 16) + d << 0;
-        b += (da ^ c) + blocks2[14] - 35309556;
-        b = (b << 23 | b >>> 9) + c << 0;
-        bc = b ^ c;
-        a += (bc ^ d) + blocks2[1] - 1530992060;
-        a = (a << 4 | a >>> 28) + b << 0;
-        d += (bc ^ a) + blocks2[4] + 1272893353;
-        d = (d << 11 | d >>> 21) + a << 0;
-        da = d ^ a;
-        c += (da ^ b) + blocks2[7] - 155497632;
-        c = (c << 16 | c >>> 16) + d << 0;
-        b += (da ^ c) + blocks2[10] - 1094730640;
-        b = (b << 23 | b >>> 9) + c << 0;
-        bc = b ^ c;
-        a += (bc ^ d) + blocks2[13] + 681279174;
-        a = (a << 4 | a >>> 28) + b << 0;
-        d += (bc ^ a) + blocks2[0] - 358537222;
-        d = (d << 11 | d >>> 21) + a << 0;
-        da = d ^ a;
-        c += (da ^ b) + blocks2[3] - 722521979;
-        c = (c << 16 | c >>> 16) + d << 0;
-        b += (da ^ c) + blocks2[6] + 76029189;
-        b = (b << 23 | b >>> 9) + c << 0;
-        bc = b ^ c;
-        a += (bc ^ d) + blocks2[9] - 640364487;
-        a = (a << 4 | a >>> 28) + b << 0;
-        d += (bc ^ a) + blocks2[12] - 421815835;
-        d = (d << 11 | d >>> 21) + a << 0;
-        da = d ^ a;
-        c += (da ^ b) + blocks2[15] + 530742520;
-        c = (c << 16 | c >>> 16) + d << 0;
-        b += (da ^ c) + blocks2[2] - 995338651;
-        b = (b << 23 | b >>> 9) + c << 0;
-        a += (c ^ (b | ~d)) + blocks2[0] - 198630844;
-        a = (a << 6 | a >>> 26) + b << 0;
-        d += (b ^ (a | ~c)) + blocks2[7] + 1126891415;
-        d = (d << 10 | d >>> 22) + a << 0;
-        c += (a ^ (d | ~b)) + blocks2[14] - 1416354905;
-        c = (c << 15 | c >>> 17) + d << 0;
-        b += (d ^ (c | ~a)) + blocks2[5] - 57434055;
-        b = (b << 21 | b >>> 11) + c << 0;
-        a += (c ^ (b | ~d)) + blocks2[12] + 1700485571;
-        a = (a << 6 | a >>> 26) + b << 0;
-        d += (b ^ (a | ~c)) + blocks2[3] - 1894986606;
-        d = (d << 10 | d >>> 22) + a << 0;
-        c += (a ^ (d | ~b)) + blocks2[10] - 1051523;
-        c = (c << 15 | c >>> 17) + d << 0;
-        b += (d ^ (c | ~a)) + blocks2[1] - 2054922799;
-        b = (b << 21 | b >>> 11) + c << 0;
-        a += (c ^ (b | ~d)) + blocks2[8] + 1873313359;
-        a = (a << 6 | a >>> 26) + b << 0;
-        d += (b ^ (a | ~c)) + blocks2[15] - 30611744;
-        d = (d << 10 | d >>> 22) + a << 0;
-        c += (a ^ (d | ~b)) + blocks2[6] - 1560198380;
-        c = (c << 15 | c >>> 17) + d << 0;
-        b += (d ^ (c | ~a)) + blocks2[13] + 1309151649;
-        b = (b << 21 | b >>> 11) + c << 0;
-        a += (c ^ (b | ~d)) + blocks2[4] - 145523070;
-        a = (a << 6 | a >>> 26) + b << 0;
-        d += (b ^ (a | ~c)) + blocks2[11] - 1120210379;
-        d = (d << 10 | d >>> 22) + a << 0;
-        c += (a ^ (d | ~b)) + blocks2[2] + 718787259;
-        c = (c << 15 | c >>> 17) + d << 0;
-        b += (d ^ (c | ~a)) + blocks2[9] - 343485551;
-        b = (b << 21 | b >>> 11) + c << 0;
-        if (this.first) {
-          this.h0 = a + 1732584193 << 0;
-          this.h1 = b - 271733879 << 0;
-          this.h2 = c - 1732584194 << 0;
-          this.h3 = d + 271733878 << 0;
-          this.first = false;
-        } else {
-          this.h0 = this.h0 + a << 0;
-          this.h1 = this.h1 + b << 0;
-          this.h2 = this.h2 + c << 0;
-          this.h3 = this.h3 + d << 0;
-        }
-      };
-      Md5.prototype.hex = function() {
-        this.finalize();
-        var h0 = this.h0, h1 = this.h1, h2 = this.h2, h3 = this.h3;
-        return HEX_CHARS[h0 >>> 4 & 15] + HEX_CHARS[h0 & 15] + HEX_CHARS[h0 >>> 12 & 15] + HEX_CHARS[h0 >>> 8 & 15] + HEX_CHARS[h0 >>> 20 & 15] + HEX_CHARS[h0 >>> 16 & 15] + HEX_CHARS[h0 >>> 28 & 15] + HEX_CHARS[h0 >>> 24 & 15] + HEX_CHARS[h1 >>> 4 & 15] + HEX_CHARS[h1 & 15] + HEX_CHARS[h1 >>> 12 & 15] + HEX_CHARS[h1 >>> 8 & 15] + HEX_CHARS[h1 >>> 20 & 15] + HEX_CHARS[h1 >>> 16 & 15] + HEX_CHARS[h1 >>> 28 & 15] + HEX_CHARS[h1 >>> 24 & 15] + HEX_CHARS[h2 >>> 4 & 15] + HEX_CHARS[h2 & 15] + HEX_CHARS[h2 >>> 12 & 15] + HEX_CHARS[h2 >>> 8 & 15] + HEX_CHARS[h2 >>> 20 & 15] + HEX_CHARS[h2 >>> 16 & 15] + HEX_CHARS[h2 >>> 28 & 15] + HEX_CHARS[h2 >>> 24 & 15] + HEX_CHARS[h3 >>> 4 & 15] + HEX_CHARS[h3 & 15] + HEX_CHARS[h3 >>> 12 & 15] + HEX_CHARS[h3 >>> 8 & 15] + HEX_CHARS[h3 >>> 20 & 15] + HEX_CHARS[h3 >>> 16 & 15] + HEX_CHARS[h3 >>> 28 & 15] + HEX_CHARS[h3 >>> 24 & 15];
-      };
-      Md5.prototype.toString = Md5.prototype.hex;
-      Md5.prototype.digest = function() {
-        this.finalize();
-        var h0 = this.h0, h1 = this.h1, h2 = this.h2, h3 = this.h3;
-        return [ h0 & 255, h0 >>> 8 & 255, h0 >>> 16 & 255, h0 >>> 24 & 255, h1 & 255, h1 >>> 8 & 255, h1 >>> 16 & 255, h1 >>> 24 & 255, h2 & 255, h2 >>> 8 & 255, h2 >>> 16 & 255, h2 >>> 24 & 255, h3 & 255, h3 >>> 8 & 255, h3 >>> 16 & 255, h3 >>> 24 & 255 ];
-      };
-      Md5.prototype.array = Md5.prototype.digest;
-      Md5.prototype.arrayBuffer = function() {
-        this.finalize();
-        var buffer2 = new ArrayBuffer(16);
-        var blocks2 = new Uint32Array(buffer2);
-        blocks2[0] = this.h0;
-        blocks2[1] = this.h1;
-        blocks2[2] = this.h2;
-        blocks2[3] = this.h3;
-        return buffer2;
-      };
-      Md5.prototype.buffer = Md5.prototype.arrayBuffer;
-      Md5.prototype.base64 = function() {
-        var v1, v2, v3, base64Str = "", bytes = this.array();
-        for (var i = 0; i < 15; ) {
-          v1 = bytes[i++];
-          v2 = bytes[i++];
-          v3 = bytes[i++];
-          base64Str += BASE64_ENCODE_CHAR[v1 >>> 2] + BASE64_ENCODE_CHAR[(v1 << 4 | v2 >>> 4) & 63] + BASE64_ENCODE_CHAR[(v2 << 2 | v3 >>> 6) & 63] + BASE64_ENCODE_CHAR[v3 & 63];
-        }
-        v1 = bytes[i];
-        base64Str += BASE64_ENCODE_CHAR[v1 >>> 2] + BASE64_ENCODE_CHAR[v1 << 4 & 63] + "==";
-        return base64Str;
-      };
-      function HmacMd5(key, sharedMemory) {
-        var i, result = formatMessage(key);
-        key = result[0];
-        if (result[1]) {
-          var bytes = [], length = key.length, index = 0, code;
-          for (i = 0; i < length; ++i) {
-            code = key.charCodeAt(i);
-            if (code < 128) {
-              bytes[index++] = code;
-            } else if (code < 2048) {
-              bytes[index++] = 192 | code >>> 6;
-              bytes[index++] = 128 | code & 63;
-            } else if (code < 55296 || code >= 57344) {
-              bytes[index++] = 224 | code >>> 12;
-              bytes[index++] = 128 | code >>> 6 & 63;
-              bytes[index++] = 128 | code & 63;
-            } else {
-              code = 65536 + ((code & 1023) << 10 | key.charCodeAt(++i) & 1023);
-              bytes[index++] = 240 | code >>> 18;
-              bytes[index++] = 128 | code >>> 12 & 63;
-              bytes[index++] = 128 | code >>> 6 & 63;
-              bytes[index++] = 128 | code & 63;
-            }
-          }
-          key = bytes;
-        }
-        if (key.length > 64) {
-          key = new Md5(true).update(key).array();
-        }
-        var oKeyPad = [], iKeyPad = [];
-        for (i = 0; i < 64; ++i) {
-          var b = key[i] || 0;
-          oKeyPad[i] = 92 ^ b;
-          iKeyPad[i] = 54 ^ b;
-        }
-        Md5.call(this, sharedMemory);
-        this.update(iKeyPad);
-        this.oKeyPad = oKeyPad;
-        this.inner = true;
-        this.sharedMemory = sharedMemory;
-      }
-      HmacMd5.prototype = new Md5;
-      HmacMd5.prototype.finalize = function() {
-        Md5.prototype.finalize.call(this);
-        if (this.inner) {
-          this.inner = false;
-          var innerHash = this.array();
-          Md5.call(this, this.sharedMemory);
-          this.update(this.oKeyPad);
-          this.update(innerHash);
-          Md5.prototype.finalize.call(this);
-        }
-      };
-      var exports = createMethod();
-      exports.md5 = exports;
-      exports.md5.hmac = createHmacMethod();
-      if (COMMON_JS) {
-        module.exports = exports;
-      } else {
-        root.md5 = exports;
-      }
-    })();
-  })(md5);
-
-  var md5Exports = md5.exports;
-
-  const RAW_TEXT_CLOSE_PATTERN = /<\/textarea/gi;
-
-  const TEXT_SENTINEL = "x";
-
-  const preserveCarriageReturns = value => value.replace(/\r/g, "&#13;");
-
-  const decodeOnce = value => {
-    var _a2, _b;
-    const neutralized = preserveCarriageReturns(value.replace(RAW_TEXT_CLOSE_PATTERN, delimiter => `&lt;${delimiter.slice(1)}`));
-    const parsed = (new DOMParser).parseFromString(`<textarea>${TEXT_SENTINEL}${neutralized}</textarea>`, "text/html");
-    return ((_b = (_a2 = parsed.querySelector("textarea")) == null ? void 0 : _a2.textContent) == null ? void 0 : _b.slice(TEXT_SENTINEL.length)) ?? "";
-  };
-
-  const decodeAttributeOnce = value => {
-    var _a2;
-    const embedded = preserveCarriageReturns(value).replace(/"/g, "&quot;");
-    const parsed = (new DOMParser).parseFromString(`<div data-value="${embedded}"></div>`, "text/html");
-    return ((_a2 = parsed.querySelector("div")) == null ? void 0 : _a2.getAttribute("data-value")) ?? "";
-  };
-
-  const decodeHTML = value => decodeOnce(value);
-
-  const decodeHTMLAttribute = value => decodeAttributeOnce(value);
-
-  const decodeAttr = value => decodeHTMLAttribute(value);
-
-  const decodeText = value => decodeHTML(value);
-
-  const IMAGE_TAG_NAME = String.raw`img(?=[\s/>])`;
-
-  const IMAGE_TAG_START_PATTERN = new RegExp(`^<${IMAGE_TAG_NAME}`, "i");
-
-  const IMAGE_TAG_PATTERN = new RegExp(`<${IMAGE_TAG_NAME}[^>]*>`, "gi");
-
-  const escapeAttr = value => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  function serializeQuestionText(value) {
-    return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-
-  const isHttpImageSrc = src => {
-    if (!/^https?:\/\//i.test(src)) return false;
-    try {
-      const url = new URL(src);
-      return (url.protocol === "http:" || url.protocol === "https:") && Boolean(url.hostname);
-    } catch {
-      return false;
-    }
-  };
-
-  function imageSrcFromTag(tag) {
-    if (!IMAGE_TAG_START_PATTERN.test(tag.trim())) return "";
-    const match = tag.match(/(?:^|\s)src\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
-    return decodeAttr((match == null ? void 0 : match[1]) ?? (match == null ? void 0 : match[2]) ?? (match == null ? void 0 : match[3]) ?? "");
-  }
-
-  function serializeImageToken(src) {
-    return isHttpImageSrc(src) ? `<img src="${escapeAttr(src)}">` : "";
-  }
-
-  function stripImageSrcVolatileParts(src) {
-    return src.replace(/[?#].*$/, "");
-  }
-
-  function splitQuestionContent(value) {
-    const source = String(value ?? "");
-    const out = [];
-    const pushText = text => {
-      if (text) out.push({
-        type: "text",
-        value: text
-      });
-    };
-    let cursor = 0;
-    for (const match of source.matchAll(IMAGE_TAG_PATTERN)) {
-      const index = match.index ?? 0;
-      pushText(source.slice(cursor, index));
-      const src = imageSrcFromTag(match[0]);
-      if (isHttpImageSrc(src)) out.push({
-        type: "image",
-        value: src
-      });
-      cursor = index + match[0].length;
-    }
-    pushText(source.slice(cursor));
-    return out;
-  }
-
-  const stripUntrustedTags = value => value.replace(/<\/?[A-Za-z][^>]*>/g, "");
-
-  function normalizeImageTagsForHash(value) {
-    return splitQuestionContent(value).map(part => part.type === "image" ? serializeImageToken(stripImageSrcVolatileParts(part.value)) : decodeText(part.value)).join("");
-  }
-
-  function normalizeQuestionContentForMatch(value) {
-    return splitQuestionContent(value).map(part => part.type === "image" ? stripImageSrcVolatileParts(part.value) : decodeText(stripUntrustedTags(part.value))).join("");
-  }
-
-  function questionTextForSearch(value) {
-    return parseQuestionContent(value).map(part => part.type === "image" ? serializeImageToken(part.value) : part.value).join("");
-  }
-
-  function parseQuestionContent(value, options = {}) {
-    const out = [];
-    const pushText = text => {
-      if (!text) return;
-      const last = out.at(-1);
-      if ((last == null ? void 0 : last.type) === "text") last.value += text; else out.push({
-        type: "text",
-        value: text
-      });
-    };
-    for (const part of splitQuestionContent(value)) {
-      if (part.type === "image") out.push(part); else {
-        const text = options.stripUntrustedTags === false ? part.value : stripUntrustedTags(part.value);
-        pushText(decodeText(text));
-      }
-    }
-    return out;
-  }
-
-  var sha256$1 = {
-    exports: {}
-  };
-
-  (function(module) {
-    (function() {
-      var ERROR = "input is invalid type";
-      var WINDOW = typeof window === "object";
-      var root = WINDOW ? window : {};
-      if (root.JS_SHA256_NO_WINDOW) {
-        WINDOW = false;
-      }
-      var WEB_WORKER = !WINDOW && typeof self === "object";
-      var NODE_JS = !root.JS_SHA256_NO_NODE_JS && typeof process === "object" && process.versions && process.versions.node && process.type != "renderer";
-      if (NODE_JS) {
-        root = commonjsGlobal;
-      } else if (WEB_WORKER) {
-        root = self;
-      }
-      var COMMON_JS = !root.JS_SHA256_NO_COMMON_JS && true && module.exports;
-      var ARRAY_BUFFER = !root.JS_SHA256_NO_ARRAY_BUFFER && typeof ArrayBuffer !== "undefined";
-      var HEX_CHARS = "0123456789abcdef".split("");
-      var EXTRA = [ -2147483648, 8388608, 32768, 128 ];
-      var SHIFT = [ 24, 16, 8, 0 ];
-      var K = [ 1116352408, 1899447441, 3049323471, 3921009573, 961987163, 1508970993, 2453635748, 2870763221, 3624381080, 310598401, 607225278, 1426881987, 1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774, 264347078, 604807628, 770255983, 1249150122, 1555081692, 1996064986, 2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711, 113926993, 338241895, 666307205, 773529912, 1294757372, 1396182291, 1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411, 3259730800, 3345764771, 3516065817, 3600352804, 4094571909, 275423344, 430227734, 506948616, 659060556, 883997877, 958139571, 1322822218, 1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424, 2428436474, 2756734187, 3204031479, 3329325298 ];
-      var OUTPUT_TYPES = [ "hex", "array", "digest", "arrayBuffer" ];
-      var blocks = [];
-      if (root.JS_SHA256_NO_NODE_JS || !Array.isArray) {
-        Array.isArray = function(obj) {
-          return Object.prototype.toString.call(obj) === "[object Array]";
-        };
-      }
-      if (ARRAY_BUFFER && (root.JS_SHA256_NO_ARRAY_BUFFER_IS_VIEW || !ArrayBuffer.isView)) {
-        ArrayBuffer.isView = function(obj) {
-          return typeof obj === "object" && obj.buffer && obj.buffer.constructor === ArrayBuffer;
-        };
-      }
-      var createOutputMethod = function(outputType, is224) {
-        return function(message) {
-          return new Sha256(is224, true).update(message)[outputType]();
-        };
-      };
-      var createMethod = function(is224) {
-        var method = createOutputMethod("hex", is224);
-        if (NODE_JS) {
-          method = nodeWrap(method, is224);
-        }
-        method.create = function() {
-          return new Sha256(is224);
-        };
-        method.update = function(message) {
-          return method.create().update(message);
-        };
-        for (var i = 0; i < OUTPUT_TYPES.length; ++i) {
-          var type = OUTPUT_TYPES[i];
-          method[type] = createOutputMethod(type, is224);
-        }
-        return method;
-      };
-      var nodeWrap = function(method, is224) {
-        var crypto2 = require$$1;
-        var Buffer2 = require$$1.Buffer;
-        var algorithm = is224 ? "sha224" : "sha256";
-        var bufferFrom;
-        if (Buffer2.from && !root.JS_SHA256_NO_BUFFER_FROM) {
-          bufferFrom = Buffer2.from;
-        } else {
-          bufferFrom = function(message) {
-            return new Buffer2(message);
-          };
-        }
-        var nodeMethod = function(message) {
-          if (typeof message === "string") {
-            return crypto2.createHash(algorithm).update(message, "utf8").digest("hex");
-          } else {
-            if (message === null || message === void 0) {
-              throw new Error(ERROR);
-            } else if (message.constructor === ArrayBuffer) {
-              message = new Uint8Array(message);
-            }
-          }
-          if (Array.isArray(message) || ArrayBuffer.isView(message) || message.constructor === Buffer2) {
-            return crypto2.createHash(algorithm).update(bufferFrom(message)).digest("hex");
-          } else {
-            return method(message);
-          }
-        };
-        return nodeMethod;
-      };
-      var createHmacOutputMethod = function(outputType, is224) {
-        return function(key, message) {
-          return new HmacSha256(key, is224, true).update(message)[outputType]();
-        };
-      };
-      var createHmacMethod = function(is224) {
-        var method = createHmacOutputMethod("hex", is224);
-        method.create = function(key) {
-          return new HmacSha256(key, is224);
-        };
-        method.update = function(key, message) {
-          return method.create(key).update(message);
-        };
-        for (var i = 0; i < OUTPUT_TYPES.length; ++i) {
-          var type = OUTPUT_TYPES[i];
-          method[type] = createHmacOutputMethod(type, is224);
-        }
-        return method;
-      };
-      function Sha256(is224, sharedMemory) {
-        if (sharedMemory) {
-          blocks[0] = blocks[16] = blocks[1] = blocks[2] = blocks[3] = blocks[4] = blocks[5] = blocks[6] = blocks[7] = blocks[8] = blocks[9] = blocks[10] = blocks[11] = blocks[12] = blocks[13] = blocks[14] = blocks[15] = 0;
-          this.blocks = blocks;
-        } else {
-          this.blocks = [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
-        }
-        if (is224) {
-          this.h0 = 3238371032;
-          this.h1 = 914150663;
-          this.h2 = 812702999;
-          this.h3 = 4144912697;
-          this.h4 = 4290775857;
-          this.h5 = 1750603025;
-          this.h6 = 1694076839;
-          this.h7 = 3204075428;
-        } else {
-          this.h0 = 1779033703;
-          this.h1 = 3144134277;
-          this.h2 = 1013904242;
-          this.h3 = 2773480762;
-          this.h4 = 1359893119;
-          this.h5 = 2600822924;
-          this.h6 = 528734635;
-          this.h7 = 1541459225;
-        }
-        this.block = this.start = this.bytes = this.hBytes = 0;
-        this.finalized = this.hashed = false;
-        this.first = true;
-        this.is224 = is224;
-      }
-      Sha256.prototype.update = function(message) {
-        if (this.finalized) {
-          return;
-        }
-        var notString, type = typeof message;
-        if (type !== "string") {
-          if (type === "object") {
-            if (message === null) {
-              throw new Error(ERROR);
-            } else if (ARRAY_BUFFER && message.constructor === ArrayBuffer) {
-              message = new Uint8Array(message);
-            } else if (!Array.isArray(message)) {
-              if (!ARRAY_BUFFER || !ArrayBuffer.isView(message)) {
-                throw new Error(ERROR);
-              }
-            }
-          } else {
-            throw new Error(ERROR);
-          }
-          notString = true;
-        }
-        var code, index = 0, i, length = message.length, blocks2 = this.blocks;
-        while (index < length) {
-          if (this.hashed) {
-            this.hashed = false;
-            blocks2[0] = this.block;
-            this.block = blocks2[16] = blocks2[1] = blocks2[2] = blocks2[3] = blocks2[4] = blocks2[5] = blocks2[6] = blocks2[7] = blocks2[8] = blocks2[9] = blocks2[10] = blocks2[11] = blocks2[12] = blocks2[13] = blocks2[14] = blocks2[15] = 0;
-          }
-          if (notString) {
-            for (i = this.start; index < length && i < 64; ++index) {
-              blocks2[i >>> 2] |= message[index] << SHIFT[i++ & 3];
-            }
-          } else {
-            for (i = this.start; index < length && i < 64; ++index) {
-              code = message.charCodeAt(index);
-              if (code < 128) {
-                blocks2[i >>> 2] |= code << SHIFT[i++ & 3];
-              } else if (code < 2048) {
-                blocks2[i >>> 2] |= (192 | code >>> 6) << SHIFT[i++ & 3];
-                blocks2[i >>> 2] |= (128 | code & 63) << SHIFT[i++ & 3];
-              } else if (code < 55296 || code >= 57344) {
-                blocks2[i >>> 2] |= (224 | code >>> 12) << SHIFT[i++ & 3];
-                blocks2[i >>> 2] |= (128 | code >>> 6 & 63) << SHIFT[i++ & 3];
-                blocks2[i >>> 2] |= (128 | code & 63) << SHIFT[i++ & 3];
-              } else {
-                code = 65536 + ((code & 1023) << 10 | message.charCodeAt(++index) & 1023);
-                blocks2[i >>> 2] |= (240 | code >>> 18) << SHIFT[i++ & 3];
-                blocks2[i >>> 2] |= (128 | code >>> 12 & 63) << SHIFT[i++ & 3];
-                blocks2[i >>> 2] |= (128 | code >>> 6 & 63) << SHIFT[i++ & 3];
-                blocks2[i >>> 2] |= (128 | code & 63) << SHIFT[i++ & 3];
-              }
-            }
-          }
-          this.lastByteIndex = i;
-          this.bytes += i - this.start;
-          if (i >= 64) {
-            this.block = blocks2[16];
-            this.start = i - 64;
-            this.hash();
-            this.hashed = true;
-          } else {
-            this.start = i;
-          }
-        }
-        if (this.bytes > 4294967295) {
-          this.hBytes += this.bytes / 4294967296 << 0;
-          this.bytes = this.bytes % 4294967296;
-        }
-        return this;
-      };
-      Sha256.prototype.finalize = function() {
-        if (this.finalized) {
-          return;
-        }
-        this.finalized = true;
-        var blocks2 = this.blocks, i = this.lastByteIndex;
-        blocks2[16] = this.block;
-        blocks2[i >>> 2] |= EXTRA[i & 3];
-        this.block = blocks2[16];
-        if (i >= 56) {
-          if (!this.hashed) {
-            this.hash();
-          }
-          blocks2[0] = this.block;
-          blocks2[16] = blocks2[1] = blocks2[2] = blocks2[3] = blocks2[4] = blocks2[5] = blocks2[6] = blocks2[7] = blocks2[8] = blocks2[9] = blocks2[10] = blocks2[11] = blocks2[12] = blocks2[13] = blocks2[14] = blocks2[15] = 0;
-        }
-        blocks2[14] = this.hBytes << 3 | this.bytes >>> 29;
-        blocks2[15] = this.bytes << 3;
-        this.hash();
-      };
-      Sha256.prototype.hash = function() {
-        var a = this.h0, b = this.h1, c = this.h2, d = this.h3, e = this.h4, f = this.h5, g = this.h6, h = this.h7, blocks2 = this.blocks, j, s0, s1, maj, t1, t2, ch, ab, da, cd, bc;
-        for (j = 16; j < 64; ++j) {
-          t1 = blocks2[j - 15];
-          s0 = (t1 >>> 7 | t1 << 25) ^ (t1 >>> 18 | t1 << 14) ^ t1 >>> 3;
-          t1 = blocks2[j - 2];
-          s1 = (t1 >>> 17 | t1 << 15) ^ (t1 >>> 19 | t1 << 13) ^ t1 >>> 10;
-          blocks2[j] = blocks2[j - 16] + s0 + blocks2[j - 7] + s1 << 0;
-        }
-        bc = b & c;
-        for (j = 0; j < 64; j += 4) {
-          if (this.first) {
-            if (this.is224) {
-              ab = 300032;
-              t1 = blocks2[0] - 1413257819;
-              h = t1 - 150054599 << 0;
-              d = t1 + 24177077 << 0;
-            } else {
-              ab = 704751109;
-              t1 = blocks2[0] - 210244248;
-              h = t1 - 1521486534 << 0;
-              d = t1 + 143694565 << 0;
-            }
-            this.first = false;
-          } else {
-            s0 = (a >>> 2 | a << 30) ^ (a >>> 13 | a << 19) ^ (a >>> 22 | a << 10);
-            s1 = (e >>> 6 | e << 26) ^ (e >>> 11 | e << 21) ^ (e >>> 25 | e << 7);
-            ab = a & b;
-            maj = ab ^ a & c ^ bc;
-            ch = e & f ^ ~e & g;
-            t1 = h + s1 + ch + K[j] + blocks2[j];
-            t2 = s0 + maj;
-            h = d + t1 << 0;
-            d = t1 + t2 << 0;
-          }
-          s0 = (d >>> 2 | d << 30) ^ (d >>> 13 | d << 19) ^ (d >>> 22 | d << 10);
-          s1 = (h >>> 6 | h << 26) ^ (h >>> 11 | h << 21) ^ (h >>> 25 | h << 7);
-          da = d & a;
-          maj = da ^ d & b ^ ab;
-          ch = h & e ^ ~h & f;
-          t1 = g + s1 + ch + K[j + 1] + blocks2[j + 1];
-          t2 = s0 + maj;
-          g = c + t1 << 0;
-          c = t1 + t2 << 0;
-          s0 = (c >>> 2 | c << 30) ^ (c >>> 13 | c << 19) ^ (c >>> 22 | c << 10);
-          s1 = (g >>> 6 | g << 26) ^ (g >>> 11 | g << 21) ^ (g >>> 25 | g << 7);
-          cd = c & d;
-          maj = cd ^ c & a ^ da;
-          ch = g & h ^ ~g & e;
-          t1 = f + s1 + ch + K[j + 2] + blocks2[j + 2];
-          t2 = s0 + maj;
-          f = b + t1 << 0;
-          b = t1 + t2 << 0;
-          s0 = (b >>> 2 | b << 30) ^ (b >>> 13 | b << 19) ^ (b >>> 22 | b << 10);
-          s1 = (f >>> 6 | f << 26) ^ (f >>> 11 | f << 21) ^ (f >>> 25 | f << 7);
-          bc = b & c;
-          maj = bc ^ b & d ^ cd;
-          ch = f & g ^ ~f & h;
-          t1 = e + s1 + ch + K[j + 3] + blocks2[j + 3];
-          t2 = s0 + maj;
-          e = a + t1 << 0;
-          a = t1 + t2 << 0;
-          this.chromeBugWorkAround = true;
-        }
-        this.h0 = this.h0 + a << 0;
-        this.h1 = this.h1 + b << 0;
-        this.h2 = this.h2 + c << 0;
-        this.h3 = this.h3 + d << 0;
-        this.h4 = this.h4 + e << 0;
-        this.h5 = this.h5 + f << 0;
-        this.h6 = this.h6 + g << 0;
-        this.h7 = this.h7 + h << 0;
-      };
-      Sha256.prototype.hex = function() {
-        this.finalize();
-        var h0 = this.h0, h1 = this.h1, h2 = this.h2, h3 = this.h3, h4 = this.h4, h5 = this.h5, h6 = this.h6, h7 = this.h7;
-        var hex = HEX_CHARS[h0 >>> 28 & 15] + HEX_CHARS[h0 >>> 24 & 15] + HEX_CHARS[h0 >>> 20 & 15] + HEX_CHARS[h0 >>> 16 & 15] + HEX_CHARS[h0 >>> 12 & 15] + HEX_CHARS[h0 >>> 8 & 15] + HEX_CHARS[h0 >>> 4 & 15] + HEX_CHARS[h0 & 15] + HEX_CHARS[h1 >>> 28 & 15] + HEX_CHARS[h1 >>> 24 & 15] + HEX_CHARS[h1 >>> 20 & 15] + HEX_CHARS[h1 >>> 16 & 15] + HEX_CHARS[h1 >>> 12 & 15] + HEX_CHARS[h1 >>> 8 & 15] + HEX_CHARS[h1 >>> 4 & 15] + HEX_CHARS[h1 & 15] + HEX_CHARS[h2 >>> 28 & 15] + HEX_CHARS[h2 >>> 24 & 15] + HEX_CHARS[h2 >>> 20 & 15] + HEX_CHARS[h2 >>> 16 & 15] + HEX_CHARS[h2 >>> 12 & 15] + HEX_CHARS[h2 >>> 8 & 15] + HEX_CHARS[h2 >>> 4 & 15] + HEX_CHARS[h2 & 15] + HEX_CHARS[h3 >>> 28 & 15] + HEX_CHARS[h3 >>> 24 & 15] + HEX_CHARS[h3 >>> 20 & 15] + HEX_CHARS[h3 >>> 16 & 15] + HEX_CHARS[h3 >>> 12 & 15] + HEX_CHARS[h3 >>> 8 & 15] + HEX_CHARS[h3 >>> 4 & 15] + HEX_CHARS[h3 & 15] + HEX_CHARS[h4 >>> 28 & 15] + HEX_CHARS[h4 >>> 24 & 15] + HEX_CHARS[h4 >>> 20 & 15] + HEX_CHARS[h4 >>> 16 & 15] + HEX_CHARS[h4 >>> 12 & 15] + HEX_CHARS[h4 >>> 8 & 15] + HEX_CHARS[h4 >>> 4 & 15] + HEX_CHARS[h4 & 15] + HEX_CHARS[h5 >>> 28 & 15] + HEX_CHARS[h5 >>> 24 & 15] + HEX_CHARS[h5 >>> 20 & 15] + HEX_CHARS[h5 >>> 16 & 15] + HEX_CHARS[h5 >>> 12 & 15] + HEX_CHARS[h5 >>> 8 & 15] + HEX_CHARS[h5 >>> 4 & 15] + HEX_CHARS[h5 & 15] + HEX_CHARS[h6 >>> 28 & 15] + HEX_CHARS[h6 >>> 24 & 15] + HEX_CHARS[h6 >>> 20 & 15] + HEX_CHARS[h6 >>> 16 & 15] + HEX_CHARS[h6 >>> 12 & 15] + HEX_CHARS[h6 >>> 8 & 15] + HEX_CHARS[h6 >>> 4 & 15] + HEX_CHARS[h6 & 15];
-        if (!this.is224) {
-          hex += HEX_CHARS[h7 >>> 28 & 15] + HEX_CHARS[h7 >>> 24 & 15] + HEX_CHARS[h7 >>> 20 & 15] + HEX_CHARS[h7 >>> 16 & 15] + HEX_CHARS[h7 >>> 12 & 15] + HEX_CHARS[h7 >>> 8 & 15] + HEX_CHARS[h7 >>> 4 & 15] + HEX_CHARS[h7 & 15];
-        }
-        return hex;
-      };
-      Sha256.prototype.toString = Sha256.prototype.hex;
-      Sha256.prototype.digest = function() {
-        this.finalize();
-        var h0 = this.h0, h1 = this.h1, h2 = this.h2, h3 = this.h3, h4 = this.h4, h5 = this.h5, h6 = this.h6, h7 = this.h7;
-        var arr = [ h0 >>> 24 & 255, h0 >>> 16 & 255, h0 >>> 8 & 255, h0 & 255, h1 >>> 24 & 255, h1 >>> 16 & 255, h1 >>> 8 & 255, h1 & 255, h2 >>> 24 & 255, h2 >>> 16 & 255, h2 >>> 8 & 255, h2 & 255, h3 >>> 24 & 255, h3 >>> 16 & 255, h3 >>> 8 & 255, h3 & 255, h4 >>> 24 & 255, h4 >>> 16 & 255, h4 >>> 8 & 255, h4 & 255, h5 >>> 24 & 255, h5 >>> 16 & 255, h5 >>> 8 & 255, h5 & 255, h6 >>> 24 & 255, h6 >>> 16 & 255, h6 >>> 8 & 255, h6 & 255 ];
-        if (!this.is224) {
-          arr.push(h7 >>> 24 & 255, h7 >>> 16 & 255, h7 >>> 8 & 255, h7 & 255);
-        }
-        return arr;
-      };
-      Sha256.prototype.array = Sha256.prototype.digest;
-      Sha256.prototype.arrayBuffer = function() {
-        this.finalize();
-        var buffer = new ArrayBuffer(this.is224 ? 28 : 32);
-        var dataView = new DataView(buffer);
-        dataView.setUint32(0, this.h0);
-        dataView.setUint32(4, this.h1);
-        dataView.setUint32(8, this.h2);
-        dataView.setUint32(12, this.h3);
-        dataView.setUint32(16, this.h4);
-        dataView.setUint32(20, this.h5);
-        dataView.setUint32(24, this.h6);
-        if (!this.is224) {
-          dataView.setUint32(28, this.h7);
-        }
-        return buffer;
-      };
-      function HmacSha256(key, is224, sharedMemory) {
-        var i, type = typeof key;
-        if (type === "string") {
-          var bytes = [], length = key.length, index = 0, code;
-          for (i = 0; i < length; ++i) {
-            code = key.charCodeAt(i);
-            if (code < 128) {
-              bytes[index++] = code;
-            } else if (code < 2048) {
-              bytes[index++] = 192 | code >>> 6;
-              bytes[index++] = 128 | code & 63;
-            } else if (code < 55296 || code >= 57344) {
-              bytes[index++] = 224 | code >>> 12;
-              bytes[index++] = 128 | code >>> 6 & 63;
-              bytes[index++] = 128 | code & 63;
-            } else {
-              code = 65536 + ((code & 1023) << 10 | key.charCodeAt(++i) & 1023);
-              bytes[index++] = 240 | code >>> 18;
-              bytes[index++] = 128 | code >>> 12 & 63;
-              bytes[index++] = 128 | code >>> 6 & 63;
-              bytes[index++] = 128 | code & 63;
-            }
-          }
-          key = bytes;
-        } else {
-          if (type === "object") {
-            if (key === null) {
-              throw new Error(ERROR);
-            } else if (ARRAY_BUFFER && key.constructor === ArrayBuffer) {
-              key = new Uint8Array(key);
-            } else if (!Array.isArray(key)) {
-              if (!ARRAY_BUFFER || !ArrayBuffer.isView(key)) {
-                throw new Error(ERROR);
-              }
-            }
-          } else {
-            throw new Error(ERROR);
-          }
-        }
-        if (key.length > 64) {
-          key = new Sha256(is224, true).update(key).array();
-        }
-        var oKeyPad = [], iKeyPad = [];
-        for (i = 0; i < 64; ++i) {
-          var b = key[i] || 0;
-          oKeyPad[i] = 92 ^ b;
-          iKeyPad[i] = 54 ^ b;
-        }
-        Sha256.call(this, is224, sharedMemory);
-        this.update(iKeyPad);
-        this.oKeyPad = oKeyPad;
-        this.inner = true;
-        this.sharedMemory = sharedMemory;
-      }
-      HmacSha256.prototype = new Sha256;
-      HmacSha256.prototype.finalize = function() {
-        Sha256.prototype.finalize.call(this);
-        if (this.inner) {
-          this.inner = false;
-          var innerHash = this.array();
-          Sha256.call(this, this.is224, this.sharedMemory);
-          this.update(this.oKeyPad);
-          this.update(innerHash);
-          Sha256.prototype.finalize.call(this);
-        }
-      };
-      var exports = createMethod();
-      exports.sha256 = exports;
-      exports.sha224 = createMethod(true);
-      exports.sha256.hmac = createHmacMethod();
-      exports.sha224.hmac = createHmacMethod(true);
-      if (COMMON_JS) {
-        module.exports = exports;
-      } else {
-        root.sha256 = exports.sha256;
-        root.sha224 = exports.sha224;
-      }
-    })();
-  })(sha256$1);
-
-  var sha256Exports = sha256$1.exports;
-
-  function normalizeQuestionContentForHash(value) {
-    return normalizeImageTagsForHash(value).replace(/\s+/g, " ").trim();
-  }
-
-  const sortedContent = values => values.map(item => normalizeQuestionContentForHash(item.content)).sort();
-
-  const canonicalSlot = slot => [ normalizeQuestionContentForHash(slot.label ?? ""), sortedContent(slot.options ?? []) ];
-
-  function semanticNode(node) {
-    switch (node.kind) {
-     case "leaf":
-      return [ "leaf", node.type, normalizeQuestionContentForHash(node.stem), sortedContent(node.options), node.slots.map(canonicalSlot) ];
-
-     case "composite":
-      return [ "composite", node.type, normalizeQuestionContentForHash(node.stem), node.children.map(questionNodeHash) ];
-
-     case "matching":
-      return [ "matching", node.cardinality, normalizeQuestionContentForHash(node.stem), sortedContent(node.left), sortedContent(node.right) ];
-    }
-  }
-
-  function canonicalQuestionNode(node) {
-    return JSON.stringify(semanticNode(node));
-  }
-
-  function questionNodeHash(node) {
-    return sha256Exports.sha256(canonicalQuestionNode(node));
-  }
-
-  function semanticContentHash(value) {
-    return sha256Exports.sha256(normalizeQuestionContentForHash(value));
-  }
-
-  function searchUnitHash(input) {
-    const segments = input.stemSegments.map(normalizeQuestionContentForHash).filter(Boolean).map(value => [ (new TextEncoder).encode(value).length, value ]);
-    return sha256Exports.sha256(JSON.stringify([ "search-unit-v2", input.queryType, segments, sortedContent(input.options), input.answerShape, input.sourceNodeHash ]));
-  }
-
-  var util;
-
-  (function(util2) {
-    util2.assertEqual = _ => {};
-    function assertIs(_arg) {}
-    util2.assertIs = assertIs;
-    function assertNever(_x) {
-      throw new Error;
-    }
-    util2.assertNever = assertNever;
-    util2.arrayToEnum = items => {
-      const obj = {};
-      for (const item of items) {
-        obj[item] = item;
-      }
-      return obj;
-    };
-    util2.getValidEnumValues = obj => {
-      const validKeys = util2.objectKeys(obj).filter(k => typeof obj[obj[k]] !== "number");
-      const filtered = {};
-      for (const k of validKeys) {
-        filtered[k] = obj[k];
-      }
-      return util2.objectValues(filtered);
-    };
-    util2.objectValues = obj => util2.objectKeys(obj).map(function(e) {
-      return obj[e];
-    });
-    util2.objectKeys = typeof Object.keys === "function" ? obj => Object.keys(obj) : object => {
-      const keys = [];
-      for (const key in object) {
-        if (Object.prototype.hasOwnProperty.call(object, key)) {
-          keys.push(key);
-        }
-      }
-      return keys;
-    };
-    util2.find = (arr, checker) => {
-      for (const item of arr) {
-        if (checker(item)) return item;
-      }
-      return void 0;
-    };
-    util2.isInteger = typeof Number.isInteger === "function" ? val => Number.isInteger(val) : val => typeof val === "number" && Number.isFinite(val) && Math.floor(val) === val;
-    function joinValues(array, separator = " | ") {
-      return array.map(val => typeof val === "string" ? `'${val}'` : val).join(separator);
-    }
-    util2.joinValues = joinValues;
-    util2.jsonStringifyReplacer = (_, value) => {
-      if (typeof value === "bigint") {
-        return value.toString();
-      }
-      return value;
-    };
-  })(util || (util = {}));
-
-  var objectUtil;
-
-  (function(objectUtil2) {
-    objectUtil2.mergeShapes = (first, second) => ({
-      ...first,
-      ...second
-    });
-  })(objectUtil || (objectUtil = {}));
-
-  const ZodParsedType = util.arrayToEnum([ "string", "nan", "number", "integer", "float", "boolean", "date", "bigint", "symbol", "function", "undefined", "null", "array", "object", "unknown", "promise", "void", "never", "map", "set" ]);
-
-  const getParsedType = data => {
-    const t = typeof data;
-    switch (t) {
-     case "undefined":
-      return ZodParsedType.undefined;
-
-     case "string":
-      return ZodParsedType.string;
-
-     case "number":
-      return Number.isNaN(data) ? ZodParsedType.nan : ZodParsedType.number;
-
-     case "boolean":
-      return ZodParsedType.boolean;
-
-     case "function":
-      return ZodParsedType.function;
-
-     case "bigint":
-      return ZodParsedType.bigint;
-
-     case "symbol":
-      return ZodParsedType.symbol;
-
-     case "object":
-      if (Array.isArray(data)) {
-        return ZodParsedType.array;
-      }
-      if (data === null) {
-        return ZodParsedType.null;
-      }
-      if (data.then && typeof data.then === "function" && data.catch && typeof data.catch === "function") {
-        return ZodParsedType.promise;
-      }
-      if (typeof Map !== "undefined" && data instanceof Map) {
-        return ZodParsedType.map;
-      }
-      if (typeof Set !== "undefined" && data instanceof Set) {
-        return ZodParsedType.set;
-      }
-      if (typeof Date !== "undefined" && data instanceof Date) {
-        return ZodParsedType.date;
-      }
-      return ZodParsedType.object;
-
-     default:
-      return ZodParsedType.unknown;
-    }
-  };
-
-  const ZodIssueCode = util.arrayToEnum([ "invalid_type", "invalid_literal", "custom", "invalid_union", "invalid_union_discriminator", "invalid_enum_value", "unrecognized_keys", "invalid_arguments", "invalid_return_type", "invalid_date", "invalid_string", "too_small", "too_big", "invalid_intersection_types", "not_multiple_of", "not_finite" ]);
-
-  class ZodError extends Error {
-    get errors() {
-      return this.issues;
-    }
-    constructor(issues) {
-      super();
-      this.issues = [];
-      this.addIssue = sub => {
-        this.issues = [ ...this.issues, sub ];
-      };
-      this.addIssues = (subs = []) => {
-        this.issues = [ ...this.issues, ...subs ];
-      };
-      const actualProto = new.target.prototype;
-      if (Object.setPrototypeOf) {
-        Object.setPrototypeOf(this, actualProto);
-      } else {
-        this.__proto__ = actualProto;
-      }
-      this.name = "ZodError";
-      this.issues = issues;
-    }
-    format(_mapper) {
-      const mapper = _mapper || function(issue) {
-        return issue.message;
-      };
-      const fieldErrors = {
-        _errors: []
-      };
-      const processError = error => {
-        for (const issue of error.issues) {
-          if (issue.code === "invalid_union") {
-            issue.unionErrors.map(processError);
-          } else if (issue.code === "invalid_return_type") {
-            processError(issue.returnTypeError);
-          } else if (issue.code === "invalid_arguments") {
-            processError(issue.argumentsError);
-          } else if (issue.path.length === 0) {
-            fieldErrors._errors.push(mapper(issue));
-          } else {
-            let curr = fieldErrors;
-            let i = 0;
-            while (i < issue.path.length) {
-              const el = issue.path[i];
-              const terminal = i === issue.path.length - 1;
-              if (!terminal) {
-                curr[el] = curr[el] || {
-                  _errors: []
-                };
-              } else {
-                curr[el] = curr[el] || {
-                  _errors: []
-                };
-                curr[el]._errors.push(mapper(issue));
-              }
-              curr = curr[el];
-              i++;
-            }
-          }
-        }
-      };
-      processError(this);
-      return fieldErrors;
-    }
-    static assert(value) {
-      if (!(value instanceof ZodError)) {
-        throw new Error(`Not a ZodError: ${value}`);
-      }
-    }
-    toString() {
-      return this.message;
-    }
-    get message() {
-      return JSON.stringify(this.issues, util.jsonStringifyReplacer, 2);
-    }
-    get isEmpty() {
-      return this.issues.length === 0;
-    }
-    flatten(mapper = issue => issue.message) {
-      const fieldErrors = {};
-      const formErrors = [];
-      for (const sub of this.issues) {
-        if (sub.path.length > 0) {
-          const firstEl = sub.path[0];
-          fieldErrors[firstEl] = fieldErrors[firstEl] || [];
-          fieldErrors[firstEl].push(mapper(sub));
-        } else {
-          formErrors.push(mapper(sub));
-        }
-      }
-      return {
-        formErrors: formErrors,
-        fieldErrors: fieldErrors
-      };
-    }
-    get formErrors() {
-      return this.flatten();
-    }
-  }
-
-  ZodError.create = issues => {
-    const error = new ZodError(issues);
-    return error;
-  };
-
-  const errorMap = (issue, _ctx) => {
-    let message;
-    switch (issue.code) {
-     case ZodIssueCode.invalid_type:
-      if (issue.received === ZodParsedType.undefined) {
-        message = "Required";
-      } else {
-        message = `Expected ${issue.expected}, received ${issue.received}`;
-      }
-      break;
-
-     case ZodIssueCode.invalid_literal:
-      message = `Invalid literal value, expected ${JSON.stringify(issue.expected, util.jsonStringifyReplacer)}`;
-      break;
-
-     case ZodIssueCode.unrecognized_keys:
-      message = `Unrecognized key(s) in object: ${util.joinValues(issue.keys, ", ")}`;
-      break;
-
-     case ZodIssueCode.invalid_union:
-      message = `Invalid input`;
-      break;
-
-     case ZodIssueCode.invalid_union_discriminator:
-      message = `Invalid discriminator value. Expected ${util.joinValues(issue.options)}`;
-      break;
-
-     case ZodIssueCode.invalid_enum_value:
-      message = `Invalid enum value. Expected ${util.joinValues(issue.options)}, received '${issue.received}'`;
-      break;
-
-     case ZodIssueCode.invalid_arguments:
-      message = `Invalid function arguments`;
-      break;
-
-     case ZodIssueCode.invalid_return_type:
-      message = `Invalid function return type`;
-      break;
-
-     case ZodIssueCode.invalid_date:
-      message = `Invalid date`;
-      break;
-
-     case ZodIssueCode.invalid_string:
-      if (typeof issue.validation === "object") {
-        if ("includes" in issue.validation) {
-          message = `Invalid input: must include "${issue.validation.includes}"`;
-          if (typeof issue.validation.position === "number") {
-            message = `${message} at one or more positions greater than or equal to ${issue.validation.position}`;
-          }
-        } else if ("startsWith" in issue.validation) {
-          message = `Invalid input: must start with "${issue.validation.startsWith}"`;
-        } else if ("endsWith" in issue.validation) {
-          message = `Invalid input: must end with "${issue.validation.endsWith}"`;
-        } else {
-          util.assertNever(issue.validation);
-        }
-      } else if (issue.validation !== "regex") {
-        message = `Invalid ${issue.validation}`;
-      } else {
-        message = "Invalid";
-      }
-      break;
-
-     case ZodIssueCode.too_small:
-      if (issue.type === "array") message = `Array must contain ${issue.exact ? "exactly" : issue.inclusive ? `at least` : `more than`} ${issue.minimum} element(s)`; else if (issue.type === "string") message = `String must contain ${issue.exact ? "exactly" : issue.inclusive ? `at least` : `over`} ${issue.minimum} character(s)`; else if (issue.type === "number") message = `Number must be ${issue.exact ? `exactly equal to ` : issue.inclusive ? `greater than or equal to ` : `greater than `}${issue.minimum}`; else if (issue.type === "bigint") message = `Number must be ${issue.exact ? `exactly equal to ` : issue.inclusive ? `greater than or equal to ` : `greater than `}${issue.minimum}`; else if (issue.type === "date") message = `Date must be ${issue.exact ? `exactly equal to ` : issue.inclusive ? `greater than or equal to ` : `greater than `}${new Date(Number(issue.minimum))}`; else message = "Invalid input";
-      break;
-
-     case ZodIssueCode.too_big:
-      if (issue.type === "array") message = `Array must contain ${issue.exact ? `exactly` : issue.inclusive ? `at most` : `less than`} ${issue.maximum} element(s)`; else if (issue.type === "string") message = `String must contain ${issue.exact ? `exactly` : issue.inclusive ? `at most` : `under`} ${issue.maximum} character(s)`; else if (issue.type === "number") message = `Number must be ${issue.exact ? `exactly` : issue.inclusive ? `less than or equal to` : `less than`} ${issue.maximum}`; else if (issue.type === "bigint") message = `BigInt must be ${issue.exact ? `exactly` : issue.inclusive ? `less than or equal to` : `less than`} ${issue.maximum}`; else if (issue.type === "date") message = `Date must be ${issue.exact ? `exactly` : issue.inclusive ? `smaller than or equal to` : `smaller than`} ${new Date(Number(issue.maximum))}`; else message = "Invalid input";
-      break;
-
-     case ZodIssueCode.custom:
-      message = `Invalid input`;
-      break;
-
-     case ZodIssueCode.invalid_intersection_types:
-      message = `Intersection results could not be merged`;
-      break;
-
-     case ZodIssueCode.not_multiple_of:
-      message = `Number must be a multiple of ${issue.multipleOf}`;
-      break;
-
-     case ZodIssueCode.not_finite:
-      message = "Number must be finite";
-      break;
-
-     default:
-      message = _ctx.defaultError;
-      util.assertNever(issue);
-    }
-    return {
-      message: message
-    };
-  };
-
-  let overrideErrorMap = errorMap;
-
-  function getErrorMap() {
-    return overrideErrorMap;
-  }
-
-  const makeIssue = params => {
-    const {data: data, path: path, errorMaps: errorMaps, issueData: issueData} = params;
-    const fullPath = [ ...path, ...issueData.path || [] ];
-    const fullIssue = {
-      ...issueData,
-      path: fullPath
-    };
-    if (issueData.message !== void 0) {
-      return {
-        ...issueData,
-        path: fullPath,
-        message: issueData.message
-      };
-    }
-    let errorMessage = "";
-    const maps = errorMaps.filter(m => !!m).slice().reverse();
-    for (const map of maps) {
-      errorMessage = map(fullIssue, {
-        data: data,
-        defaultError: errorMessage
-      }).message;
-    }
-    return {
-      ...issueData,
-      path: fullPath,
-      message: errorMessage
-    };
-  };
-
-  function addIssueToContext(ctx, issueData) {
-    const overrideMap = getErrorMap();
-    const issue = makeIssue({
-      issueData: issueData,
-      data: ctx.data,
-      path: ctx.path,
-      errorMaps: [ ctx.common.contextualErrorMap, ctx.schemaErrorMap, overrideMap, overrideMap === errorMap ? void 0 : errorMap ].filter(x => !!x)
-    });
-    ctx.common.issues.push(issue);
-  }
-
-  class ParseStatus {
-    constructor() {
-      this.value = "valid";
-    }
-    dirty() {
-      if (this.value === "valid") this.value = "dirty";
-    }
-    abort() {
-      if (this.value !== "aborted") this.value = "aborted";
-    }
-    static mergeArray(status, results) {
-      const arrayValue = [];
-      for (const s of results) {
-        if (s.status === "aborted") return INVALID;
-        if (s.status === "dirty") status.dirty();
-        arrayValue.push(s.value);
-      }
-      return {
-        status: status.value,
-        value: arrayValue
-      };
-    }
-    static async mergeObjectAsync(status, pairs) {
-      const syncPairs = [];
-      for (const pair of pairs) {
-        const key = await pair.key;
-        const value = await pair.value;
-        syncPairs.push({
-          key: key,
-          value: value
-        });
-      }
-      return ParseStatus.mergeObjectSync(status, syncPairs);
-    }
-    static mergeObjectSync(status, pairs) {
-      const finalObject = {};
-      for (const pair of pairs) {
-        const {key: key, value: value} = pair;
-        if (key.status === "aborted") return INVALID;
-        if (value.status === "aborted") return INVALID;
-        if (key.status === "dirty") status.dirty();
-        if (value.status === "dirty") status.dirty();
-        if (key.value !== "__proto__" && (typeof value.value !== "undefined" || pair.alwaysSet)) {
-          finalObject[key.value] = value.value;
-        }
-      }
-      return {
-        status: status.value,
-        value: finalObject
-      };
-    }
-  }
-
-  const INVALID = Object.freeze({
-    status: "aborted"
-  });
-
-  const DIRTY = value => ({
-    status: "dirty",
-    value: value
-  });
-
-  const OK = value => ({
-    status: "valid",
-    value: value
-  });
-
-  const isAborted = x => x.status === "aborted";
-
-  const isDirty = x => x.status === "dirty";
-
-  const isValid = x => x.status === "valid";
-
-  const isAsync = x => typeof Promise !== "undefined" && x instanceof Promise;
-
-  var errorUtil;
-
-  (function(errorUtil2) {
-    errorUtil2.errToObj = message => typeof message === "string" ? {
-      message: message
-    } : message || {};
-    errorUtil2.toString = message => typeof message === "string" ? message : message == null ? void 0 : message.message;
-  })(errorUtil || (errorUtil = {}));
-
-  class ParseInputLazyPath {
-    constructor(parent, value, path, key) {
-      this._cachedPath = [];
-      this.parent = parent;
-      this.data = value;
-      this._path = path;
-      this._key = key;
-    }
-    get path() {
-      if (!this._cachedPath.length) {
-        if (Array.isArray(this._key)) {
-          this._cachedPath.push(...this._path, ...this._key);
-        } else {
-          this._cachedPath.push(...this._path, this._key);
-        }
-      }
-      return this._cachedPath;
-    }
-  }
-
-  const handleResult = (ctx, result) => {
-    if (isValid(result)) {
-      return {
-        success: true,
-        data: result.value
-      };
-    } else {
-      if (!ctx.common.issues.length) {
-        throw new Error("Validation failed but no issues detected.");
-      }
-      return {
-        success: false,
-        get error() {
-          if (this._error) return this._error;
-          const error = new ZodError(ctx.common.issues);
-          this._error = error;
-          return this._error;
-        }
-      };
-    }
-  };
-
-  function processCreateParams(params) {
-    if (!params) return {};
-    const {errorMap: errorMap2, invalid_type_error: invalid_type_error, required_error: required_error, description: description} = params;
-    if (errorMap2 && (invalid_type_error || required_error)) {
-      throw new Error(`Can't use "invalid_type_error" or "required_error" in conjunction with custom error map.`);
-    }
-    if (errorMap2) return {
-      errorMap: errorMap2,
-      description: description
-    };
-    const customMap = (iss, ctx) => {
-      const {message: message} = params;
-      if (iss.code === "invalid_enum_value") {
-        return {
-          message: message ?? ctx.defaultError
-        };
-      }
-      if (typeof ctx.data === "undefined") {
-        return {
-          message: message ?? required_error ?? ctx.defaultError
-        };
-      }
-      if (iss.code !== "invalid_type") return {
-        message: ctx.defaultError
-      };
-      return {
-        message: message ?? invalid_type_error ?? ctx.defaultError
-      };
-    };
-    return {
-      errorMap: customMap,
-      description: description
-    };
-  }
-
-  class ZodType {
-    get description() {
-      return this._def.description;
-    }
-    _getType(input) {
-      return getParsedType(input.data);
-    }
-    _getOrReturnCtx(input, ctx) {
-      return ctx || {
-        common: input.parent.common,
-        data: input.data,
-        parsedType: getParsedType(input.data),
-        schemaErrorMap: this._def.errorMap,
-        path: input.path,
-        parent: input.parent
-      };
-    }
-    _processInputParams(input) {
-      return {
-        status: new ParseStatus,
-        ctx: {
-          common: input.parent.common,
-          data: input.data,
-          parsedType: getParsedType(input.data),
-          schemaErrorMap: this._def.errorMap,
-          path: input.path,
-          parent: input.parent
-        }
-      };
-    }
-    _parseSync(input) {
-      const result = this._parse(input);
-      if (isAsync(result)) {
-        throw new Error("Synchronous parse encountered promise.");
-      }
-      return result;
-    }
-    _parseAsync(input) {
-      const result = this._parse(input);
-      return Promise.resolve(result);
-    }
-    parse(data, params) {
-      const result = this.safeParse(data, params);
-      if (result.success) return result.data;
-      throw result.error;
-    }
-    safeParse(data, params) {
-      const ctx = {
-        common: {
-          issues: [],
-          async: (params == null ? void 0 : params.async) ?? false,
-          contextualErrorMap: params == null ? void 0 : params.errorMap
-        },
-        path: (params == null ? void 0 : params.path) || [],
-        schemaErrorMap: this._def.errorMap,
-        parent: null,
-        data: data,
-        parsedType: getParsedType(data)
-      };
-      const result = this._parseSync({
-        data: data,
-        path: ctx.path,
-        parent: ctx
-      });
-      return handleResult(ctx, result);
-    }
-    "~validate"(data) {
-      var _a2, _b;
-      const ctx = {
-        common: {
-          issues: [],
-          async: !!this["~standard"].async
-        },
-        path: [],
-        schemaErrorMap: this._def.errorMap,
-        parent: null,
-        data: data,
-        parsedType: getParsedType(data)
-      };
-      if (!this["~standard"].async) {
-        try {
-          const result = this._parseSync({
-            data: data,
-            path: [],
-            parent: ctx
-          });
-          return isValid(result) ? {
-            value: result.value
-          } : {
-            issues: ctx.common.issues
-          };
-        } catch (err) {
-          if ((_b = (_a2 = err == null ? void 0 : err.message) == null ? void 0 : _a2.toLowerCase()) == null ? void 0 : _b.includes("encountered")) {
-            this["~standard"].async = true;
-          }
-          ctx.common = {
-            issues: [],
-            async: true
-          };
-        }
-      }
-      return this._parseAsync({
-        data: data,
-        path: [],
-        parent: ctx
-      }).then(result => isValid(result) ? {
-        value: result.value
-      } : {
-        issues: ctx.common.issues
-      });
-    }
-    async parseAsync(data, params) {
-      const result = await this.safeParseAsync(data, params);
-      if (result.success) return result.data;
-      throw result.error;
-    }
-    async safeParseAsync(data, params) {
-      const ctx = {
-        common: {
-          issues: [],
-          contextualErrorMap: params == null ? void 0 : params.errorMap,
-          async: true
-        },
-        path: (params == null ? void 0 : params.path) || [],
-        schemaErrorMap: this._def.errorMap,
-        parent: null,
-        data: data,
-        parsedType: getParsedType(data)
-      };
-      const maybeAsyncResult = this._parse({
-        data: data,
-        path: ctx.path,
-        parent: ctx
-      });
-      const result = await (isAsync(maybeAsyncResult) ? maybeAsyncResult : Promise.resolve(maybeAsyncResult));
-      return handleResult(ctx, result);
-    }
-    refine(check, message) {
-      const getIssueProperties = val => {
-        if (typeof message === "string" || typeof message === "undefined") {
-          return {
-            message: message
-          };
-        } else if (typeof message === "function") {
-          return message(val);
-        } else {
-          return message;
-        }
-      };
-      return this._refinement((val, ctx) => {
-        const result = check(val);
-        const setError = () => ctx.addIssue({
-          code: ZodIssueCode.custom,
-          ...getIssueProperties(val)
-        });
-        if (typeof Promise !== "undefined" && result instanceof Promise) {
-          return result.then(data => {
-            if (!data) {
-              setError();
-              return false;
-            } else {
-              return true;
-            }
-          });
-        }
-        if (!result) {
-          setError();
-          return false;
-        } else {
-          return true;
-        }
-      });
-    }
-    refinement(check, refinementData) {
-      return this._refinement((val, ctx) => {
-        if (!check(val)) {
-          ctx.addIssue(typeof refinementData === "function" ? refinementData(val, ctx) : refinementData);
-          return false;
-        } else {
-          return true;
-        }
-      });
-    }
-    _refinement(refinement) {
-      return new ZodEffects({
-        schema: this,
-        typeName: ZodFirstPartyTypeKind.ZodEffects,
-        effect: {
-          type: "refinement",
-          refinement: refinement
-        }
-      });
-    }
-    superRefine(refinement) {
-      return this._refinement(refinement);
-    }
-    constructor(def) {
-      this.spa = this.safeParseAsync;
-      this._def = def;
-      this.parse = this.parse.bind(this);
-      this.safeParse = this.safeParse.bind(this);
-      this.parseAsync = this.parseAsync.bind(this);
-      this.safeParseAsync = this.safeParseAsync.bind(this);
-      this.spa = this.spa.bind(this);
-      this.refine = this.refine.bind(this);
-      this.refinement = this.refinement.bind(this);
-      this.superRefine = this.superRefine.bind(this);
-      this.optional = this.optional.bind(this);
-      this.nullable = this.nullable.bind(this);
-      this.nullish = this.nullish.bind(this);
-      this.array = this.array.bind(this);
-      this.promise = this.promise.bind(this);
-      this.or = this.or.bind(this);
-      this.and = this.and.bind(this);
-      this.transform = this.transform.bind(this);
-      this.brand = this.brand.bind(this);
-      this.default = this.default.bind(this);
-      this.catch = this.catch.bind(this);
-      this.describe = this.describe.bind(this);
-      this.pipe = this.pipe.bind(this);
-      this.readonly = this.readonly.bind(this);
-      this.isNullable = this.isNullable.bind(this);
-      this.isOptional = this.isOptional.bind(this);
-      this["~standard"] = {
-        version: 1,
-        vendor: "zod",
-        validate: data => this["~validate"](data)
-      };
-    }
-    optional() {
-      return ZodOptional.create(this, this._def);
-    }
-    nullable() {
-      return ZodNullable.create(this, this._def);
-    }
-    nullish() {
-      return this.nullable().optional();
-    }
-    array() {
-      return ZodArray.create(this);
-    }
-    promise() {
-      return ZodPromise.create(this, this._def);
-    }
-    or(option) {
-      return ZodUnion.create([ this, option ], this._def);
-    }
-    and(incoming) {
-      return ZodIntersection.create(this, incoming, this._def);
-    }
-    transform(transform) {
-      return new ZodEffects({
-        ...processCreateParams(this._def),
-        schema: this,
-        typeName: ZodFirstPartyTypeKind.ZodEffects,
-        effect: {
-          type: "transform",
-          transform: transform
-        }
-      });
-    }
-    default(def) {
-      const defaultValueFunc = typeof def === "function" ? def : () => def;
-      return new ZodDefault({
-        ...processCreateParams(this._def),
-        innerType: this,
-        defaultValue: defaultValueFunc,
-        typeName: ZodFirstPartyTypeKind.ZodDefault
-      });
-    }
-    brand() {
-      return new ZodBranded({
-        typeName: ZodFirstPartyTypeKind.ZodBranded,
-        type: this,
-        ...processCreateParams(this._def)
-      });
-    }
-    catch(def) {
-      const catchValueFunc = typeof def === "function" ? def : () => def;
-      return new ZodCatch({
-        ...processCreateParams(this._def),
-        innerType: this,
-        catchValue: catchValueFunc,
-        typeName: ZodFirstPartyTypeKind.ZodCatch
-      });
-    }
-    describe(description) {
-      const This = this.constructor;
-      return new This({
-        ...this._def,
-        description: description
-      });
-    }
-    pipe(target) {
-      return ZodPipeline.create(this, target);
-    }
-    readonly() {
-      return ZodReadonly.create(this);
-    }
-    isOptional() {
-      return this.safeParse(void 0).success;
-    }
-    isNullable() {
-      return this.safeParse(null).success;
-    }
-  }
-
-  const cuidRegex = /^c[^\s-]{8,}$/i;
-
-  const cuid2Regex = /^[0-9a-z]+$/;
-
-  const ulidRegex = /^[0-9A-HJKMNP-TV-Z]{26}$/i;
-
-  const uuidRegex = /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/i;
-
-  const nanoidRegex = /^[a-z0-9_-]{21}$/i;
-
-  const jwtRegex = /^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]*$/;
-
-  const durationRegex = /^[-+]?P(?!$)(?:(?:[-+]?\d+Y)|(?:[-+]?\d+[.,]\d+Y$))?(?:(?:[-+]?\d+M)|(?:[-+]?\d+[.,]\d+M$))?(?:(?:[-+]?\d+W)|(?:[-+]?\d+[.,]\d+W$))?(?:(?:[-+]?\d+D)|(?:[-+]?\d+[.,]\d+D$))?(?:T(?=[\d+-])(?:(?:[-+]?\d+H)|(?:[-+]?\d+[.,]\d+H$))?(?:(?:[-+]?\d+M)|(?:[-+]?\d+[.,]\d+M$))?(?:[-+]?\d+(?:[.,]\d+)?S)?)??$/;
-
-  const emailRegex = /^(?!\.)(?!.*\.\.)([A-Z0-9_'+\-\.]*)[A-Z0-9_+-]@([A-Z0-9][A-Z0-9\-]*\.)+[A-Z]{2,}$/i;
-
-  const _emojiRegex = `^(\\p{Extended_Pictographic}|\\p{Emoji_Component})+$`;
-
-  let emojiRegex;
-
-  const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$/;
-
-  const ipv4CidrRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\/(3[0-2]|[12]?[0-9])$/;
-
-  const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
-
-  const ipv6CidrRegex = /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))\/(12[0-8]|1[01][0-9]|[1-9]?[0-9])$/;
-
-  const base64Regex = /^([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$/;
-
-  const base64urlRegex = /^([0-9a-zA-Z-_]{4})*(([0-9a-zA-Z-_]{2}(==)?)|([0-9a-zA-Z-_]{3}(=)?))?$/;
-
-  const dateRegexSource = `((\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-((0[13578]|1[02])-(0[1-9]|[12]\\d|3[01])|(0[469]|11)-(0[1-9]|[12]\\d|30)|(02)-(0[1-9]|1\\d|2[0-8])))`;
-
-  const dateRegex = new RegExp(`^${dateRegexSource}$`);
-
-  function timeRegexSource(args) {
-    let secondsRegexSource = `[0-5]\\d`;
-    if (args.precision) {
-      secondsRegexSource = `${secondsRegexSource}\\.\\d{${args.precision}}`;
-    } else if (args.precision == null) {
-      secondsRegexSource = `${secondsRegexSource}(\\.\\d+)?`;
-    }
-    const secondsQuantifier = args.precision ? "+" : "?";
-    return `([01]\\d|2[0-3]):[0-5]\\d(:${secondsRegexSource})${secondsQuantifier}`;
-  }
-
-  function timeRegex(args) {
-    return new RegExp(`^${timeRegexSource(args)}$`);
-  }
-
-  function datetimeRegex(args) {
-    let regex = `${dateRegexSource}T${timeRegexSource(args)}`;
-    const opts = [];
-    opts.push(args.local ? `Z?` : `Z`);
-    if (args.offset) opts.push(`([+-]\\d{2}:?\\d{2})`);
-    regex = `${regex}(${opts.join("|")})`;
-    return new RegExp(`^${regex}$`);
-  }
-
-  function isValidIP(ip, version) {
-    if ((version === "v4" || !version) && ipv4Regex.test(ip)) {
-      return true;
-    }
-    if ((version === "v6" || !version) && ipv6Regex.test(ip)) {
-      return true;
-    }
-    return false;
-  }
-
-  function isValidJWT(jwt, alg) {
-    if (!jwtRegex.test(jwt)) return false;
-    try {
-      const [header] = jwt.split(".");
-      if (!header) return false;
-      const base64 = header.replace(/-/g, "+").replace(/_/g, "/").padEnd(header.length + (4 - header.length % 4) % 4, "=");
-      const decoded = JSON.parse(atob(base64));
-      if (typeof decoded !== "object" || decoded === null) return false;
-      if ("typ" in decoded && (decoded == null ? void 0 : decoded.typ) !== "JWT") return false;
-      if (!decoded.alg) return false;
-      if (alg && decoded.alg !== alg) return false;
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  function isValidCidr(ip, version) {
-    if ((version === "v4" || !version) && ipv4CidrRegex.test(ip)) {
-      return true;
-    }
-    if ((version === "v6" || !version) && ipv6CidrRegex.test(ip)) {
-      return true;
-    }
-    return false;
-  }
-
-  class ZodString extends ZodType {
-    _parse(input) {
-      if (this._def.coerce) {
-        input.data = String(input.data);
-      }
-      const parsedType = this._getType(input);
-      if (parsedType !== ZodParsedType.string) {
-        const ctx2 = this._getOrReturnCtx(input);
-        addIssueToContext(ctx2, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.string,
-          received: ctx2.parsedType
-        });
-        return INVALID;
-      }
-      const status = new ParseStatus;
-      let ctx = void 0;
-      for (const check of this._def.checks) {
-        if (check.kind === "min") {
-          if (input.data.length < check.value) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.too_small,
-              minimum: check.value,
-              type: "string",
-              inclusive: true,
-              exact: false,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "max") {
-          if (input.data.length > check.value) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.too_big,
-              maximum: check.value,
-              type: "string",
-              inclusive: true,
-              exact: false,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "length") {
-          const tooBig = input.data.length > check.value;
-          const tooSmall = input.data.length < check.value;
-          if (tooBig || tooSmall) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            if (tooBig) {
-              addIssueToContext(ctx, {
-                code: ZodIssueCode.too_big,
-                maximum: check.value,
-                type: "string",
-                inclusive: true,
-                exact: true,
-                message: check.message
-              });
-            } else if (tooSmall) {
-              addIssueToContext(ctx, {
-                code: ZodIssueCode.too_small,
-                minimum: check.value,
-                type: "string",
-                inclusive: true,
-                exact: true,
-                message: check.message
-              });
-            }
-            status.dirty();
-          }
-        } else if (check.kind === "email") {
-          if (!emailRegex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "email",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "emoji") {
-          if (!emojiRegex) {
-            emojiRegex = new RegExp(_emojiRegex, "u");
-          }
-          if (!emojiRegex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "emoji",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "uuid") {
-          if (!uuidRegex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "uuid",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "nanoid") {
-          if (!nanoidRegex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "nanoid",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "cuid") {
-          if (!cuidRegex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "cuid",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "cuid2") {
-          if (!cuid2Regex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "cuid2",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "ulid") {
-          if (!ulidRegex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "ulid",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "url") {
-          try {
-            new URL(input.data);
-          } catch {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "url",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "regex") {
-          check.regex.lastIndex = 0;
-          const testResult = check.regex.test(input.data);
-          if (!testResult) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "regex",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "trim") {
-          input.data = input.data.trim();
-        } else if (check.kind === "includes") {
-          if (!input.data.includes(check.value, check.position)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.invalid_string,
-              validation: {
-                includes: check.value,
-                position: check.position
-              },
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "toLowerCase") {
-          input.data = input.data.toLowerCase();
-        } else if (check.kind === "toUpperCase") {
-          input.data = input.data.toUpperCase();
-        } else if (check.kind === "startsWith") {
-          if (!input.data.startsWith(check.value)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.invalid_string,
-              validation: {
-                startsWith: check.value
-              },
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "endsWith") {
-          if (!input.data.endsWith(check.value)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.invalid_string,
-              validation: {
-                endsWith: check.value
-              },
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "datetime") {
-          const regex = datetimeRegex(check);
-          if (!regex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.invalid_string,
-              validation: "datetime",
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "date") {
-          const regex = dateRegex;
-          if (!regex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.invalid_string,
-              validation: "date",
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "time") {
-          const regex = timeRegex(check);
-          if (!regex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.invalid_string,
-              validation: "time",
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "duration") {
-          if (!durationRegex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "duration",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "ip") {
-          if (!isValidIP(input.data, check.version)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "ip",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "jwt") {
-          if (!isValidJWT(input.data, check.alg)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "jwt",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "cidr") {
-          if (!isValidCidr(input.data, check.version)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "cidr",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "base64") {
-          if (!base64Regex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "base64",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "base64url") {
-          if (!base64urlRegex.test(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              validation: "base64url",
-              code: ZodIssueCode.invalid_string,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else {
-          util.assertNever(check);
-        }
-      }
-      return {
-        status: status.value,
-        value: input.data
-      };
-    }
-    _regex(regex, validation, message) {
-      return this.refinement(data => regex.test(data), {
-        validation: validation,
-        code: ZodIssueCode.invalid_string,
-        ...errorUtil.errToObj(message)
-      });
-    }
-    _addCheck(check) {
-      return new ZodString({
-        ...this._def,
-        checks: [ ...this._def.checks, check ]
-      });
-    }
-    email(message) {
-      return this._addCheck({
-        kind: "email",
-        ...errorUtil.errToObj(message)
-      });
-    }
-    url(message) {
-      return this._addCheck({
-        kind: "url",
-        ...errorUtil.errToObj(message)
-      });
-    }
-    emoji(message) {
-      return this._addCheck({
-        kind: "emoji",
-        ...errorUtil.errToObj(message)
-      });
-    }
-    uuid(message) {
-      return this._addCheck({
-        kind: "uuid",
-        ...errorUtil.errToObj(message)
-      });
-    }
-    nanoid(message) {
-      return this._addCheck({
-        kind: "nanoid",
-        ...errorUtil.errToObj(message)
-      });
-    }
-    cuid(message) {
-      return this._addCheck({
-        kind: "cuid",
-        ...errorUtil.errToObj(message)
-      });
-    }
-    cuid2(message) {
-      return this._addCheck({
-        kind: "cuid2",
-        ...errorUtil.errToObj(message)
-      });
-    }
-    ulid(message) {
-      return this._addCheck({
-        kind: "ulid",
-        ...errorUtil.errToObj(message)
-      });
-    }
-    base64(message) {
-      return this._addCheck({
-        kind: "base64",
-        ...errorUtil.errToObj(message)
-      });
-    }
-    base64url(message) {
-      return this._addCheck({
-        kind: "base64url",
-        ...errorUtil.errToObj(message)
-      });
-    }
-    jwt(options) {
-      return this._addCheck({
-        kind: "jwt",
-        ...errorUtil.errToObj(options)
-      });
-    }
-    ip(options) {
-      return this._addCheck({
-        kind: "ip",
-        ...errorUtil.errToObj(options)
-      });
-    }
-    cidr(options) {
-      return this._addCheck({
-        kind: "cidr",
-        ...errorUtil.errToObj(options)
-      });
-    }
-    datetime(options) {
-      if (typeof options === "string") {
-        return this._addCheck({
-          kind: "datetime",
-          precision: null,
-          offset: false,
-          local: false,
-          message: options
-        });
-      }
-      return this._addCheck({
-        kind: "datetime",
-        precision: typeof (options == null ? void 0 : options.precision) === "undefined" ? null : options == null ? void 0 : options.precision,
-        offset: (options == null ? void 0 : options.offset) ?? false,
-        local: (options == null ? void 0 : options.local) ?? false,
-        ...errorUtil.errToObj(options == null ? void 0 : options.message)
-      });
-    }
-    date(message) {
-      return this._addCheck({
-        kind: "date",
-        message: message
-      });
-    }
-    time(options) {
-      if (typeof options === "string") {
-        return this._addCheck({
-          kind: "time",
-          precision: null,
-          message: options
-        });
-      }
-      return this._addCheck({
-        kind: "time",
-        precision: typeof (options == null ? void 0 : options.precision) === "undefined" ? null : options == null ? void 0 : options.precision,
-        ...errorUtil.errToObj(options == null ? void 0 : options.message)
-      });
-    }
-    duration(message) {
-      return this._addCheck({
-        kind: "duration",
-        ...errorUtil.errToObj(message)
-      });
-    }
-    regex(regex, message) {
-      return this._addCheck({
-        kind: "regex",
-        regex: regex,
-        ...errorUtil.errToObj(message)
-      });
-    }
-    includes(value, options) {
-      return this._addCheck({
-        kind: "includes",
-        value: value,
-        position: options == null ? void 0 : options.position,
-        ...errorUtil.errToObj(options == null ? void 0 : options.message)
-      });
-    }
-    startsWith(value, message) {
-      return this._addCheck({
-        kind: "startsWith",
-        value: value,
-        ...errorUtil.errToObj(message)
-      });
-    }
-    endsWith(value, message) {
-      return this._addCheck({
-        kind: "endsWith",
-        value: value,
-        ...errorUtil.errToObj(message)
-      });
-    }
-    min(minLength, message) {
-      return this._addCheck({
-        kind: "min",
-        value: minLength,
-        ...errorUtil.errToObj(message)
-      });
-    }
-    max(maxLength, message) {
-      return this._addCheck({
-        kind: "max",
-        value: maxLength,
-        ...errorUtil.errToObj(message)
-      });
-    }
-    length(len, message) {
-      return this._addCheck({
-        kind: "length",
-        value: len,
-        ...errorUtil.errToObj(message)
-      });
-    }
-    nonempty(message) {
-      return this.min(1, errorUtil.errToObj(message));
-    }
-    trim() {
-      return new ZodString({
-        ...this._def,
-        checks: [ ...this._def.checks, {
-          kind: "trim"
-        } ]
-      });
-    }
-    toLowerCase() {
-      return new ZodString({
-        ...this._def,
-        checks: [ ...this._def.checks, {
-          kind: "toLowerCase"
-        } ]
-      });
-    }
-    toUpperCase() {
-      return new ZodString({
-        ...this._def,
-        checks: [ ...this._def.checks, {
-          kind: "toUpperCase"
-        } ]
-      });
-    }
-    get isDatetime() {
-      return !!this._def.checks.find(ch => ch.kind === "datetime");
-    }
-    get isDate() {
-      return !!this._def.checks.find(ch => ch.kind === "date");
-    }
-    get isTime() {
-      return !!this._def.checks.find(ch => ch.kind === "time");
-    }
-    get isDuration() {
-      return !!this._def.checks.find(ch => ch.kind === "duration");
-    }
-    get isEmail() {
-      return !!this._def.checks.find(ch => ch.kind === "email");
-    }
-    get isURL() {
-      return !!this._def.checks.find(ch => ch.kind === "url");
-    }
-    get isEmoji() {
-      return !!this._def.checks.find(ch => ch.kind === "emoji");
-    }
-    get isUUID() {
-      return !!this._def.checks.find(ch => ch.kind === "uuid");
-    }
-    get isNANOID() {
-      return !!this._def.checks.find(ch => ch.kind === "nanoid");
-    }
-    get isCUID() {
-      return !!this._def.checks.find(ch => ch.kind === "cuid");
-    }
-    get isCUID2() {
-      return !!this._def.checks.find(ch => ch.kind === "cuid2");
-    }
-    get isULID() {
-      return !!this._def.checks.find(ch => ch.kind === "ulid");
-    }
-    get isIP() {
-      return !!this._def.checks.find(ch => ch.kind === "ip");
-    }
-    get isCIDR() {
-      return !!this._def.checks.find(ch => ch.kind === "cidr");
-    }
-    get isBase64() {
-      return !!this._def.checks.find(ch => ch.kind === "base64");
-    }
-    get isBase64url() {
-      return !!this._def.checks.find(ch => ch.kind === "base64url");
-    }
-    get minLength() {
-      let min = null;
-      for (const ch of this._def.checks) {
-        if (ch.kind === "min") {
-          if (min === null || ch.value > min) min = ch.value;
-        }
-      }
-      return min;
-    }
-    get maxLength() {
-      let max = null;
-      for (const ch of this._def.checks) {
-        if (ch.kind === "max") {
-          if (max === null || ch.value < max) max = ch.value;
-        }
-      }
-      return max;
-    }
-  }
-
-  ZodString.create = params => new ZodString({
-    checks: [],
-    typeName: ZodFirstPartyTypeKind.ZodString,
-    coerce: (params == null ? void 0 : params.coerce) ?? false,
-    ...processCreateParams(params)
-  });
-
-  function floatSafeRemainder(val, step) {
-    const valDecCount = (val.toString().split(".")[1] || "").length;
-    const stepDecCount = (step.toString().split(".")[1] || "").length;
-    const decCount = valDecCount > stepDecCount ? valDecCount : stepDecCount;
-    const valInt = Number.parseInt(val.toFixed(decCount).replace(".", ""));
-    const stepInt = Number.parseInt(step.toFixed(decCount).replace(".", ""));
-    return valInt % stepInt / 10 ** decCount;
-  }
-
-  class ZodNumber extends ZodType {
-    constructor() {
-      super(...arguments);
-      this.min = this.gte;
-      this.max = this.lte;
-      this.step = this.multipleOf;
-    }
-    _parse(input) {
-      if (this._def.coerce) {
-        input.data = Number(input.data);
-      }
-      const parsedType = this._getType(input);
-      if (parsedType !== ZodParsedType.number) {
-        const ctx2 = this._getOrReturnCtx(input);
-        addIssueToContext(ctx2, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.number,
-          received: ctx2.parsedType
-        });
-        return INVALID;
-      }
-      let ctx = void 0;
-      const status = new ParseStatus;
-      for (const check of this._def.checks) {
-        if (check.kind === "int") {
-          if (!util.isInteger(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.invalid_type,
-              expected: "integer",
-              received: "float",
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "min") {
-          const tooSmall = check.inclusive ? input.data < check.value : input.data <= check.value;
-          if (tooSmall) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.too_small,
-              minimum: check.value,
-              type: "number",
-              inclusive: check.inclusive,
-              exact: false,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "max") {
-          const tooBig = check.inclusive ? input.data > check.value : input.data >= check.value;
-          if (tooBig) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.too_big,
-              maximum: check.value,
-              type: "number",
-              inclusive: check.inclusive,
-              exact: false,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "multipleOf") {
-          if (floatSafeRemainder(input.data, check.value) !== 0) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.not_multiple_of,
-              multipleOf: check.value,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "finite") {
-          if (!Number.isFinite(input.data)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.not_finite,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else {
-          util.assertNever(check);
-        }
-      }
-      return {
-        status: status.value,
-        value: input.data
-      };
-    }
-    gte(value, message) {
-      return this.setLimit("min", value, true, errorUtil.toString(message));
-    }
-    gt(value, message) {
-      return this.setLimit("min", value, false, errorUtil.toString(message));
-    }
-    lte(value, message) {
-      return this.setLimit("max", value, true, errorUtil.toString(message));
-    }
-    lt(value, message) {
-      return this.setLimit("max", value, false, errorUtil.toString(message));
-    }
-    setLimit(kind, value, inclusive, message) {
-      return new ZodNumber({
-        ...this._def,
-        checks: [ ...this._def.checks, {
-          kind: kind,
-          value: value,
-          inclusive: inclusive,
-          message: errorUtil.toString(message)
-        } ]
-      });
-    }
-    _addCheck(check) {
-      return new ZodNumber({
-        ...this._def,
-        checks: [ ...this._def.checks, check ]
-      });
-    }
-    int(message) {
-      return this._addCheck({
-        kind: "int",
-        message: errorUtil.toString(message)
-      });
-    }
-    positive(message) {
-      return this._addCheck({
-        kind: "min",
-        value: 0,
-        inclusive: false,
-        message: errorUtil.toString(message)
-      });
-    }
-    negative(message) {
-      return this._addCheck({
-        kind: "max",
-        value: 0,
-        inclusive: false,
-        message: errorUtil.toString(message)
-      });
-    }
-    nonpositive(message) {
-      return this._addCheck({
-        kind: "max",
-        value: 0,
-        inclusive: true,
-        message: errorUtil.toString(message)
-      });
-    }
-    nonnegative(message) {
-      return this._addCheck({
-        kind: "min",
-        value: 0,
-        inclusive: true,
-        message: errorUtil.toString(message)
-      });
-    }
-    multipleOf(value, message) {
-      return this._addCheck({
-        kind: "multipleOf",
-        value: value,
-        message: errorUtil.toString(message)
-      });
-    }
-    finite(message) {
-      return this._addCheck({
-        kind: "finite",
-        message: errorUtil.toString(message)
-      });
-    }
-    safe(message) {
-      return this._addCheck({
-        kind: "min",
-        inclusive: true,
-        value: Number.MIN_SAFE_INTEGER,
-        message: errorUtil.toString(message)
-      })._addCheck({
-        kind: "max",
-        inclusive: true,
-        value: Number.MAX_SAFE_INTEGER,
-        message: errorUtil.toString(message)
-      });
-    }
-    get minValue() {
-      let min = null;
-      for (const ch of this._def.checks) {
-        if (ch.kind === "min") {
-          if (min === null || ch.value > min) min = ch.value;
-        }
-      }
-      return min;
-    }
-    get maxValue() {
-      let max = null;
-      for (const ch of this._def.checks) {
-        if (ch.kind === "max") {
-          if (max === null || ch.value < max) max = ch.value;
-        }
-      }
-      return max;
-    }
-    get isInt() {
-      return !!this._def.checks.find(ch => ch.kind === "int" || ch.kind === "multipleOf" && util.isInteger(ch.value));
-    }
-    get isFinite() {
-      let max = null;
-      let min = null;
-      for (const ch of this._def.checks) {
-        if (ch.kind === "finite" || ch.kind === "int" || ch.kind === "multipleOf") {
-          return true;
-        } else if (ch.kind === "min") {
-          if (min === null || ch.value > min) min = ch.value;
-        } else if (ch.kind === "max") {
-          if (max === null || ch.value < max) max = ch.value;
-        }
-      }
-      return Number.isFinite(min) && Number.isFinite(max);
-    }
-  }
-
-  ZodNumber.create = params => new ZodNumber({
-    checks: [],
-    typeName: ZodFirstPartyTypeKind.ZodNumber,
-    coerce: (params == null ? void 0 : params.coerce) || false,
-    ...processCreateParams(params)
-  });
-
-  class ZodBigInt extends ZodType {
-    constructor() {
-      super(...arguments);
-      this.min = this.gte;
-      this.max = this.lte;
-    }
-    _parse(input) {
-      if (this._def.coerce) {
-        try {
-          input.data = BigInt(input.data);
-        } catch {
-          return this._getInvalidInput(input);
-        }
-      }
-      const parsedType = this._getType(input);
-      if (parsedType !== ZodParsedType.bigint) {
-        return this._getInvalidInput(input);
-      }
-      let ctx = void 0;
-      const status = new ParseStatus;
-      for (const check of this._def.checks) {
-        if (check.kind === "min") {
-          const tooSmall = check.inclusive ? input.data < check.value : input.data <= check.value;
-          if (tooSmall) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.too_small,
-              type: "bigint",
-              minimum: check.value,
-              inclusive: check.inclusive,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "max") {
-          const tooBig = check.inclusive ? input.data > check.value : input.data >= check.value;
-          if (tooBig) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.too_big,
-              type: "bigint",
-              maximum: check.value,
-              inclusive: check.inclusive,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "multipleOf") {
-          if (input.data % check.value !== BigInt(0)) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.not_multiple_of,
-              multipleOf: check.value,
-              message: check.message
-            });
-            status.dirty();
-          }
-        } else {
-          util.assertNever(check);
-        }
-      }
-      return {
-        status: status.value,
-        value: input.data
-      };
-    }
-    _getInvalidInput(input) {
-      const ctx = this._getOrReturnCtx(input);
-      addIssueToContext(ctx, {
-        code: ZodIssueCode.invalid_type,
-        expected: ZodParsedType.bigint,
-        received: ctx.parsedType
-      });
-      return INVALID;
-    }
-    gte(value, message) {
-      return this.setLimit("min", value, true, errorUtil.toString(message));
-    }
-    gt(value, message) {
-      return this.setLimit("min", value, false, errorUtil.toString(message));
-    }
-    lte(value, message) {
-      return this.setLimit("max", value, true, errorUtil.toString(message));
-    }
-    lt(value, message) {
-      return this.setLimit("max", value, false, errorUtil.toString(message));
-    }
-    setLimit(kind, value, inclusive, message) {
-      return new ZodBigInt({
-        ...this._def,
-        checks: [ ...this._def.checks, {
-          kind: kind,
-          value: value,
-          inclusive: inclusive,
-          message: errorUtil.toString(message)
-        } ]
-      });
-    }
-    _addCheck(check) {
-      return new ZodBigInt({
-        ...this._def,
-        checks: [ ...this._def.checks, check ]
-      });
-    }
-    positive(message) {
-      return this._addCheck({
-        kind: "min",
-        value: BigInt(0),
-        inclusive: false,
-        message: errorUtil.toString(message)
-      });
-    }
-    negative(message) {
-      return this._addCheck({
-        kind: "max",
-        value: BigInt(0),
-        inclusive: false,
-        message: errorUtil.toString(message)
-      });
-    }
-    nonpositive(message) {
-      return this._addCheck({
-        kind: "max",
-        value: BigInt(0),
-        inclusive: true,
-        message: errorUtil.toString(message)
-      });
-    }
-    nonnegative(message) {
-      return this._addCheck({
-        kind: "min",
-        value: BigInt(0),
-        inclusive: true,
-        message: errorUtil.toString(message)
-      });
-    }
-    multipleOf(value, message) {
-      return this._addCheck({
-        kind: "multipleOf",
-        value: value,
-        message: errorUtil.toString(message)
-      });
-    }
-    get minValue() {
-      let min = null;
-      for (const ch of this._def.checks) {
-        if (ch.kind === "min") {
-          if (min === null || ch.value > min) min = ch.value;
-        }
-      }
-      return min;
-    }
-    get maxValue() {
-      let max = null;
-      for (const ch of this._def.checks) {
-        if (ch.kind === "max") {
-          if (max === null || ch.value < max) max = ch.value;
-        }
-      }
-      return max;
-    }
-  }
-
-  ZodBigInt.create = params => new ZodBigInt({
-    checks: [],
-    typeName: ZodFirstPartyTypeKind.ZodBigInt,
-    coerce: (params == null ? void 0 : params.coerce) ?? false,
-    ...processCreateParams(params)
-  });
-
-  class ZodBoolean extends ZodType {
-    _parse(input) {
-      if (this._def.coerce) {
-        input.data = Boolean(input.data);
-      }
-      const parsedType = this._getType(input);
-      if (parsedType !== ZodParsedType.boolean) {
-        const ctx = this._getOrReturnCtx(input);
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.boolean,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      return OK(input.data);
-    }
-  }
-
-  ZodBoolean.create = params => new ZodBoolean({
-    typeName: ZodFirstPartyTypeKind.ZodBoolean,
-    coerce: (params == null ? void 0 : params.coerce) || false,
-    ...processCreateParams(params)
-  });
-
-  class ZodDate extends ZodType {
-    _parse(input) {
-      if (this._def.coerce) {
-        input.data = new Date(input.data);
-      }
-      const parsedType = this._getType(input);
-      if (parsedType !== ZodParsedType.date) {
-        const ctx2 = this._getOrReturnCtx(input);
-        addIssueToContext(ctx2, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.date,
-          received: ctx2.parsedType
-        });
-        return INVALID;
-      }
-      if (Number.isNaN(input.data.getTime())) {
-        const ctx2 = this._getOrReturnCtx(input);
-        addIssueToContext(ctx2, {
-          code: ZodIssueCode.invalid_date
-        });
-        return INVALID;
-      }
-      const status = new ParseStatus;
-      let ctx = void 0;
-      for (const check of this._def.checks) {
-        if (check.kind === "min") {
-          if (input.data.getTime() < check.value) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.too_small,
-              message: check.message,
-              inclusive: true,
-              exact: false,
-              minimum: check.value,
-              type: "date"
-            });
-            status.dirty();
-          }
-        } else if (check.kind === "max") {
-          if (input.data.getTime() > check.value) {
-            ctx = this._getOrReturnCtx(input, ctx);
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.too_big,
-              message: check.message,
-              inclusive: true,
-              exact: false,
-              maximum: check.value,
-              type: "date"
-            });
-            status.dirty();
-          }
-        } else {
-          util.assertNever(check);
-        }
-      }
-      return {
-        status: status.value,
-        value: new Date(input.data.getTime())
-      };
-    }
-    _addCheck(check) {
-      return new ZodDate({
-        ...this._def,
-        checks: [ ...this._def.checks, check ]
-      });
-    }
-    min(minDate, message) {
-      return this._addCheck({
-        kind: "min",
-        value: minDate.getTime(),
-        message: errorUtil.toString(message)
-      });
-    }
-    max(maxDate, message) {
-      return this._addCheck({
-        kind: "max",
-        value: maxDate.getTime(),
-        message: errorUtil.toString(message)
-      });
-    }
-    get minDate() {
-      let min = null;
-      for (const ch of this._def.checks) {
-        if (ch.kind === "min") {
-          if (min === null || ch.value > min) min = ch.value;
-        }
-      }
-      return min != null ? new Date(min) : null;
-    }
-    get maxDate() {
-      let max = null;
-      for (const ch of this._def.checks) {
-        if (ch.kind === "max") {
-          if (max === null || ch.value < max) max = ch.value;
-        }
-      }
-      return max != null ? new Date(max) : null;
-    }
-  }
-
-  ZodDate.create = params => new ZodDate({
-    checks: [],
-    coerce: (params == null ? void 0 : params.coerce) || false,
-    typeName: ZodFirstPartyTypeKind.ZodDate,
-    ...processCreateParams(params)
-  });
-
-  class ZodSymbol extends ZodType {
-    _parse(input) {
-      const parsedType = this._getType(input);
-      if (parsedType !== ZodParsedType.symbol) {
-        const ctx = this._getOrReturnCtx(input);
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.symbol,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      return OK(input.data);
-    }
-  }
-
-  ZodSymbol.create = params => new ZodSymbol({
-    typeName: ZodFirstPartyTypeKind.ZodSymbol,
-    ...processCreateParams(params)
-  });
-
-  class ZodUndefined extends ZodType {
-    _parse(input) {
-      const parsedType = this._getType(input);
-      if (parsedType !== ZodParsedType.undefined) {
-        const ctx = this._getOrReturnCtx(input);
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.undefined,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      return OK(input.data);
-    }
-  }
-
-  ZodUndefined.create = params => new ZodUndefined({
-    typeName: ZodFirstPartyTypeKind.ZodUndefined,
-    ...processCreateParams(params)
-  });
-
-  class ZodNull extends ZodType {
-    _parse(input) {
-      const parsedType = this._getType(input);
-      if (parsedType !== ZodParsedType.null) {
-        const ctx = this._getOrReturnCtx(input);
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.null,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      return OK(input.data);
-    }
-  }
-
-  ZodNull.create = params => new ZodNull({
-    typeName: ZodFirstPartyTypeKind.ZodNull,
-    ...processCreateParams(params)
-  });
-
-  class ZodAny extends ZodType {
-    constructor() {
-      super(...arguments);
-      this._any = true;
-    }
-    _parse(input) {
-      return OK(input.data);
-    }
-  }
-
-  ZodAny.create = params => new ZodAny({
-    typeName: ZodFirstPartyTypeKind.ZodAny,
-    ...processCreateParams(params)
-  });
-
-  class ZodUnknown extends ZodType {
-    constructor() {
-      super(...arguments);
-      this._unknown = true;
-    }
-    _parse(input) {
-      return OK(input.data);
-    }
-  }
-
-  ZodUnknown.create = params => new ZodUnknown({
-    typeName: ZodFirstPartyTypeKind.ZodUnknown,
-    ...processCreateParams(params)
-  });
-
-  class ZodNever extends ZodType {
-    _parse(input) {
-      const ctx = this._getOrReturnCtx(input);
-      addIssueToContext(ctx, {
-        code: ZodIssueCode.invalid_type,
-        expected: ZodParsedType.never,
-        received: ctx.parsedType
-      });
-      return INVALID;
-    }
-  }
-
-  ZodNever.create = params => new ZodNever({
-    typeName: ZodFirstPartyTypeKind.ZodNever,
-    ...processCreateParams(params)
-  });
-
-  class ZodVoid extends ZodType {
-    _parse(input) {
-      const parsedType = this._getType(input);
-      if (parsedType !== ZodParsedType.undefined) {
-        const ctx = this._getOrReturnCtx(input);
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.void,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      return OK(input.data);
-    }
-  }
-
-  ZodVoid.create = params => new ZodVoid({
-    typeName: ZodFirstPartyTypeKind.ZodVoid,
-    ...processCreateParams(params)
-  });
-
-  class ZodArray extends ZodType {
-    _parse(input) {
-      const {ctx: ctx, status: status} = this._processInputParams(input);
-      const def = this._def;
-      if (ctx.parsedType !== ZodParsedType.array) {
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.array,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      if (def.exactLength !== null) {
-        const tooBig = ctx.data.length > def.exactLength.value;
-        const tooSmall = ctx.data.length < def.exactLength.value;
-        if (tooBig || tooSmall) {
-          addIssueToContext(ctx, {
-            code: tooBig ? ZodIssueCode.too_big : ZodIssueCode.too_small,
-            minimum: tooSmall ? def.exactLength.value : void 0,
-            maximum: tooBig ? def.exactLength.value : void 0,
-            type: "array",
-            inclusive: true,
-            exact: true,
-            message: def.exactLength.message
-          });
-          status.dirty();
-        }
-      }
-      if (def.minLength !== null) {
-        if (ctx.data.length < def.minLength.value) {
-          addIssueToContext(ctx, {
-            code: ZodIssueCode.too_small,
-            minimum: def.minLength.value,
-            type: "array",
-            inclusive: true,
-            exact: false,
-            message: def.minLength.message
-          });
-          status.dirty();
-        }
-      }
-      if (def.maxLength !== null) {
-        if (ctx.data.length > def.maxLength.value) {
-          addIssueToContext(ctx, {
-            code: ZodIssueCode.too_big,
-            maximum: def.maxLength.value,
-            type: "array",
-            inclusive: true,
-            exact: false,
-            message: def.maxLength.message
-          });
-          status.dirty();
-        }
-      }
-      if (ctx.common.async) {
-        return Promise.all([ ...ctx.data ].map((item, i) => def.type._parseAsync(new ParseInputLazyPath(ctx, item, ctx.path, i)))).then(result2 => ParseStatus.mergeArray(status, result2));
-      }
-      const result = [ ...ctx.data ].map((item, i) => def.type._parseSync(new ParseInputLazyPath(ctx, item, ctx.path, i)));
-      return ParseStatus.mergeArray(status, result);
-    }
-    get element() {
-      return this._def.type;
-    }
-    min(minLength, message) {
-      return new ZodArray({
-        ...this._def,
-        minLength: {
-          value: minLength,
-          message: errorUtil.toString(message)
-        }
-      });
-    }
-    max(maxLength, message) {
-      return new ZodArray({
-        ...this._def,
-        maxLength: {
-          value: maxLength,
-          message: errorUtil.toString(message)
-        }
-      });
-    }
-    length(len, message) {
-      return new ZodArray({
-        ...this._def,
-        exactLength: {
-          value: len,
-          message: errorUtil.toString(message)
-        }
-      });
-    }
-    nonempty(message) {
-      return this.min(1, message);
-    }
-  }
-
-  ZodArray.create = (schema, params) => new ZodArray({
-    type: schema,
-    minLength: null,
-    maxLength: null,
-    exactLength: null,
-    typeName: ZodFirstPartyTypeKind.ZodArray,
-    ...processCreateParams(params)
-  });
-
-  function deepPartialify(schema) {
-    if (schema instanceof ZodObject) {
-      const newShape = {};
-      for (const key in schema.shape) {
-        const fieldSchema = schema.shape[key];
-        newShape[key] = ZodOptional.create(deepPartialify(fieldSchema));
-      }
-      return new ZodObject({
-        ...schema._def,
-        shape: () => newShape
-      });
-    } else if (schema instanceof ZodArray) {
-      return new ZodArray({
-        ...schema._def,
-        type: deepPartialify(schema.element)
-      });
-    } else if (schema instanceof ZodOptional) {
-      return ZodOptional.create(deepPartialify(schema.unwrap()));
-    } else if (schema instanceof ZodNullable) {
-      return ZodNullable.create(deepPartialify(schema.unwrap()));
-    } else if (schema instanceof ZodTuple) {
-      return ZodTuple.create(schema.items.map(item => deepPartialify(item)));
-    } else {
-      return schema;
-    }
-  }
-
-  class ZodObject extends ZodType {
-    constructor() {
-      super(...arguments);
-      this._cached = null;
-      this.nonstrict = this.passthrough;
-      this.augment = this.extend;
-    }
-    _getCached() {
-      if (this._cached !== null) return this._cached;
-      const shape = this._def.shape();
-      const keys = util.objectKeys(shape);
-      this._cached = {
-        shape: shape,
-        keys: keys
-      };
-      return this._cached;
-    }
-    _parse(input) {
-      const parsedType = this._getType(input);
-      if (parsedType !== ZodParsedType.object) {
-        const ctx2 = this._getOrReturnCtx(input);
-        addIssueToContext(ctx2, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.object,
-          received: ctx2.parsedType
-        });
-        return INVALID;
-      }
-      const {status: status, ctx: ctx} = this._processInputParams(input);
-      const {shape: shape, keys: shapeKeys} = this._getCached();
-      const extraKeys = [];
-      if (!(this._def.catchall instanceof ZodNever && this._def.unknownKeys === "strip")) {
-        for (const key in ctx.data) {
-          if (!shapeKeys.includes(key)) {
-            extraKeys.push(key);
-          }
-        }
-      }
-      const pairs = [];
-      for (const key of shapeKeys) {
-        const keyValidator = shape[key];
-        const value = ctx.data[key];
-        pairs.push({
-          key: {
-            status: "valid",
-            value: key
-          },
-          value: keyValidator._parse(new ParseInputLazyPath(ctx, value, ctx.path, key)),
-          alwaysSet: key in ctx.data
-        });
-      }
-      if (this._def.catchall instanceof ZodNever) {
-        const unknownKeys = this._def.unknownKeys;
-        if (unknownKeys === "passthrough") {
-          for (const key of extraKeys) {
-            pairs.push({
-              key: {
-                status: "valid",
-                value: key
-              },
-              value: {
-                status: "valid",
-                value: ctx.data[key]
-              }
-            });
-          }
-        } else if (unknownKeys === "strict") {
-          if (extraKeys.length > 0) {
-            addIssueToContext(ctx, {
-              code: ZodIssueCode.unrecognized_keys,
-              keys: extraKeys
-            });
-            status.dirty();
-          }
-        } else if (unknownKeys === "strip") ; else {
-          throw new Error(`Internal ZodObject error: invalid unknownKeys value.`);
-        }
-      } else {
-        const catchall = this._def.catchall;
-        for (const key of extraKeys) {
-          const value = ctx.data[key];
-          pairs.push({
-            key: {
-              status: "valid",
-              value: key
-            },
-            value: catchall._parse(new ParseInputLazyPath(ctx, value, ctx.path, key)),
-            alwaysSet: key in ctx.data
-          });
-        }
-      }
-      if (ctx.common.async) {
-        return Promise.resolve().then(async () => {
-          const syncPairs = [];
-          for (const pair of pairs) {
-            const key = await pair.key;
-            const value = await pair.value;
-            syncPairs.push({
-              key: key,
-              value: value,
-              alwaysSet: pair.alwaysSet
-            });
-          }
-          return syncPairs;
-        }).then(syncPairs => ParseStatus.mergeObjectSync(status, syncPairs));
-      } else {
-        return ParseStatus.mergeObjectSync(status, pairs);
-      }
-    }
-    get shape() {
-      return this._def.shape();
-    }
-    strict(message) {
-      errorUtil.errToObj;
-      return new ZodObject({
-        ...this._def,
-        unknownKeys: "strict",
-        ...message !== void 0 ? {
-          errorMap: (issue, ctx) => {
-            var _a2, _b;
-            const defaultError = ((_b = (_a2 = this._def).errorMap) == null ? void 0 : _b.call(_a2, issue, ctx).message) ?? ctx.defaultError;
-            if (issue.code === "unrecognized_keys") return {
-              message: errorUtil.errToObj(message).message ?? defaultError
-            };
-            return {
-              message: defaultError
-            };
-          }
-        } : {}
-      });
-    }
-    strip() {
-      return new ZodObject({
-        ...this._def,
-        unknownKeys: "strip"
-      });
-    }
-    passthrough() {
-      return new ZodObject({
-        ...this._def,
-        unknownKeys: "passthrough"
-      });
-    }
-    extend(augmentation) {
-      return new ZodObject({
-        ...this._def,
-        shape: () => ({
-          ...this._def.shape(),
-          ...augmentation
-        })
-      });
-    }
-    merge(merging) {
-      const merged = new ZodObject({
-        unknownKeys: merging._def.unknownKeys,
-        catchall: merging._def.catchall,
-        shape: () => ({
-          ...this._def.shape(),
-          ...merging._def.shape()
-        }),
-        typeName: ZodFirstPartyTypeKind.ZodObject
-      });
-      return merged;
-    }
-    setKey(key, schema) {
-      return this.augment({
-        [key]: schema
-      });
-    }
-    catchall(index) {
-      return new ZodObject({
-        ...this._def,
-        catchall: index
-      });
-    }
-    pick(mask) {
-      const shape = {};
-      for (const key of util.objectKeys(mask)) {
-        if (mask[key] && this.shape[key]) {
-          shape[key] = this.shape[key];
-        }
-      }
-      return new ZodObject({
-        ...this._def,
-        shape: () => shape
-      });
-    }
-    omit(mask) {
-      const shape = {};
-      for (const key of util.objectKeys(this.shape)) {
-        if (!mask[key]) {
-          shape[key] = this.shape[key];
-        }
-      }
-      return new ZodObject({
-        ...this._def,
-        shape: () => shape
-      });
-    }
-    deepPartial() {
-      return deepPartialify(this);
-    }
-    partial(mask) {
-      const newShape = {};
-      for (const key of util.objectKeys(this.shape)) {
-        const fieldSchema = this.shape[key];
-        if (mask && !mask[key]) {
-          newShape[key] = fieldSchema;
-        } else {
-          newShape[key] = fieldSchema.optional();
-        }
-      }
-      return new ZodObject({
-        ...this._def,
-        shape: () => newShape
-      });
-    }
-    required(mask) {
-      const newShape = {};
-      for (const key of util.objectKeys(this.shape)) {
-        if (mask && !mask[key]) {
-          newShape[key] = this.shape[key];
-        } else {
-          const fieldSchema = this.shape[key];
-          let newField = fieldSchema;
-          while (newField instanceof ZodOptional) {
-            newField = newField._def.innerType;
-          }
-          newShape[key] = newField;
-        }
-      }
-      return new ZodObject({
-        ...this._def,
-        shape: () => newShape
-      });
-    }
-    keyof() {
-      return createZodEnum(util.objectKeys(this.shape));
-    }
-  }
-
-  ZodObject.create = (shape, params) => new ZodObject({
-    shape: () => shape,
-    unknownKeys: "strip",
-    catchall: ZodNever.create(),
-    typeName: ZodFirstPartyTypeKind.ZodObject,
-    ...processCreateParams(params)
-  });
-
-  ZodObject.strictCreate = (shape, params) => new ZodObject({
-    shape: () => shape,
-    unknownKeys: "strict",
-    catchall: ZodNever.create(),
-    typeName: ZodFirstPartyTypeKind.ZodObject,
-    ...processCreateParams(params)
-  });
-
-  ZodObject.lazycreate = (shape, params) => new ZodObject({
-    shape: shape,
-    unknownKeys: "strip",
-    catchall: ZodNever.create(),
-    typeName: ZodFirstPartyTypeKind.ZodObject,
-    ...processCreateParams(params)
-  });
-
-  class ZodUnion extends ZodType {
-    _parse(input) {
-      const {ctx: ctx} = this._processInputParams(input);
-      const options = this._def.options;
-      function handleResults(results) {
-        for (const result of results) {
-          if (result.result.status === "valid") {
-            return result.result;
-          }
-        }
-        for (const result of results) {
-          if (result.result.status === "dirty") {
-            ctx.common.issues.push(...result.ctx.common.issues);
-            return result.result;
-          }
-        }
-        const unionErrors = results.map(result => new ZodError(result.ctx.common.issues));
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_union,
-          unionErrors: unionErrors
-        });
-        return INVALID;
-      }
-      if (ctx.common.async) {
-        return Promise.all(options.map(async option => {
-          const childCtx = {
-            ...ctx,
-            common: {
-              ...ctx.common,
-              issues: []
-            },
-            parent: null
-          };
-          return {
-            result: await option._parseAsync({
-              data: ctx.data,
-              path: ctx.path,
-              parent: childCtx
-            }),
-            ctx: childCtx
-          };
-        })).then(handleResults);
-      } else {
-        let dirty = void 0;
-        const issues = [];
-        for (const option of options) {
-          const childCtx = {
-            ...ctx,
-            common: {
-              ...ctx.common,
-              issues: []
-            },
-            parent: null
-          };
-          const result = option._parseSync({
-            data: ctx.data,
-            path: ctx.path,
-            parent: childCtx
-          });
-          if (result.status === "valid") {
-            return result;
-          } else if (result.status === "dirty" && !dirty) {
-            dirty = {
-              result: result,
-              ctx: childCtx
-            };
-          }
-          if (childCtx.common.issues.length) {
-            issues.push(childCtx.common.issues);
-          }
-        }
-        if (dirty) {
-          ctx.common.issues.push(...dirty.ctx.common.issues);
-          return dirty.result;
-        }
-        const unionErrors = issues.map(issues2 => new ZodError(issues2));
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_union,
-          unionErrors: unionErrors
-        });
-        return INVALID;
-      }
-    }
-    get options() {
-      return this._def.options;
-    }
-  }
-
-  ZodUnion.create = (types, params) => new ZodUnion({
-    options: types,
-    typeName: ZodFirstPartyTypeKind.ZodUnion,
-    ...processCreateParams(params)
-  });
-
-  const getDiscriminator = type => {
-    if (type instanceof ZodLazy) {
-      return getDiscriminator(type.schema);
-    } else if (type instanceof ZodEffects) {
-      return getDiscriminator(type.innerType());
-    } else if (type instanceof ZodLiteral) {
-      return [ type.value ];
-    } else if (type instanceof ZodEnum) {
-      return type.options;
-    } else if (type instanceof ZodNativeEnum) {
-      return util.objectValues(type.enum);
-    } else if (type instanceof ZodDefault) {
-      return getDiscriminator(type._def.innerType);
-    } else if (type instanceof ZodUndefined) {
-      return [ void 0 ];
-    } else if (type instanceof ZodNull) {
-      return [ null ];
-    } else if (type instanceof ZodOptional) {
-      return [ void 0, ...getDiscriminator(type.unwrap()) ];
-    } else if (type instanceof ZodNullable) {
-      return [ null, ...getDiscriminator(type.unwrap()) ];
-    } else if (type instanceof ZodBranded) {
-      return getDiscriminator(type.unwrap());
-    } else if (type instanceof ZodReadonly) {
-      return getDiscriminator(type.unwrap());
-    } else if (type instanceof ZodCatch) {
-      return getDiscriminator(type._def.innerType);
-    } else {
-      return [];
-    }
-  };
-
-  class ZodDiscriminatedUnion extends ZodType {
-    _parse(input) {
-      const {ctx: ctx} = this._processInputParams(input);
-      if (ctx.parsedType !== ZodParsedType.object) {
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.object,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      const discriminator = this.discriminator;
-      const discriminatorValue = ctx.data[discriminator];
-      const option = this.optionsMap.get(discriminatorValue);
-      if (!option) {
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_union_discriminator,
-          options: Array.from(this.optionsMap.keys()),
-          path: [ discriminator ]
-        });
-        return INVALID;
-      }
-      if (ctx.common.async) {
-        return option._parseAsync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx
-        });
-      } else {
-        return option._parseSync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx
-        });
-      }
-    }
-    get discriminator() {
-      return this._def.discriminator;
-    }
-    get options() {
-      return this._def.options;
-    }
-    get optionsMap() {
-      return this._def.optionsMap;
-    }
-    static create(discriminator, options, params) {
-      const optionsMap = new Map;
-      for (const type of options) {
-        const discriminatorValues = getDiscriminator(type.shape[discriminator]);
-        if (!discriminatorValues.length) {
-          throw new Error(`A discriminator value for key \`${discriminator}\` could not be extracted from all schema options`);
-        }
-        for (const value of discriminatorValues) {
-          if (optionsMap.has(value)) {
-            throw new Error(`Discriminator property ${String(discriminator)} has duplicate value ${String(value)}`);
-          }
-          optionsMap.set(value, type);
-        }
-      }
-      return new ZodDiscriminatedUnion({
-        typeName: ZodFirstPartyTypeKind.ZodDiscriminatedUnion,
-        discriminator: discriminator,
-        options: options,
-        optionsMap: optionsMap,
-        ...processCreateParams(params)
-      });
-    }
-  }
-
-  function mergeValues(a, b) {
-    const aType = getParsedType(a);
-    const bType = getParsedType(b);
-    if (a === b) {
-      return {
-        valid: true,
-        data: a
-      };
-    } else if (aType === ZodParsedType.object && bType === ZodParsedType.object) {
-      const bKeys = util.objectKeys(b);
-      const sharedKeys = util.objectKeys(a).filter(key => bKeys.indexOf(key) !== -1);
-      const newObj = {
-        ...a,
-        ...b
-      };
-      for (const key of sharedKeys) {
-        const sharedValue = mergeValues(a[key], b[key]);
-        if (!sharedValue.valid) {
-          return {
-            valid: false
-          };
-        }
-        newObj[key] = sharedValue.data;
-      }
-      return {
-        valid: true,
-        data: newObj
-      };
-    } else if (aType === ZodParsedType.array && bType === ZodParsedType.array) {
-      if (a.length !== b.length) {
-        return {
-          valid: false
-        };
-      }
-      const newArray = [];
-      for (let index = 0; index < a.length; index++) {
-        const itemA = a[index];
-        const itemB = b[index];
-        const sharedValue = mergeValues(itemA, itemB);
-        if (!sharedValue.valid) {
-          return {
-            valid: false
-          };
-        }
-        newArray.push(sharedValue.data);
-      }
-      return {
-        valid: true,
-        data: newArray
-      };
-    } else if (aType === ZodParsedType.date && bType === ZodParsedType.date && +a === +b) {
-      return {
-        valid: true,
-        data: a
-      };
-    } else {
-      return {
-        valid: false
-      };
-    }
-  }
-
-  class ZodIntersection extends ZodType {
-    _parse(input) {
-      const {status: status, ctx: ctx} = this._processInputParams(input);
-      const handleParsed = (parsedLeft, parsedRight) => {
-        if (isAborted(parsedLeft) || isAborted(parsedRight)) {
-          return INVALID;
-        }
-        const merged = mergeValues(parsedLeft.value, parsedRight.value);
-        if (!merged.valid) {
-          addIssueToContext(ctx, {
-            code: ZodIssueCode.invalid_intersection_types
-          });
-          return INVALID;
-        }
-        if (isDirty(parsedLeft) || isDirty(parsedRight)) {
-          status.dirty();
-        }
-        return {
-          status: status.value,
-          value: merged.data
-        };
-      };
-      if (ctx.common.async) {
-        return Promise.all([ this._def.left._parseAsync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx
-        }), this._def.right._parseAsync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx
-        }) ]).then(([left, right]) => handleParsed(left, right));
-      } else {
-        return handleParsed(this._def.left._parseSync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx
-        }), this._def.right._parseSync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx
-        }));
-      }
-    }
-  }
-
-  ZodIntersection.create = (left, right, params) => new ZodIntersection({
-    left: left,
-    right: right,
-    typeName: ZodFirstPartyTypeKind.ZodIntersection,
-    ...processCreateParams(params)
-  });
-
-  class ZodTuple extends ZodType {
-    _parse(input) {
-      const {status: status, ctx: ctx} = this._processInputParams(input);
-      if (ctx.parsedType !== ZodParsedType.array) {
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.array,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      if (ctx.data.length < this._def.items.length) {
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.too_small,
-          minimum: this._def.items.length,
-          inclusive: true,
-          exact: false,
-          type: "array"
-        });
-        return INVALID;
-      }
-      const rest = this._def.rest;
-      if (!rest && ctx.data.length > this._def.items.length) {
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.too_big,
-          maximum: this._def.items.length,
-          inclusive: true,
-          exact: false,
-          type: "array"
-        });
-        status.dirty();
-      }
-      const items = [ ...ctx.data ].map((item, itemIndex) => {
-        const schema = this._def.items[itemIndex] || this._def.rest;
-        if (!schema) return null;
-        return schema._parse(new ParseInputLazyPath(ctx, item, ctx.path, itemIndex));
-      }).filter(x => !!x);
-      if (ctx.common.async) {
-        return Promise.all(items).then(results => ParseStatus.mergeArray(status, results));
-      } else {
-        return ParseStatus.mergeArray(status, items);
-      }
-    }
-    get items() {
-      return this._def.items;
-    }
-    rest(rest) {
-      return new ZodTuple({
-        ...this._def,
-        rest: rest
-      });
-    }
-  }
-
-  ZodTuple.create = (schemas, params) => {
-    if (!Array.isArray(schemas)) {
-      throw new Error("You must pass an array of schemas to z.tuple([ ... ])");
-    }
-    return new ZodTuple({
-      items: schemas,
-      typeName: ZodFirstPartyTypeKind.ZodTuple,
-      rest: null,
-      ...processCreateParams(params)
-    });
-  };
-
-  class ZodRecord extends ZodType {
-    get keySchema() {
-      return this._def.keyType;
-    }
-    get valueSchema() {
-      return this._def.valueType;
-    }
-    _parse(input) {
-      const {status: status, ctx: ctx} = this._processInputParams(input);
-      if (ctx.parsedType !== ZodParsedType.object) {
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.object,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      const pairs = [];
-      const keyType = this._def.keyType;
-      const valueType = this._def.valueType;
-      for (const key in ctx.data) {
-        pairs.push({
-          key: keyType._parse(new ParseInputLazyPath(ctx, key, ctx.path, key)),
-          value: valueType._parse(new ParseInputLazyPath(ctx, ctx.data[key], ctx.path, key)),
-          alwaysSet: key in ctx.data
-        });
-      }
-      if (ctx.common.async) {
-        return ParseStatus.mergeObjectAsync(status, pairs);
-      } else {
-        return ParseStatus.mergeObjectSync(status, pairs);
-      }
-    }
-    get element() {
-      return this._def.valueType;
-    }
-    static create(first, second, third) {
-      if (second instanceof ZodType) {
-        return new ZodRecord({
-          keyType: first,
-          valueType: second,
-          typeName: ZodFirstPartyTypeKind.ZodRecord,
-          ...processCreateParams(third)
-        });
-      }
-      return new ZodRecord({
-        keyType: ZodString.create(),
-        valueType: first,
-        typeName: ZodFirstPartyTypeKind.ZodRecord,
-        ...processCreateParams(second)
-      });
-    }
-  }
-
-  class ZodMap extends ZodType {
-    get keySchema() {
-      return this._def.keyType;
-    }
-    get valueSchema() {
-      return this._def.valueType;
-    }
-    _parse(input) {
-      const {status: status, ctx: ctx} = this._processInputParams(input);
-      if (ctx.parsedType !== ZodParsedType.map) {
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.map,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      const keyType = this._def.keyType;
-      const valueType = this._def.valueType;
-      const pairs = [ ...ctx.data.entries() ].map(([key, value], index) => ({
-        key: keyType._parse(new ParseInputLazyPath(ctx, key, ctx.path, [ index, "key" ])),
-        value: valueType._parse(new ParseInputLazyPath(ctx, value, ctx.path, [ index, "value" ]))
-      }));
-      if (ctx.common.async) {
-        const finalMap = new Map;
-        return Promise.resolve().then(async () => {
-          for (const pair of pairs) {
-            const key = await pair.key;
-            const value = await pair.value;
-            if (key.status === "aborted" || value.status === "aborted") {
-              return INVALID;
-            }
-            if (key.status === "dirty" || value.status === "dirty") {
-              status.dirty();
-            }
-            finalMap.set(key.value, value.value);
-          }
-          return {
-            status: status.value,
-            value: finalMap
-          };
-        });
-      } else {
-        const finalMap = new Map;
-        for (const pair of pairs) {
-          const key = pair.key;
-          const value = pair.value;
-          if (key.status === "aborted" || value.status === "aborted") {
-            return INVALID;
-          }
-          if (key.status === "dirty" || value.status === "dirty") {
-            status.dirty();
-          }
-          finalMap.set(key.value, value.value);
-        }
-        return {
-          status: status.value,
-          value: finalMap
-        };
-      }
-    }
-  }
-
-  ZodMap.create = (keyType, valueType, params) => new ZodMap({
-    valueType: valueType,
-    keyType: keyType,
-    typeName: ZodFirstPartyTypeKind.ZodMap,
-    ...processCreateParams(params)
-  });
-
-  class ZodSet extends ZodType {
-    _parse(input) {
-      const {status: status, ctx: ctx} = this._processInputParams(input);
-      if (ctx.parsedType !== ZodParsedType.set) {
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.set,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      const def = this._def;
-      if (def.minSize !== null) {
-        if (ctx.data.size < def.minSize.value) {
-          addIssueToContext(ctx, {
-            code: ZodIssueCode.too_small,
-            minimum: def.minSize.value,
-            type: "set",
-            inclusive: true,
-            exact: false,
-            message: def.minSize.message
-          });
-          status.dirty();
-        }
-      }
-      if (def.maxSize !== null) {
-        if (ctx.data.size > def.maxSize.value) {
-          addIssueToContext(ctx, {
-            code: ZodIssueCode.too_big,
-            maximum: def.maxSize.value,
-            type: "set",
-            inclusive: true,
-            exact: false,
-            message: def.maxSize.message
-          });
-          status.dirty();
-        }
-      }
-      const valueType = this._def.valueType;
-      function finalizeSet(elements2) {
-        const parsedSet = new Set;
-        for (const element of elements2) {
-          if (element.status === "aborted") return INVALID;
-          if (element.status === "dirty") status.dirty();
-          parsedSet.add(element.value);
-        }
-        return {
-          status: status.value,
-          value: parsedSet
-        };
-      }
-      const elements = [ ...ctx.data.values() ].map((item, i) => valueType._parse(new ParseInputLazyPath(ctx, item, ctx.path, i)));
-      if (ctx.common.async) {
-        return Promise.all(elements).then(elements2 => finalizeSet(elements2));
-      } else {
-        return finalizeSet(elements);
-      }
-    }
-    min(minSize, message) {
-      return new ZodSet({
-        ...this._def,
-        minSize: {
-          value: minSize,
-          message: errorUtil.toString(message)
-        }
-      });
-    }
-    max(maxSize, message) {
-      return new ZodSet({
-        ...this._def,
-        maxSize: {
-          value: maxSize,
-          message: errorUtil.toString(message)
-        }
-      });
-    }
-    size(size, message) {
-      return this.min(size, message).max(size, message);
-    }
-    nonempty(message) {
-      return this.min(1, message);
-    }
-  }
-
-  ZodSet.create = (valueType, params) => new ZodSet({
-    valueType: valueType,
-    minSize: null,
-    maxSize: null,
-    typeName: ZodFirstPartyTypeKind.ZodSet,
-    ...processCreateParams(params)
-  });
-
-  class ZodLazy extends ZodType {
-    get schema() {
-      return this._def.getter();
-    }
-    _parse(input) {
-      const {ctx: ctx} = this._processInputParams(input);
-      const lazySchema = this._def.getter();
-      return lazySchema._parse({
-        data: ctx.data,
-        path: ctx.path,
-        parent: ctx
-      });
-    }
-  }
-
-  ZodLazy.create = (getter, params) => new ZodLazy({
-    getter: getter,
-    typeName: ZodFirstPartyTypeKind.ZodLazy,
-    ...processCreateParams(params)
-  });
-
-  class ZodLiteral extends ZodType {
-    _parse(input) {
-      if (input.data !== this._def.value) {
-        const ctx = this._getOrReturnCtx(input);
-        addIssueToContext(ctx, {
-          received: ctx.data,
-          code: ZodIssueCode.invalid_literal,
-          expected: this._def.value
-        });
-        return INVALID;
-      }
-      return {
-        status: "valid",
-        value: input.data
-      };
-    }
-    get value() {
-      return this._def.value;
-    }
-  }
-
-  ZodLiteral.create = (value, params) => new ZodLiteral({
-    value: value,
-    typeName: ZodFirstPartyTypeKind.ZodLiteral,
-    ...processCreateParams(params)
-  });
-
-  function createZodEnum(values, params) {
-    return new ZodEnum({
-      values: values,
-      typeName: ZodFirstPartyTypeKind.ZodEnum,
-      ...processCreateParams(params)
-    });
-  }
-
-  class ZodEnum extends ZodType {
-    _parse(input) {
-      if (typeof input.data !== "string") {
-        const ctx = this._getOrReturnCtx(input);
-        const expectedValues = this._def.values;
-        addIssueToContext(ctx, {
-          expected: util.joinValues(expectedValues),
-          received: ctx.parsedType,
-          code: ZodIssueCode.invalid_type
-        });
-        return INVALID;
-      }
-      if (!this._cache) {
-        this._cache = new Set(this._def.values);
-      }
-      if (!this._cache.has(input.data)) {
-        const ctx = this._getOrReturnCtx(input);
-        const expectedValues = this._def.values;
-        addIssueToContext(ctx, {
-          received: ctx.data,
-          code: ZodIssueCode.invalid_enum_value,
-          options: expectedValues
-        });
-        return INVALID;
-      }
-      return OK(input.data);
-    }
-    get options() {
-      return this._def.values;
-    }
-    get enum() {
-      const enumValues = {};
-      for (const val of this._def.values) {
-        enumValues[val] = val;
-      }
-      return enumValues;
-    }
-    get Values() {
-      const enumValues = {};
-      for (const val of this._def.values) {
-        enumValues[val] = val;
-      }
-      return enumValues;
-    }
-    get Enum() {
-      const enumValues = {};
-      for (const val of this._def.values) {
-        enumValues[val] = val;
-      }
-      return enumValues;
-    }
-    extract(values, newDef = this._def) {
-      return ZodEnum.create(values, {
-        ...this._def,
-        ...newDef
-      });
-    }
-    exclude(values, newDef = this._def) {
-      return ZodEnum.create(this.options.filter(opt => !values.includes(opt)), {
-        ...this._def,
-        ...newDef
-      });
-    }
-  }
-
-  ZodEnum.create = createZodEnum;
-
-  class ZodNativeEnum extends ZodType {
-    _parse(input) {
-      const nativeEnumValues = util.getValidEnumValues(this._def.values);
-      const ctx = this._getOrReturnCtx(input);
-      if (ctx.parsedType !== ZodParsedType.string && ctx.parsedType !== ZodParsedType.number) {
-        const expectedValues = util.objectValues(nativeEnumValues);
-        addIssueToContext(ctx, {
-          expected: util.joinValues(expectedValues),
-          received: ctx.parsedType,
-          code: ZodIssueCode.invalid_type
-        });
-        return INVALID;
-      }
-      if (!this._cache) {
-        this._cache = new Set(util.getValidEnumValues(this._def.values));
-      }
-      if (!this._cache.has(input.data)) {
-        const expectedValues = util.objectValues(nativeEnumValues);
-        addIssueToContext(ctx, {
-          received: ctx.data,
-          code: ZodIssueCode.invalid_enum_value,
-          options: expectedValues
-        });
-        return INVALID;
-      }
-      return OK(input.data);
-    }
-    get enum() {
-      return this._def.values;
-    }
-  }
-
-  ZodNativeEnum.create = (values, params) => new ZodNativeEnum({
-    values: values,
-    typeName: ZodFirstPartyTypeKind.ZodNativeEnum,
-    ...processCreateParams(params)
-  });
-
-  class ZodPromise extends ZodType {
-    unwrap() {
-      return this._def.type;
-    }
-    _parse(input) {
-      const {ctx: ctx} = this._processInputParams(input);
-      if (ctx.parsedType !== ZodParsedType.promise && ctx.common.async === false) {
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.promise,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      const promisified = ctx.parsedType === ZodParsedType.promise ? ctx.data : Promise.resolve(ctx.data);
-      return OK(promisified.then(data => this._def.type.parseAsync(data, {
-        path: ctx.path,
-        errorMap: ctx.common.contextualErrorMap
-      })));
-    }
-  }
-
-  ZodPromise.create = (schema, params) => new ZodPromise({
-    type: schema,
-    typeName: ZodFirstPartyTypeKind.ZodPromise,
-    ...processCreateParams(params)
-  });
-
-  class ZodEffects extends ZodType {
-    innerType() {
-      return this._def.schema;
-    }
-    sourceType() {
-      return this._def.schema._def.typeName === ZodFirstPartyTypeKind.ZodEffects ? this._def.schema.sourceType() : this._def.schema;
-    }
-    _parse(input) {
-      const {status: status, ctx: ctx} = this._processInputParams(input);
-      const effect = this._def.effect || null;
-      const checkCtx = {
-        addIssue: arg => {
-          addIssueToContext(ctx, arg);
-          if (arg.fatal) {
-            status.abort();
-          } else {
-            status.dirty();
-          }
-        },
-        get path() {
-          return ctx.path;
-        }
-      };
-      checkCtx.addIssue = checkCtx.addIssue.bind(checkCtx);
-      if (effect.type === "preprocess") {
-        const processed = effect.transform(ctx.data, checkCtx);
-        if (ctx.common.async) {
-          return Promise.resolve(processed).then(async processed2 => {
-            if (status.value === "aborted") return INVALID;
-            const result = await this._def.schema._parseAsync({
-              data: processed2,
-              path: ctx.path,
-              parent: ctx
-            });
-            if (result.status === "aborted") return INVALID;
-            if (result.status === "dirty") return DIRTY(result.value);
-            if (status.value === "dirty") return DIRTY(result.value);
-            return result;
-          });
-        } else {
-          if (status.value === "aborted") return INVALID;
-          const result = this._def.schema._parseSync({
-            data: processed,
-            path: ctx.path,
-            parent: ctx
-          });
-          if (result.status === "aborted") return INVALID;
-          if (result.status === "dirty") return DIRTY(result.value);
-          if (status.value === "dirty") return DIRTY(result.value);
-          return result;
-        }
-      }
-      if (effect.type === "refinement") {
-        const executeRefinement = acc => {
-          const result = effect.refinement(acc, checkCtx);
-          if (ctx.common.async) {
-            return Promise.resolve(result);
-          }
-          if (result instanceof Promise) {
-            throw new Error("Async refinement encountered during synchronous parse operation. Use .parseAsync instead.");
-          }
-          return acc;
-        };
-        if (ctx.common.async === false) {
-          const inner = this._def.schema._parseSync({
-            data: ctx.data,
-            path: ctx.path,
-            parent: ctx
-          });
-          if (inner.status === "aborted") return INVALID;
-          if (inner.status === "dirty") status.dirty();
-          executeRefinement(inner.value);
-          return {
-            status: status.value,
-            value: inner.value
-          };
-        } else {
-          return this._def.schema._parseAsync({
-            data: ctx.data,
-            path: ctx.path,
-            parent: ctx
-          }).then(inner => {
-            if (inner.status === "aborted") return INVALID;
-            if (inner.status === "dirty") status.dirty();
-            return executeRefinement(inner.value).then(() => ({
-              status: status.value,
-              value: inner.value
-            }));
-          });
-        }
-      }
-      if (effect.type === "transform") {
-        if (ctx.common.async === false) {
-          const base = this._def.schema._parseSync({
-            data: ctx.data,
-            path: ctx.path,
-            parent: ctx
-          });
-          if (!isValid(base)) return INVALID;
-          const result = effect.transform(base.value, checkCtx);
-          if (result instanceof Promise) {
-            throw new Error(`Asynchronous transform encountered during synchronous parse operation. Use .parseAsync instead.`);
-          }
-          return {
-            status: status.value,
-            value: result
-          };
-        } else {
-          return this._def.schema._parseAsync({
-            data: ctx.data,
-            path: ctx.path,
-            parent: ctx
-          }).then(base => {
-            if (!isValid(base)) return INVALID;
-            return Promise.resolve(effect.transform(base.value, checkCtx)).then(result => ({
-              status: status.value,
-              value: result
-            }));
-          });
-        }
-      }
-      util.assertNever(effect);
-    }
-  }
-
-  ZodEffects.create = (schema, effect, params) => new ZodEffects({
-    schema: schema,
-    typeName: ZodFirstPartyTypeKind.ZodEffects,
-    effect: effect,
-    ...processCreateParams(params)
-  });
-
-  ZodEffects.createWithPreprocess = (preprocess, schema, params) => new ZodEffects({
-    schema: schema,
-    effect: {
-      type: "preprocess",
-      transform: preprocess
-    },
-    typeName: ZodFirstPartyTypeKind.ZodEffects,
-    ...processCreateParams(params)
-  });
-
-  class ZodOptional extends ZodType {
-    _parse(input) {
-      const parsedType = this._getType(input);
-      if (parsedType === ZodParsedType.undefined) {
-        return OK(void 0);
-      }
-      return this._def.innerType._parse(input);
-    }
-    unwrap() {
-      return this._def.innerType;
-    }
-  }
-
-  ZodOptional.create = (type, params) => new ZodOptional({
-    innerType: type,
-    typeName: ZodFirstPartyTypeKind.ZodOptional,
-    ...processCreateParams(params)
-  });
-
-  class ZodNullable extends ZodType {
-    _parse(input) {
-      const parsedType = this._getType(input);
-      if (parsedType === ZodParsedType.null) {
-        return OK(null);
-      }
-      return this._def.innerType._parse(input);
-    }
-    unwrap() {
-      return this._def.innerType;
-    }
-  }
-
-  ZodNullable.create = (type, params) => new ZodNullable({
-    innerType: type,
-    typeName: ZodFirstPartyTypeKind.ZodNullable,
-    ...processCreateParams(params)
-  });
-
-  class ZodDefault extends ZodType {
-    _parse(input) {
-      const {ctx: ctx} = this._processInputParams(input);
-      let data = ctx.data;
-      if (ctx.parsedType === ZodParsedType.undefined) {
-        data = this._def.defaultValue();
-      }
-      return this._def.innerType._parse({
-        data: data,
-        path: ctx.path,
-        parent: ctx
-      });
-    }
-    removeDefault() {
-      return this._def.innerType;
-    }
-  }
-
-  ZodDefault.create = (type, params) => new ZodDefault({
-    innerType: type,
-    typeName: ZodFirstPartyTypeKind.ZodDefault,
-    defaultValue: typeof params.default === "function" ? params.default : () => params.default,
-    ...processCreateParams(params)
-  });
-
-  class ZodCatch extends ZodType {
-    _parse(input) {
-      const {ctx: ctx} = this._processInputParams(input);
-      const newCtx = {
-        ...ctx,
-        common: {
-          ...ctx.common,
-          issues: []
-        }
-      };
-      const result = this._def.innerType._parse({
-        data: newCtx.data,
-        path: newCtx.path,
-        parent: {
-          ...newCtx
-        }
-      });
-      if (isAsync(result)) {
-        return result.then(result2 => ({
-          status: "valid",
-          value: result2.status === "valid" ? result2.value : this._def.catchValue({
-            get error() {
-              return new ZodError(newCtx.common.issues);
-            },
-            input: newCtx.data
-          })
-        }));
-      } else {
-        return {
-          status: "valid",
-          value: result.status === "valid" ? result.value : this._def.catchValue({
-            get error() {
-              return new ZodError(newCtx.common.issues);
-            },
-            input: newCtx.data
-          })
-        };
-      }
-    }
-    removeCatch() {
-      return this._def.innerType;
-    }
-  }
-
-  ZodCatch.create = (type, params) => new ZodCatch({
-    innerType: type,
-    typeName: ZodFirstPartyTypeKind.ZodCatch,
-    catchValue: typeof params.catch === "function" ? params.catch : () => params.catch,
-    ...processCreateParams(params)
-  });
-
-  class ZodNaN extends ZodType {
-    _parse(input) {
-      const parsedType = this._getType(input);
-      if (parsedType !== ZodParsedType.nan) {
-        const ctx = this._getOrReturnCtx(input);
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_type,
-          expected: ZodParsedType.nan,
-          received: ctx.parsedType
-        });
-        return INVALID;
-      }
-      return {
-        status: "valid",
-        value: input.data
-      };
-    }
-  }
-
-  ZodNaN.create = params => new ZodNaN({
-    typeName: ZodFirstPartyTypeKind.ZodNaN,
-    ...processCreateParams(params)
-  });
-
-  class ZodBranded extends ZodType {
-    _parse(input) {
-      const {ctx: ctx} = this._processInputParams(input);
-      const data = ctx.data;
-      return this._def.type._parse({
-        data: data,
-        path: ctx.path,
-        parent: ctx
-      });
-    }
-    unwrap() {
-      return this._def.type;
-    }
-  }
-
-  class ZodPipeline extends ZodType {
-    _parse(input) {
-      const {status: status, ctx: ctx} = this._processInputParams(input);
-      if (ctx.common.async) {
-        const handleAsync = async () => {
-          const inResult = await this._def.in._parseAsync({
-            data: ctx.data,
-            path: ctx.path,
-            parent: ctx
-          });
-          if (inResult.status === "aborted") return INVALID;
-          if (inResult.status === "dirty") {
-            status.dirty();
-            return DIRTY(inResult.value);
-          } else {
-            return this._def.out._parseAsync({
-              data: inResult.value,
-              path: ctx.path,
-              parent: ctx
-            });
-          }
-        };
-        return handleAsync();
-      } else {
-        const inResult = this._def.in._parseSync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx
-        });
-        if (inResult.status === "aborted") return INVALID;
-        if (inResult.status === "dirty") {
-          status.dirty();
-          return {
-            status: "dirty",
-            value: inResult.value
-          };
-        } else {
-          return this._def.out._parseSync({
-            data: inResult.value,
-            path: ctx.path,
-            parent: ctx
-          });
-        }
-      }
-    }
-    static create(a, b) {
-      return new ZodPipeline({
-        in: a,
-        out: b,
-        typeName: ZodFirstPartyTypeKind.ZodPipeline
-      });
-    }
-  }
-
-  class ZodReadonly extends ZodType {
-    _parse(input) {
-      const result = this._def.innerType._parse(input);
-      const freeze = data => {
-        if (isValid(data)) {
-          data.value = Object.freeze(data.value);
-        }
-        return data;
-      };
-      return isAsync(result) ? result.then(data => freeze(data)) : freeze(result);
-    }
-    unwrap() {
-      return this._def.innerType;
-    }
-  }
-
-  ZodReadonly.create = (type, params) => new ZodReadonly({
-    innerType: type,
-    typeName: ZodFirstPartyTypeKind.ZodReadonly,
-    ...processCreateParams(params)
-  });
-
-  var ZodFirstPartyTypeKind;
-
-  (function(ZodFirstPartyTypeKind2) {
-    ZodFirstPartyTypeKind2["ZodString"] = "ZodString";
-    ZodFirstPartyTypeKind2["ZodNumber"] = "ZodNumber";
-    ZodFirstPartyTypeKind2["ZodNaN"] = "ZodNaN";
-    ZodFirstPartyTypeKind2["ZodBigInt"] = "ZodBigInt";
-    ZodFirstPartyTypeKind2["ZodBoolean"] = "ZodBoolean";
-    ZodFirstPartyTypeKind2["ZodDate"] = "ZodDate";
-    ZodFirstPartyTypeKind2["ZodSymbol"] = "ZodSymbol";
-    ZodFirstPartyTypeKind2["ZodUndefined"] = "ZodUndefined";
-    ZodFirstPartyTypeKind2["ZodNull"] = "ZodNull";
-    ZodFirstPartyTypeKind2["ZodAny"] = "ZodAny";
-    ZodFirstPartyTypeKind2["ZodUnknown"] = "ZodUnknown";
-    ZodFirstPartyTypeKind2["ZodNever"] = "ZodNever";
-    ZodFirstPartyTypeKind2["ZodVoid"] = "ZodVoid";
-    ZodFirstPartyTypeKind2["ZodArray"] = "ZodArray";
-    ZodFirstPartyTypeKind2["ZodObject"] = "ZodObject";
-    ZodFirstPartyTypeKind2["ZodUnion"] = "ZodUnion";
-    ZodFirstPartyTypeKind2["ZodDiscriminatedUnion"] = "ZodDiscriminatedUnion";
-    ZodFirstPartyTypeKind2["ZodIntersection"] = "ZodIntersection";
-    ZodFirstPartyTypeKind2["ZodTuple"] = "ZodTuple";
-    ZodFirstPartyTypeKind2["ZodRecord"] = "ZodRecord";
-    ZodFirstPartyTypeKind2["ZodMap"] = "ZodMap";
-    ZodFirstPartyTypeKind2["ZodSet"] = "ZodSet";
-    ZodFirstPartyTypeKind2["ZodFunction"] = "ZodFunction";
-    ZodFirstPartyTypeKind2["ZodLazy"] = "ZodLazy";
-    ZodFirstPartyTypeKind2["ZodLiteral"] = "ZodLiteral";
-    ZodFirstPartyTypeKind2["ZodEnum"] = "ZodEnum";
-    ZodFirstPartyTypeKind2["ZodEffects"] = "ZodEffects";
-    ZodFirstPartyTypeKind2["ZodNativeEnum"] = "ZodNativeEnum";
-    ZodFirstPartyTypeKind2["ZodOptional"] = "ZodOptional";
-    ZodFirstPartyTypeKind2["ZodNullable"] = "ZodNullable";
-    ZodFirstPartyTypeKind2["ZodDefault"] = "ZodDefault";
-    ZodFirstPartyTypeKind2["ZodCatch"] = "ZodCatch";
-    ZodFirstPartyTypeKind2["ZodPromise"] = "ZodPromise";
-    ZodFirstPartyTypeKind2["ZodBranded"] = "ZodBranded";
-    ZodFirstPartyTypeKind2["ZodPipeline"] = "ZodPipeline";
-    ZodFirstPartyTypeKind2["ZodReadonly"] = "ZodReadonly";
-  })(ZodFirstPartyTypeKind || (ZodFirstPartyTypeKind = {}));
-
-  const stringType = ZodString.create;
-
-  const numberType = ZodNumber.create;
-
-  const booleanType = ZodBoolean.create;
-
-  const nullType = ZodNull.create;
-
-  ZodNever.create;
-
-  const arrayType = ZodArray.create;
-
-  const objectType = ZodObject.create;
-
-  const unionType = ZodUnion.create;
-
-  const discriminatedUnionType = ZodDiscriminatedUnion.create;
-
-  ZodIntersection.create;
-
-  ZodTuple.create;
-
-  const recordType = ZodRecord.create;
-
-  const lazyType = ZodLazy.create;
-
-  const literalType = ZodLiteral.create;
-
-  const enumType = ZodEnum.create;
-
-  const nativeEnumType = ZodNativeEnum.create;
-
-  ZodPromise.create;
-
-  ZodOptional.create;
-
-  ZodNullable.create;
-
-  const lazyOnce = getter => {
-    let cached;
-    return lazyType(() => {
-      cached ?? (cached = getter());
-      return cached;
-    });
-  };
-
-  const QUESTION_TREE_LIMITS = {
-    maxRootBytes: 512 * 1024,
-    maxDepth: 12,
-    maxNodes: 512,
-    maxCollectionSize: 256,
-    maxContentBytes: 64 * 1024
-  };
-
-  const utf8Length$4 = value => (new TextEncoder).encode(value).length;
-
-  const ContentSchema = stringType().refine(value => utf8Length$4(value) <= QUESTION_TREE_LIMITS.maxContentBytes, "question content exceeds byte limit");
-
-  const NonEmptyContentSchema = ContentSchema.refine(value => value.trim().length > 0, "question content must not be empty");
-
-  const StableIdSchema$1 = stringType().min(1).max(256).refine(value => [ ...value ].every(character => {
-    const code = character.charCodeAt(0);
-    return code > 31 && code !== 127;
-  }), "invalid id");
-
-  const NodePathSchema = stringType().min(2).max(4096).regex(/^\/(?:[^/~]|~[01])+(?:\/(?:[^/~]|~[01])+)*$/, "invalid path");
-
-  const QuestionOptionSchema = objectType({
-    id: StableIdSchema$1,
-    content: NonEmptyContentSchema
-  }).strict();
-
-  const AnswerSlotSchema = objectType({
-    id: StableIdSchema$1,
-    label: ContentSchema.optional(),
-    options: arrayType(QuestionOptionSchema).max(QUESTION_TREE_LIMITS.maxCollectionSize).optional()
-  }).strict().superRefine((slot, ctx) => {
-    var _a2;
-    if (slot.options && slot.options.length === 0) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "options" ],
-        message: "slot options must not be empty"
-      });
-    }
-    addDuplicateIdIssue(slot.options ?? [], ctx, [ "options" ]);
-    if (slot.options && !((_a2 = slot.label) == null ? void 0 : _a2.trim())) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "label" ],
-        message: "dropdown slot requires a label"
-      });
-    }
-  });
-
-  const QuestionMetadataSchema = objectType({
-    platform: stringType().max(128).optional(),
-    variant: stringType().max(128).optional(),
-    ruleVersion: stringType().max(128).optional(),
-    sourceType: stringType().max(128).optional(),
-    score: numberType().finite().max(1e4).optional()
-  }).strict();
-
-  function addDuplicateIdIssue(values, ctx, path) {
-    var _a2;
-    const seen = new Set;
-    for (let index = 0; index < values.length; index += 1) {
-      const id = (_a2 = values[index]) == null ? void 0 : _a2.id;
-      if (id == null) continue;
-      if (seen.has(id)) {
-        ctx.addIssue({
-          code: ZodIssueCode.custom,
-          path: [ ...path, index, "id" ],
-          message: `duplicate id: ${id}`
-        });
-      }
-      seen.add(id);
-    }
-  }
-
-  const LeafQuestionNodeSchema = objectType({
-    kind: literalType("leaf"),
-    id: StableIdSchema$1,
-    path: NodePathSchema,
-    type: enumType([ "single", "multiple", "judge", "fill", "short_answer" ]),
-    stem: NonEmptyContentSchema,
-    options: arrayType(QuestionOptionSchema).max(QUESTION_TREE_LIMITS.maxCollectionSize),
-    slots: arrayType(AnswerSlotSchema).max(QUESTION_TREE_LIMITS.maxCollectionSize),
-    fillPolicy: enumType([ "atomic", "per-slot" ]),
-    metadata: QuestionMetadataSchema.optional()
-  }).strict().superRefine((node, ctx) => {
-    addDuplicateIdIssue(node.options, ctx, [ "options" ]);
-    addDuplicateIdIssue(node.slots, ctx, [ "slots" ]);
-    const isChoice = [ "single", "multiple", "judge" ].includes(node.type);
-    if (isChoice && (node.options.length === 0 || node.slots.length !== 0)) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        message: "choice questions require options and forbid slots"
-      });
-    }
-    if (!isChoice && (node.options.length !== 0 || node.slots.length === 0)) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        message: "text questions require slots and forbid root options"
-      });
-    }
-    const dropdownSlots = node.slots.filter(slot => slot.options != null);
-    if (dropdownSlots.length > 0 && node.slots.length !== 1) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "slots" ],
-        message: "each dropdown must be represented by one leaf slot"
-      });
-    }
-  });
-
-  const MatchingQuestionNodeSchema = objectType({
-    kind: literalType("matching"),
-    id: StableIdSchema$1,
-    path: NodePathSchema,
-    type: literalType("matching"),
-    stem: NonEmptyContentSchema,
-    left: arrayType(QuestionOptionSchema).min(1).max(QUESTION_TREE_LIMITS.maxCollectionSize),
-    right: arrayType(QuestionOptionSchema).min(1).max(QUESTION_TREE_LIMITS.maxCollectionSize),
-    cardinality: enumType([ "one-to-one", "many-to-one" ]),
-    fillPolicy: enumType([ "atomic", "per-pair" ]),
-    metadata: QuestionMetadataSchema.optional()
-  }).strict().superRefine((node, ctx) => {
-    addDuplicateIdIssue(node.left, ctx, [ "left" ]);
-    addDuplicateIdIssue(node.right, ctx, [ "right" ]);
-  });
-
-  const CompositeQuestionNodeSchema = objectType({
-    kind: literalType("composite"),
-    id: StableIdSchema$1,
-    path: NodePathSchema,
-    type: enumType([ "composite", "cloze", "reading", "analysis" ]),
-    stem: ContentSchema,
-    children: arrayType(lazyType(() => QuestionNodeSchema)).min(1).max(QUESTION_TREE_LIMITS.maxCollectionSize),
-    fillPolicy: enumType([ "atomic", "per-child" ]),
-    metadata: QuestionMetadataSchema.optional()
-  }).strict().superRefine((node, ctx) => {
-    addDuplicateIdIssue(node.children, ctx, [ "children" ]);
-  });
-
-  const QuestionNodeSchema = lazyOnce(() => unionType([ LeafQuestionNodeSchema, CompositeQuestionNodeSchema, MatchingQuestionNodeSchema ]));
-
-  function preflightTree(root) {
-    let nodes = 0;
-    const active2 = new WeakSet;
-    const visit = (value, depth) => {
-      if (depth > QUESTION_TREE_LIMITS.maxDepth) {
-        throw new Error("question tree exceeds max depth");
-      }
-      if (typeof value !== "object" || value === null) return;
-      if (active2.has(value)) throw new Error("question tree contains a cycle");
-      active2.add(value);
-      nodes += 1;
-      if (nodes > QUESTION_TREE_LIMITS.maxNodes) {
-        throw new Error("question tree exceeds max node count");
-      }
-      const candidate = value;
-      if (candidate.kind === "composite" && Array.isArray(candidate.children)) {
-        for (const child of candidate.children) visit(child, depth + 1);
-      }
-      active2.delete(value);
-    };
-    visit(root, 1);
-    let encoded;
-    try {
-      encoded = JSON.stringify(root);
-    } catch {
-      throw new Error("question tree is not serializable");
-    }
-    if (utf8Length$4(encoded) > QUESTION_TREE_LIMITS.maxRootBytes) {
-      throw new Error("question tree exceeds max byte size");
-    }
-  }
-
-  function escapeNodePathSegment(value) {
-    return value.replace(/~/g, "~0").replace(/\//g, "~1");
-  }
-
-  function deriveQuestionPaths(root) {
-    const visit = (node, path) => {
-      if (node.kind !== "composite") return {
-        ...node,
-        path: path
-      };
-      return {
-        ...node,
-        path: path,
-        children: node.children.map(child => visit(child, `${path}/children/${escapeNodePathSegment(child.id)}`))
-      };
-    };
-    return visit(root, `/${escapeNodePathSegment(root.id)}`);
-  }
-
-  function assertValidQuestionTree(root) {
-    preflightTree(root);
-    const parsed = QuestionNodeSchema.parse(root);
-    const derived = deriveQuestionPaths(parsed);
-    const compare = (actual, expected) => {
-      if (actual.path !== expected.path) {
-        throw new Error(`question path mismatch for ${actual.id}: ${actual.path} !== ${expected.path}`);
-      }
-      if (actual.kind === "composite" && expected.kind === "composite") {
-        for (let index = 0; index < actual.children.length; index += 1) {
-          const actualChild = actual.children[index];
-          const expectedChild = expected.children[index];
-          if (actualChild && expectedChild) compare(actualChild, expectedChild);
-        }
-      }
-    };
-    compare(parsed, derived);
-  }
-
-  function formatSearchStem(segments) {
-    return segments.map(segment => segment.replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
-  }
-
-  function createUnit(input) {
-    return {
-      rootHash: input.rootHash,
-      unitPath: input.unitPath,
-      sourceNodeHash: input.sourceNodeHash,
-      unitHash: searchUnitHash(input),
-      queryType: input.queryType,
-      effectiveStem: formatSearchStem(input.stemSegments),
-      options: input.options,
-      answerShape: input.answerShape
-    };
-  }
-
-  function flattenLeaf(node, rootHash, contexts) {
-    const sourceNodeHash = questionNodeHash(node);
-    const slot = node.slots[0];
-    const isDropdown = (slot == null ? void 0 : slot.options) != null;
-    const queryType = isDropdown ? "single" : node.type;
-    const options = isDropdown ? slot.options ?? [] : node.options;
-    const answerShape = [ "single", "multiple", "judge" ].includes(node.type) ? {
-      kind: "choice",
-      min: 1,
-      max: node.type === "multiple" ? node.options.length : 1
-    } : {
-      kind: "slots",
-      slotIds: node.slots.map(item => item.id)
-    };
-    const stemSegments = [ ...contexts, node.stem, ...isDropdown && (slot == null ? void 0 : slot.label) ? [ slot.label ] : [] ];
-    return createUnit({
-      rootHash: rootHash,
-      unitPath: node.path,
-      sourceNodeHash: sourceNodeHash,
-      queryType: queryType,
-      stemSegments: stemSegments,
-      options: options,
-      answerShape: answerShape
-    });
-  }
-
-  function flattenMatching(node, rootHash, contexts) {
-    const sourceNodeHash = questionNodeHash(node);
-    return node.left.map(left => {
-      const answerShape = {
-        kind: "matching-pair",
-        leftId: left.id,
-        rightIds: node.right.map(right => right.id)
-      };
-      return createUnit({
-        rootHash: rootHash,
-        unitPath: `${node.path}/pairs/${escapeNodePathSegment(left.id)}`,
-        sourceNodeHash: sourceNodeHash,
-        queryType: "single",
-        stemSegments: [ ...contexts, node.stem, left.content ],
-        options: node.right,
-        answerShape: answerShape
-      });
-    });
-  }
-
-  function flattenQuestionTree(root) {
-    assertValidQuestionTree(root);
-    const rootHash = questionNodeHash(root);
-    const units = [];
-    const visit = (node, contexts) => {
-      switch (node.kind) {
-       case "leaf":
-        units.push(flattenLeaf(node, rootHash, contexts));
-        break;
-
-       case "matching":
-        units.push(...flattenMatching(node, rootHash, contexts));
-        break;
-
-       case "composite":
-        {
-          const nextContexts = node.stem.trim() ? [ ...contexts, node.stem ] : contexts;
-          for (const child of node.children) visit(child, nextContexts);
-          break;
-        }
-      }
-    };
-    visit(root, []);
-    return units;
-  }
-
-  const successful = answer => answer.kind === "leaf" ? answer.status === "hit" : answer.status === "complete";
-
-  const missed = answer => answer.kind === "leaf" ? answer.status === "miss" : answer.status === "miss";
-
-  function aggregateStatus(children, atomic) {
-    if (children.every(successful)) return "complete";
-    if (children.every(missed)) return "miss";
-    const unsafe = children.some(child => child.status === "unsafe");
-    return atomic && unsafe ? "unsafe" : "partial";
-  }
-
-  function assembleMatching(node, answerByPath) {
-    const pairs = node.left.map(left => {
-      var _a2;
-      const result = answerByPath.get(`${node.path}/pairs/${left.id.replace(/~/g, "~0").replace(/\//g, "~1")}`);
-      const payload = ((_a2 = result == null ? void 0 : result.answer) == null ? void 0 : _a2.kind) === "matching-pair" ? result.answer : null;
-      return {
-        leftId: left.id,
-        ...payload ? {
-          rightId: payload.rightId,
-          displayValue: payload.displayValue
-        } : {},
-        status: (result == null ? void 0 : result.status) ?? "miss",
-        charged: (result == null ? void 0 : result.charged) ?? false
-      };
-    });
-    const status = pairs.every(pair => pair.status === "hit") ? "complete" : pairs.every(pair => pair.status === "miss") ? "miss" : node.fillPolicy === "atomic" && pairs.some(pair => pair.status === "unsafe") ? "unsafe" : "partial";
-    return {
-      kind: "matching",
-      path: node.path,
-      status: status,
-      pairs: pairs
-    };
-  }
-
-  function assembleAnswerTree(root, answers) {
-    const answerByPath = new Map(answers.map(answer => [ answer.path, answer ]));
-    const unitByPath = new Map(flattenQuestionTree(root).map(unit => [ unit.unitPath, unit ]));
-    const visit = node => {
-      var _a2;
-      if (node.kind === "leaf") {
-        return answerByPath.get(node.path) ?? {
-          kind: "leaf",
-          path: node.path,
-          unitHash: ((_a2 = unitByPath.get(node.path)) == null ? void 0 : _a2.unitHash) ?? "",
-          status: "miss",
-          answer: null,
-          charged: false
-        };
-      }
-      if (node.kind === "matching") {
-        return assembleMatching(node, answerByPath);
-      }
-      const children = node.children.map(visit);
-      return {
-        kind: "composite",
-        path: node.path,
-        status: aggregateStatus(children, node.fillPolicy === "atomic"),
-        children: children
-      };
-    };
-    return visit(root);
-  }
-
-  const HashV2Schema$1 = stringType().regex(/^[0-9a-f]{64}$/);
-
-  const LeafAnswerPayloadSchema = unionType([ objectType({
-    kind: literalType("choice"),
-    optionIds: arrayType(stringType().min(1)).min(1),
-    displayValues: arrayType(stringType()).min(1)
-  }).strict().refine(value => value.optionIds.length === value.displayValues.length, {
-    message: "choice ids and display values must align"
-  }), objectType({
-    kind: literalType("slots"),
-    slots: arrayType(objectType({
-      slotId: stringType().min(1),
-      values: arrayType(stringType().min(1)).min(1)
-    }).strict()).min(1)
-  }).strict() ]);
-
-  const MatchingPairPayloadSchema = objectType({
-    kind: literalType("matching-pair"),
-    leftId: stringType().min(1),
-    rightId: stringType().min(1),
-    displayValue: stringType().min(1)
-  }).strict();
-
-  const LeafAnswerNodeSchema = objectType({
-    kind: literalType("leaf"),
-    path: NodePathSchema,
-    unitHash: HashV2Schema$1,
-    status: enumType([ "hit", "miss", "busy", "unauthorized", "insufficient", "rate_limited", "invalid", "unsafe" ]),
-    answer: unionType([ LeafAnswerPayloadSchema, MatchingPairPayloadSchema ]).nullable(),
-    source: enumType([ "free", "cache", "relay", "local" ]).optional(),
-    aiGenerated: booleanType().optional(),
-    charged: booleanType()
-  }).strict().superRefine((node, ctx) => {
-    if (node.status === "hit" && node.answer == null) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "answer" ],
-        message: "hit requires a typed answer"
-      });
-    }
-    if (node.status !== "hit" && node.answer != null) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "answer" ],
-        message: "non-hit must not expose answer candidates"
-      });
-    }
-    if (node.charged && node.status !== "hit") {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "charged" ],
-        message: "only usable hits can be charged"
-      });
-    }
-  });
-
-  const CompositeAnswerNodeSchema = lazyOnce(() => objectType({
-    kind: literalType("composite"),
-    path: NodePathSchema,
-    status: enumType([ "complete", "partial", "miss", "unsafe" ]),
-    children: arrayType(AnswerNodeSchema).min(1)
-  }).strict());
-
-  const MatchingAnswerNodeSchema = objectType({
-    kind: literalType("matching"),
-    path: NodePathSchema,
-    status: enumType([ "complete", "partial", "miss", "unsafe" ]),
-    pairs: arrayType(objectType({
-      leftId: stringType().min(1),
-      rightId: stringType().min(1).optional(),
-      displayValue: stringType().min(1).optional(),
-      status: enumType([ "hit", "miss", "busy", "unauthorized", "insufficient", "rate_limited", "invalid", "unsafe" ]),
-      charged: booleanType()
-    }).strict())
-  }).strict();
-
-  const AnswerNodeSchema = lazyOnce(() => unionType([ LeafAnswerNodeSchema, CompositeAnswerNodeSchema, MatchingAnswerNodeSchema ]));
-
-  const SEARCH_PATH = "/api/search";
-
-  const HashV2Schema = stringType().regex(/^[0-9a-f]{64}$/);
-
-  objectType({
-    requestSchemaVersion: literalType(2),
-    root: QuestionNodeSchema,
-    unitPath: NodePathSchema,
-    expectedRootHash: HashV2Schema.optional(),
-    expectedUnitHash: HashV2Schema.optional()
-  }).strict().superRefine((request, ctx) => {
-    try {
-      assertValidQuestionTree(request.root);
-    } catch (error) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "root" ],
-        message: error instanceof Error ? error.message : "invalid question tree"
-      });
-    }
-  });
-
-  const SearchUnitResponseSchema = objectType({
-    code: nativeEnumType(AiAskCode),
-    found: booleanType(),
-    result: LeafAnswerNodeSchema.nullable().default(null)
-  }).strict().superRefine((response, ctx) => {
-    var _a2;
-    const isHit = ((_a2 = response.result) == null ? void 0 : _a2.status) === "hit";
-    if (response.found !== isHit) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "result" ],
-        message: "found must match typed hit status"
-      });
-    }
-    if (response.found && response.code !== AiAskCode.Ok) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "code" ],
-        message: "found response requires Ok code"
-      });
-    }
-  });
-
-  const AUTH_REGISTER_PATH = "/api/auth/register";
-
-  const AUTH_LOGIN_PATH = "/api/auth/login";
-
-  const USERNAME_MAX = 32;
-
-  const PASSWORD_MAX = 128;
-
-  const EMAIL_MAX = 128;
-
-  const AuthCredentialsSchema = objectType({
-    username: stringType().min(3).max(USERNAME_MAX),
-    password: stringType().min(8).max(PASSWORD_MAX)
-  });
-
-  objectType({
-    username: stringType().min(1).max(EMAIL_MAX),
-    password: stringType().min(1).max(PASSWORD_MAX)
-  });
-
-  AuthCredentialsSchema.extend({
-    captchaToken: stringType().min(1).max(4096),
-    email: stringType().email().max(EMAIL_MAX).optional()
-  });
-
-  const AuthResponseSchema = objectType({
-    code: nativeEnumType(AiAskCode),
-    token: stringType().optional(),
-    reason: enumType([ "taken", "disabled" ]).optional()
-  });
-
-  const PASSWORD_RESET_CODE_LENGTH = 6;
-
-  objectType({
-    identifier: stringType().min(1).max(128),
-    captchaToken: stringType().min(1).max(4096)
-  });
-
-  objectType({
-    identifier: stringType().min(1).max(128),
-    code: stringType().length(PASSWORD_RESET_CODE_LENGTH),
-    newPassword: stringType().min(8).max(128)
-  });
-
-  objectType({
-    code: nativeEnumType(AiAskCode),
-    reason: enumType([ "sent", "disabled", "invalid_code" ]).optional(),
-    username: stringType().optional()
-  });
-
-  const REDEEM_PATH = "/api/redeem";
-
-  objectType({
-    code: stringType().min(1).max(128)
-  });
-
-  const RedeemResponseSchema = objectType({
-    code: nativeEnumType(AiAskCode),
-    balance: numberType().optional()
-  });
-
-  const ME_PATH = "/api/me";
-
-  objectType({}).strict();
-
-  const MeResponseSchema = objectType({
-    code: nativeEnumType(AiAskCode),
-    username: stringType().optional(),
-    balance: numberType().int().optional(),
-    emailBound: booleanType().optional()
-  }).strict();
-
-  objectType({
-    limit: numberType().int().min(1).max(50).default(20),
-    cursor: stringType().regex(/^\d+$/u).max(20).optional()
-  }).strict();
-
-  const MeLedgerItemSchema = objectType({
-    id: stringType(),
-    at: stringType().datetime(),
-    scene: stringType(),
-    state: stringType(),
-    amount: numberType().int()
-  }).strict();
-
-  objectType({
-    code: nativeEnumType(AiAskCode),
-    present: booleanType().optional()
-  }).strict();
-
-  objectType({
-    code: nativeEnumType(AiAskCode),
-    apiKey: stringType().optional()
-  }).strict();
-
-  objectType({
-    code: nativeEnumType(AiAskCode),
-    items: arrayType(MeLedgerItemSchema).max(50),
-    nextCursor: stringType().nullable()
-  }).strict();
-
-  objectType({
-    email: stringType().email().max(128)
-  }).strict();
-
-  objectType({
-    code: nativeEnumType(AiAskCode),
-    reason: enumType([ "sent", "cooldown", "taken", "already_bound" ]).optional()
-  }).strict();
-
-  objectType({
-    email: stringType().email().max(128),
-    code: stringType().length(PASSWORD_RESET_CODE_LENGTH)
-  }).strict();
-
-  objectType({
-    code: nativeEnumType(AiAskCode),
-    reason: enumType([ "bound", "invalid_code", "taken", "already_bound" ]).optional()
-  }).strict();
-
-  objectType({
-    currentPassword: stringType().min(1).max(128),
-    newPassword: stringType().min(8).max(128)
-  }).strict();
-
-  objectType({
-    code: nativeEnumType(AiAskCode),
-    reason: enumType([ "changed", "wrong_password", "raced" ]).optional()
-  }).strict();
-
-  const EVIDENCE_PATH = "/api/evidence";
-
-  const PageDomShapeSchema = objectType({
-    iframes: numberType().int().nonnegative().max(64),
-    radios: numberType().int().nonnegative().max(2e3),
-    checkboxes: numberType().int().nonnegative().max(2e3),
-    textareas: numberType().int().nonnegative().max(500),
-    selects: numberType().int().nonnegative().max(500),
-    forms: numberType().int().nonnegative().max(64),
-    bodyNodes: numberType().int().min(0).max(17),
-    readyState: enumType([ "loading", "interactive", "complete" ])
-  }).strict();
-
-  const PageFingerprintSchema = objectType({
-    host: stringType().min(1).max(64),
-    path: stringType().min(1).max(128),
-    qkeys: arrayType(stringType().min(1).max(32)).max(16),
-    dom: PageDomShapeSchema
-  }).strict();
-
-  const EvidenceRequestSchema = objectType({
-    requestId: stringType().min(1).max(64),
-    fpHash: stringType().min(1).max(64),
-    host: stringType().min(1).max(64),
-    path: stringType().min(1).max(128),
-    expiresAt: numberType().int().nonnegative().max(EPOCH_MS_MAX)
-  }).strict();
-
-  const RULE_HARD_LIMITS = {
-    maxPackageBytes: 512 * 1024,
-    maxSteps: 5e4,
-    maxWallMs: 1e4,
-    maxAsyncMs: 8e3,
-    maxLoopIterations: 1e3,
-    maxCallDepth: 32,
-    maxDomRefs: 5e3,
-    maxRegexPatternBytes: 2 * 1024,
-    maxRegexValueBytes: 128 * 1024
-  };
-
-  const FORBIDDEN_KEYS$3 = new Set([ "__proto__", "prototype", "constructor" ]);
-
-  const utf8Length$3 = value => (new TextEncoder).encode(value).length;
-
-  const SafeObjectKeySchema = stringType().min(1).max(256).refine(value => !FORBIDDEN_KEYS$3.has(value), "forbidden object key");
-
-  const DeclaredVariableSchema = stringType().min(1).max(128).regex(/^[A-Za-z_][A-Za-z0-9_]*$/u, "invalid variable name").refine(value => !FORBIDDEN_KEYS$3.has(value), "forbidden variable name");
-
-  const ReadVariableSchema = stringType().min(1).max(128).regex(/^\$?[A-Za-z_][A-Za-z0-9_]*$/u, "invalid variable name").refine(value => !FORBIDDEN_KEYS$3.has(value.replace(/^\$/u, "")), "forbidden variable name");
-
-  const StableIdSchema = stringType().min(1).max(128).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u, "invalid stable id");
-
-  const VersionSchema = stringType().min(1).max(64).regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u, "invalid version");
-
-  const base64Url$1 = length => stringType().length(length).regex(/^[A-Za-z0-9_-]+$/u, "invalid base64url");
-
-  const RuleContentHashSchema = base64Url$1(43);
-
-  const JsonObjectSchema = lazyOnce(() => recordType(JsonRuleValueSchema).superRefine((value, ctx) => {
-    for (const key of Object.keys(value)) {
-      if (!SafeObjectKeySchema.safeParse(key).success) {
-        ctx.addIssue({
-          code: ZodIssueCode.custom,
-          path: [ key ],
-          message: "forbidden object key"
-        });
-      }
-    }
-  }));
-
-  const JsonRuleValueSchema = lazyOnce(() => unionType([ nullType(), booleanType(), numberType().finite().max(SAFE_INT_MAX), stringType(), arrayType(JsonRuleValueSchema).max(RULE_HARD_LIMITS.maxSteps), JsonObjectSchema ]));
-
-  const ExprRecordSchema = () => recordType(SafeObjectKeySchema, ExprSchema);
-
-  const RegexFlagsSchema = stringType().max(8).regex(/^[dgimsuvy]*$/u, "invalid regex flags").refine(value => new Set(value).size === value.length, "duplicate regex flag");
-
-  const ExprSchema = lazyOnce(() => discriminatedUnionType("op", [ objectType({
-    op: literalType("literal"),
-    value: JsonRuleValueSchema
-  }).strict(), objectType({
-    op: literalType("var"),
-    name: ReadVariableSchema
-  }).strict(), objectType({
-    op: literalType("path"),
-    from: ExprSchema,
-    path: arrayType(unionType([ SafeObjectKeySchema, numberType().int().nonnegative().max(INT32_MAX) ])).max(256)
-  }).strict(), objectType({
-    op: literalType("coalesce"),
-    values: arrayType(ExprSchema).min(1).max(256)
-  }).strict(), objectType({
-    op: literalType("compare"),
-    kind: enumType([ "eq", "ne", "gt", "gte", "lt", "lte" ]),
-    left: ExprSchema,
-    right: ExprSchema
-  }).strict(), objectType({
-    op: literalType("logic"),
-    kind: enumType([ "and", "or" ]),
-    values: arrayType(ExprSchema).min(1).max(256)
-  }).strict(), objectType({
-    op: literalType("not"),
-    value: ExprSchema
-  }).strict(), objectType({
-    op: literalType("array"),
-    items: arrayType(ExprSchema).max(RULE_HARD_LIMITS.maxSteps)
-  }).strict(), objectType({
-    op: literalType("object"),
-    entries: ExprRecordSchema()
-  }).strict(), objectType({
-    op: literalType("map"),
-    items: ExprSchema,
-    item: DeclaredVariableSchema,
-    index: DeclaredVariableSchema.optional(),
-    value: ExprSchema,
-    maxIterations: numberType().int().positive().max(RULE_HARD_LIMITS.maxLoopIterations)
-  }).strict(), objectType({
-    op: literalType("filter"),
-    items: ExprSchema,
-    item: DeclaredVariableSchema,
-    index: DeclaredVariableSchema.optional(),
-    when: ExprSchema,
-    maxIterations: numberType().int().positive().max(RULE_HARD_LIMITS.maxLoopIterations)
-  }).strict(), objectType({
-    op: literalType("reduce"),
-    items: ExprSchema,
-    item: DeclaredVariableSchema,
-    index: DeclaredVariableSchema.optional(),
-    accumulator: DeclaredVariableSchema,
-    initial: ExprSchema,
-    value: ExprSchema,
-    maxIterations: numberType().int().positive().max(RULE_HARD_LIMITS.maxLoopIterations)
-  }).strict(), objectType({
-    op: literalType("string"),
-    kind: enumType([ "trim", "collapseWs", "lower", "upper" ]),
-    value: ExprSchema
-  }).strict(), objectType({
-    op: literalType("regex"),
-    kind: enumType([ "test", "extract", "replace" ]),
-    value: ExprSchema,
-    pattern: stringType().refine(value => utf8Length$3(value) <= RULE_HARD_LIMITS.maxRegexPatternBytes, "regex pattern exceeds byte limit"),
-    flags: RegexFlagsSchema.optional(),
-    replacement: stringType().refine(value => utf8Length$3(value) <= RULE_HARD_LIMITS.maxRegexValueBytes, "regex replacement exceeds byte limit").optional()
-  }).strict(), objectType({
-    op: literalType("jsonPath"),
-    from: ExprSchema,
-    query: stringType().min(1).max(4096)
-  }).strict(), objectType({
-    op: literalType("format"),
-    template: stringType().max(64 * 1024),
-    args: ExprRecordSchema()
-  }).strict() ]));
-
-  const StepListSchema = () => arrayType(StepSchema).max(RULE_HARD_LIMITS.maxSteps);
-
-  const StepSchema = lazyOnce(() => unionType([ objectType({
-    type: literalType("set"),
-    name: DeclaredVariableSchema,
-    value: ExprSchema
-  }).strict(), objectType({
-    type: literalType("if"),
-    when: ExprSchema,
-    then: StepListSchema(),
-    else: StepListSchema().optional()
-  }).strict(), objectType({
-    type: literalType("switch"),
-    value: ExprSchema,
-    cases: arrayType(objectType({
-      equals: JsonRuleValueSchema,
-      steps: StepListSchema()
-    }).strict()).min(1).max(256),
-    default: StepListSchema().optional()
-  }).strict(), objectType({
-    type: literalType("forEach"),
-    items: ExprSchema,
-    item: DeclaredVariableSchema,
-    index: DeclaredVariableSchema.optional(),
-    steps: StepListSchema(),
-    maxIterations: numberType().int().positive().max(RULE_HARD_LIMITS.maxLoopIterations)
-  }).strict(), objectType({
-    type: literalType("while"),
-    when: ExprSchema,
-    steps: StepListSchema(),
-    maxIterations: numberType().int().positive().max(RULE_HARD_LIMITS.maxLoopIterations)
-  }).strict(), objectType({
-    type: literalType("callFlow"),
-    flowId: StableIdSchema,
-    args: ExprRecordSchema().optional(),
-    result: DeclaredVariableSchema.optional()
-  }).strict(), objectType({
-    type: literalType("return"),
-    value: ExprSchema.optional()
-  }).strict(), objectType({
-    type: literalType("try"),
-    steps: StepListSchema(),
-    catch: StepListSchema().optional(),
-    finally: StepListSchema().optional()
-  }).strict().refine(step => step.catch != null || step.finally != null, {
-    message: "try requires catch or finally"
-  }), objectType({
-    type: literalType("primitive"),
-    id: stringType().min(3).max(128).regex(/^[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z][A-Za-z0-9]*)+$/u, "invalid primitive id"),
-    args: ExprRecordSchema().optional(),
-    result: DeclaredVariableSchema.optional(),
-    timeoutMs: numberType().int().positive().max(RULE_HARD_LIMITS.maxAsyncMs).optional()
-  }).strict() ]));
-
-  const FlowDefinitionSchema = objectType({
-    id: StableIdSchema,
-    params: arrayType(DeclaredVariableSchema).max(256).refine(values => new Set(values).size === values.length, {
-      message: "duplicate flow param"
-    }).optional(),
-    steps: StepListSchema()
-  }).strict();
-
-  const RuleEventSchema = enumType([ "url-change", "dom-change", "frame-ready", "api-captured", "user-start", "session-complete", "timeout" ]);
-
-  const StateMachineDefinitionSchema = objectType({
-    initial: StableIdSchema,
-    states: recordType(StableIdSchema, objectType({
-      enter: StepListSchema().optional(),
-      transitions: arrayType(objectType({
-        event: RuleEventSchema,
-        when: ExprSchema.optional(),
-        target: StableIdSchema,
-        actions: StepListSchema().optional()
-      }).strict()).max(256)
-    }).strict())
-  }).strict().superRefine((machine, ctx) => {
-    if (!(machine.initial in machine.states)) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "initial" ],
-        message: "initial state does not exist"
-      });
-    }
-    for (const [stateId, state] of Object.entries(machine.states)) {
-      for (let index = 0; index < state.transitions.length; index += 1) {
-        const transition = state.transitions[index];
-        if (transition && !(transition.target in machine.states)) {
-          ctx.addIssue({
-            code: ZodIssueCode.custom,
-            path: [ "states", stateId, "transitions", index, "target" ],
-            message: "transition target does not exist"
-          });
-        }
-      }
-    }
-  });
-
-  const RuleCapabilitySchema = enumType([ "dom-read", "frame-read", "runtime-read", "network-read", "dom-mutate", "ui-reveal", "answer-write" ]);
-
-  const RuleLimitsSchema = objectType({
-    maxSteps: numberType().int().positive().max(RULE_HARD_LIMITS.maxSteps),
-    maxWallMs: numberType().int().positive().max(RULE_HARD_LIMITS.maxWallMs),
-    maxAsyncMs: numberType().int().positive().max(RULE_HARD_LIMITS.maxAsyncMs),
-    maxLoopIterations: numberType().int().positive().max(RULE_HARD_LIMITS.maxLoopIterations),
-    maxCallDepth: numberType().int().positive().max(RULE_HARD_LIMITS.maxCallDepth),
-    maxDomRefs: numberType().int().positive().max(RULE_HARD_LIMITS.maxDomRefs)
-  }).strict();
-
-  const PageVariantRuleSchema = objectType({
-    id: StableIdSchema,
-    title: stringType().min(1).max(256),
-    priority: numberType().int().min(-1e6).max(1e6),
-    match: FlowDefinitionSchema,
-    lifecycle: StateMachineDefinitionSchema.optional(),
-    capture: FlowDefinitionSchema,
-    fill: FlowDefinitionSchema,
-    diagnostics: FlowDefinitionSchema.optional(),
-    limits: RuleLimitsSchema.partial().optional()
-  }).strict().superRefine((variant, ctx) => {
-    var _a2;
-    const ids = [ variant.match.id, variant.capture.id, variant.fill.id, (_a2 = variant.diagnostics) == null ? void 0 : _a2.id ].filter(id => id != null);
-    if (new Set(ids).size !== ids.length) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        message: "duplicate flow id"
-      });
-    }
-  });
-
-  const RuleRollbackAuthorizationSchema = objectType({
-    toVersion: VersionSchema,
-    authorizationId: StableIdSchema
-  }).strict();
-
-  const ShellSelectorValueSchema = unionType([ stringType().min(1).max(256), arrayType(stringType().min(1).max(256)).min(1).max(32) ]);
-
-  const RuleShellConfigSchema = objectType({
-    selectors: recordType(stringType().regex(/^[a-z][a-zA-Z0-9.-]{0,47}$/u), ShellSelectorValueSchema).refine(value => Object.keys(value).length <= 64, {
-      message: "shellConfig.selectors accepts at most 64 entries"
-    }).optional()
-  }).strict();
-
-  const RulePackageSchema = objectType({
-    schemaVersion: literalType(1),
-    packageId: StableIdSchema,
-    platform: StableIdSchema,
-    version: VersionSchema,
-    releaseSequence: numberType().int().nonnegative().max(INT32_MAX),
-    engineRange: objectType({
-      min: VersionSchema,
-      maxExclusive: VersionSchema.optional()
-    }).strict(),
-    issuedAt: numberType().int().nonnegative().max(EPOCH_MS_MAX),
-    expiresAt: numberType().int().nonnegative().max(EPOCH_MS_MAX).optional(),
-    signingKid: StableIdSchema,
-    rollbackAuthorization: RuleRollbackAuthorizationSchema.optional(),
-    capabilities: arrayType(RuleCapabilitySchema).max(16),
-    shellConfig: RuleShellConfigSchema.optional(),
-    variants: arrayType(PageVariantRuleSchema).min(1).max(256),
-    changelog: stringType().max(64 * 1024),
-    contentHash: RuleContentHashSchema,
-    signature: base64Url$1(86)
-  }).strict().superRefine((pkg, ctx) => {
-    if (pkg.expiresAt != null && pkg.expiresAt <= pkg.issuedAt) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "expiresAt" ],
-        message: "package expiry must be after issue time"
-      });
-    }
-    if (new Set(pkg.capabilities).size !== pkg.capabilities.length) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "capabilities" ],
-        message: "duplicate capability"
-      });
-    }
-    if (pkg.rollbackAuthorization != null && pkg.rollbackAuthorization.toVersion !== pkg.version) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "rollbackAuthorization", "toVersion" ],
-        message: "rollback authorization must target package version"
-      });
-    }
-    const variantIds = pkg.variants.map(variant => variant.id);
-    if (new Set(variantIds).size !== variantIds.length) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "variants" ],
-        message: "duplicate variant id"
-      });
-    }
-    if (utf8Length$3(JSON.stringify(pkg)) > RULE_HARD_LIMITS.maxPackageBytes) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        message: "rule package exceeds byte limit"
-      });
-    }
-  });
-
-  const RULE_SYNC_PATH = "/api/rules/sync";
-
-  const MAX_RULE_PACKAGES = 256;
-
-  const RuleSyncKnownPackageSchema = objectType({
-    packageId: StableIdSchema,
-    releaseSequence: numberType().int().nonnegative().max(INT32_MAX),
-    contentHash: RuleContentHashSchema
-  }).strict();
-
-  const RuleReleaseChannelSchema = enumType([ "stable", "candidate" ]);
-
-  const RuleRolloutPercentSchema = unionType([ literalType(5), literalType(20), literalType(50), literalType(100) ]);
-
-  const RuleReleaseContextSchema = objectType({
-    releaseId: StableIdSchema,
-    channel: RuleReleaseChannelSchema,
-    rolloutPercent: RuleRolloutPercentSchema,
-    cohortBucket: numberType().int().min(0).max(9999)
-  }).strict();
-
-  function isRuleCandidateTestDelivery(value) {
-    return value.channel === "candidate" && value.cohortBucket >= value.rolloutPercent * 100;
-  }
-
-  const RulePackageSummarySchema = RuleReleaseContextSchema.extend({
-    packageId: StableIdSchema,
-    platform: StableIdSchema,
-    version: VersionSchema,
-    releaseSequence: numberType().int().nonnegative(),
-    contentHash: RuleContentHashSchema,
-    issuedAt: numberType().int().nonnegative(),
-    rollbackAuthorization: RuleRollbackAuthorizationSchema.optional()
-  }).strict();
-
-  objectType({
-    engineVersion: VersionSchema,
-    known: arrayType(RuleSyncKnownPackageSchema).max(MAX_RULE_PACKAGES)
-  }).strict().superRefine((request, ctx) => {
-    const packageIds = request.known.map(item => item.packageId);
-    if (new Set(packageIds).size !== packageIds.length) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "known" ],
-        message: "duplicate package id"
-      });
-    }
-  });
-
-  const sameRollbackAuthorization = (left, right) => (left == null ? void 0 : left.toVersion) === (right == null ? void 0 : right.toVersion) && (left == null ? void 0 : left.authorizationId) === (right == null ? void 0 : right.authorizationId);
-
-  const RuleSyncResponseSchema = objectType({
-    code: nativeEnumType(AiAskCode),
-    checkedAt: numberType().int().nonnegative(),
-    latest: arrayType(RulePackageSummarySchema).max(MAX_RULE_PACKAGES),
-    update: RulePackageSchema.nullable(),
-    hasMore: booleanType()
-  }).strict().superRefine((response, ctx) => {
-    const packageIds = response.latest.map(item => item.packageId);
-    if (new Set(packageIds).size !== packageIds.length) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "latest" ],
-        message: "duplicate package id"
-      });
-    }
-    if (response.update == null && response.hasMore) {
-      ctx.addIssue({
-        code: ZodIssueCode.custom,
-        path: [ "hasMore" ],
-        message: "hasMore requires an update package"
-      });
-    }
-    if (response.update) {
-      const summary = response.latest.find(item => {
-        var _a2;
-        return item.packageId === ((_a2 = response.update) == null ? void 0 : _a2.packageId) && item.releaseSequence === response.update.releaseSequence && item.contentHash === response.update.contentHash;
-      });
-      if (!summary) {
-        ctx.addIssue({
-          code: ZodIssueCode.custom,
-          path: [ "update" ],
-          message: "update package is missing from latest summaries"
-        });
-      } else if (!sameRollbackAuthorization(response.update.rollbackAuthorization, summary.rollbackAuthorization)) {
-        ctx.addIssue({
-          code: ZodIssueCode.custom,
-          path: [ "update", "rollbackAuthorization" ],
-          message: "rollback authorization summary mismatch"
-        });
-      }
-    }
-  });
-
-  const REPORT_PATH = "/api/report";
-
-  const SENTINEL_PACKAGE_IDS = Object.freeze([ "chaoxing-unrouted" ]);
-
-  const ReportStageSchema = enumType([ "resolve", "match", "lifecycle", "capture", "decode", "query", "safety", "fill", "verify", "update" ]);
-
-  const ReportReasonSchema = enumType([ "no_match", "invalid_match_result", "zero_question", "selector_zero", "selector_many", "decode_failed", "query_failed", "unsafe_answer", "missing_binding", "disconnected", "stale_dom", "ambiguous_binding", "shape_mismatch", "partial_not_allowed", "adapter_rejected", "fill_failed", "verify_failed", "timeout", "budget_exceeded", "unknown_primitive", "rule_failed", "update_failed", "unsupported_question" ]);
-
-  const ReportRuleSourceSchema = enumType([ "bundled", "remote-active", "remote-lkg", "missing" ]);
-
-  const ReportRuleContextSchema = objectType({
-    packageId: stringType().min(1).max(128),
-    variantId: stringType().min(1).max(128),
-    source: ReportRuleSourceSchema,
-    version: stringType().min(1).max(64),
-    releaseSequence: numberType().int().nonnegative().max(INT32_MAX),
-    contentHash: stringType().min(1).max(64),
-    release: RuleReleaseContextSchema.optional()
-  });
-
-  const ReportStageResultSchema = discriminatedUnionType("ok", [ objectType({
-    stage: ReportStageSchema,
-    ok: literalType(true)
-  }).strict(), objectType({
-    stage: ReportStageSchema,
-    ok: literalType(false),
-    reason: ReportReasonSchema
-  }).strict() ]);
-
-  const HealthReportSchema = objectType({
-    schemaVersion: literalType(2),
-    platform: stringType().min(1).max(32),
-    clientId: stringType().min(8).max(64),
-    scriptVersion: stringType().max(32),
-    engineVersion: stringType().min(1).max(32),
-    rule: ReportRuleContextSchema,
-    mode: literalType("health"),
-    stages: arrayType(ReportStageResultSchema).min(1).max(16),
-    fingerprint: PageFingerprintSchema.optional()
-  });
-
-  const DiagnosticItemSchema = objectType({
-    type: stringType().min(1).max(32),
-    decodeFailed: booleanType(),
-    optionCount: numberType().int().nonnegative().max(1e3),
-    imageCount: numberType().int().nonnegative().max(1e3),
-    unsupportedReason: enumType([ "empty-content" ]).optional()
-  }).strict();
-
-  const DiagnosticPayloadSchema = objectType({
-    matched: booleanType(),
-    count: numberType().int().nonnegative().max(1e4),
-    imageCount: numberType().int().nonnegative().max(1e4),
-    items: arrayType(DiagnosticItemSchema).max(1e4)
-  }).strict();
-
-  const DiagnosticReportSchema = HealthReportSchema.extend({
-    mode: literalType("diagnostic"),
-    diagnostic: DiagnosticPayloadSchema
-  });
-
-  discriminatedUnionType("mode", [ HealthReportSchema, DiagnosticReportSchema ]);
-
-  const ReportResponseSchema = objectType({
-    code: nativeEnumType(AiAskCode),
-    evidenceRequest: EvidenceRequestSchema.optional()
-  });
-
-  objectType({
-    requestId: stringType().min(1).max(64).nullable(),
-    platform: stringType().min(1).max(32),
-    clientId: stringType().min(8).max(64),
-    scriptVersion: stringType().max(32),
-    engineVersion: stringType().min(1).max(32),
-    fingerprint: PageFingerprintSchema,
-    rule: ReportRuleContextSchema,
-    note: stringType().max(200).optional(),
-    html: stringType().max(64e3),
-    truncated: booleanType()
-  }).strict();
-
-  const EvidenceResponseSchema = objectType({
-    code: nativeEnumType(AiAskCode),
-    claimed: booleanType().optional(),
-    reason: enumType([ "ip", "ticket", "client", "global" ]).optional()
-  });
-
-  const EVENTS_PATH = "/api/events";
-
-  const DurationBucketSchema = enumType([ "lt1s", "lt5s", "lt30s", "lt2m", "lt10m", "lt1h", "ge1h" ]);
-
-  const UsageFeatureSchema = enumType([ "random_answer", "auto_submit", "cache_import", "cache_export", "diagnostic", "course_automation" ]);
-
-  const UsageFeatureActionSchema = enumType([ "enabled", "disabled", "used" ]);
-
-  const AnswerSourceCountsSchema = objectType({
-    total: numberType().int().nonnegative().max(1e4),
-    cacheHit: numberType().int().nonnegative().max(1e4),
-    relayHit: numberType().int().nonnegative().max(1e4),
-    aiHit: numberType().int().nonnegative().max(1e4),
-    randomFill: numberType().int().nonnegative().max(1e4)
-  }).strict();
-
-  const HeartbeatEventSchema = objectType({
-    type: literalType("heartbeat")
-  }).strict();
-
-  const AnswerRoundEventSchema = objectType({
-    type: literalType("answer_round"),
-    rule: ReportRuleContextSchema,
-    stages: arrayType(ReportStageResultSchema).min(1).max(16),
-    counts: AnswerSourceCountsSchema.optional(),
-    durationBucket: DurationBucketSchema.optional(),
-    fingerprint: PageFingerprintSchema.optional()
-  }).strict();
-
-  const SubmitOutcomeSchema = enumType([ "submitted", "confirm_accepted", "confirm_unverified", "below_threshold", "unrecognized_questions", "blocked" ]);
-
-  const SubmitEventSchema = objectType({
-    type: literalType("submit"),
-    outcome: SubmitOutcomeSchema,
-    trustedDecile: numberType().int().min(0).max(10).optional()
-  }).strict();
-
-  const CourseTaskEventSchema = objectType({
-    type: literalType("course_task"),
-    kind: enumType([ "video", "audio", "document", "read", "chapter" ]),
-    outcome: enumType([ "done", "failed", "skipped" ]),
-    durationBucket: DurationBucketSchema
-  }).strict();
-
-  const CourseStopReasonSchema = enumType([ "course-done", "section-done", "finished", "section-stalled", "budget-exhausted", "advance-failed", "locked" ]);
-
-  const CourseStopEventSchema = objectType({
-    type: literalType("course_stop"),
-    reason: CourseStopReasonSchema
-  }).strict();
-
-  const FeatureEventSchema = objectType({
-    type: literalType("feature"),
-    feature: UsageFeatureSchema,
-    action: UsageFeatureActionSchema
-  }).strict();
-
-  const RuleMissingEventSchema = objectType({
-    type: literalType("rule_missing"),
-    packageId: stringType().min(1).max(128),
-    fingerprint: PageFingerprintSchema.optional()
-  }).strict();
-
-  const DiagnosticEventSchema = objectType({
-    type: literalType("diagnostic"),
-    rule: ReportRuleContextSchema,
-    stages: arrayType(ReportStageResultSchema).min(1).max(16),
-    diagnostic: DiagnosticPayloadSchema
-  }).strict();
-
-  const RegisterStepEventSchema = objectType({
-    type: literalType("register_step"),
-    step: enumType([ "view", "captcha", "success" ])
-  }).strict();
-
-  const UsageEventSchema = discriminatedUnionType("type", [ HeartbeatEventSchema, AnswerRoundEventSchema, SubmitEventSchema, CourseTaskEventSchema, CourseStopEventSchema, FeatureEventSchema, RuleMissingEventSchema, DiagnosticEventSchema, RegisterStepEventSchema ]);
-
-  objectType({
-    schemaVersion: literalType(1),
-    clientId: stringType().min(8).max(64),
-    platform: stringType().min(1).max(32),
-    scriptVersion: stringType().max(32),
-    engineVersion: stringType().min(1).max(32),
-    events: arrayType(UsageEventSchema).min(1).max(50)
-  });
-
-  objectType({
-    code: nativeEnumType(AiAskCode)
-  });
-
-  const ANNOUNCEMENT_PATH = "/api/announcement";
-
-  const AnnouncementLevelSchema = enumType([ "info", "warning", "critical" ]);
-
-  const ANNOUNCEMENT_TITLE_MAX = 120;
-
-  const ANNOUNCEMENT_HTML_MAX = 4096;
-
-  const AnnouncementBodySchema = objectType({
-    level: AnnouncementLevelSchema,
-    title: stringType().min(1).max(ANNOUNCEMENT_TITLE_MAX),
-    html: stringType().max(ANNOUNCEMENT_HTML_MAX)
-  }).strict();
-
-  objectType({}).strict();
-
-  const AnnouncementResponseSchema = objectType({
-    code: nativeEnumType(AiAskCode),
-    seq: numberType().int().nonnegative(),
-    updatedAt: stringType().datetime().nullable(),
-    announcement: AnnouncementBodySchema.nullable()
-  }).strict().refine(value => value.announcement === null === (value.updatedAt === null), {
-    message: "updatedAt \u5fc5\u987b\u4e0e announcement \u540c\u65f6\u4e3a null"
-  });
-
-  const ADMIN_ANNOUNCEMENT_CONFIRMATION = "announcement";
-
-  objectType({}).strict();
-
-  objectType({
-    code: nativeEnumType(AiAskCode),
-    seq: numberType().int().nonnegative(),
-    updatedAt: stringType().datetime().nullable(),
-    active: booleanType(),
-    level: AnnouncementLevelSchema,
-    title: stringType().max(ANNOUNCEMENT_TITLE_MAX),
-    html: stringType().max(ANNOUNCEMENT_HTML_MAX)
-  }).strict();
-
-  objectType({
-    level: AnnouncementLevelSchema,
-    title: stringType().max(ANNOUNCEMENT_TITLE_MAX),
-    html: stringType().max(ANNOUNCEMENT_HTML_MAX),
-    active: booleanType(),
-    expectedSeq: numberType().int().nonnegative().max(INT32_MAX),
-    reason: stringType().trim().min(3).max(500),
-    confirmation: literalType(ADMIN_ANNOUNCEMENT_CONFIRMATION)
-  }).strict().refine(value => !value.active || value.title.trim().length > 0, {
-    path: [ "title" ],
-    message: "active announcement requires a title"
-  });
-
-  const AnnouncementUpdateOutcomeSchema = enumType([ "written", "unchanged", "stale" ]);
-
-  objectType({
-    code: nativeEnumType(AiAskCode),
-    outcome: AnnouncementUpdateOutcomeSchema,
-    seq: numberType().int().nonnegative()
-  }).strict();
-
-  const BASE64URL = /^[A-Za-z0-9_-]*$/;
-
-  function bytesToBase64Url(bytes) {
-    let binary = "";
-    const chunkSize = 32768;
-    for (let offset = 0; offset < bytes.length; offset += chunkSize) binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
-    return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
-  }
-
-  function base64UrlToBytes(value) {
-    if (!BASE64URL.test(value) || value.includes("=")) throw new Error("invalid base64url");
-    const padding = "=".repeat((4 - value.length % 4) % 4);
-    let binary;
-    try {
-      binary = atob(value.replaceAll("-", "+").replaceAll("_", "/") + padding);
-    } catch {
-      throw new Error("invalid base64url");
-    }
-    const out = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index++) out[index] = binary.charCodeAt(index);
-    if (bytesToBase64Url(out) !== value) throw new Error("invalid base64url");
-    return out;
-  }
-
-  const utf8Bytes = value => (new TextEncoder).encode(value);
-
-  const utf8Text = value => new TextDecoder("utf-8", {
-    fatal: true
-  }).decode(value);
-
-  const base64Url = (min, max) => stringType().min(min).max(max).regex(/^[A-Za-z0-9_-]+$/u);
-
-  const signature = base64Url(86, 86);
-
-  const timestamp = numberType().int().nonnegative().max(EPOCH_MS_MAX);
-
-  const kid = stringType().min(1).max(64).regex(/^[A-Za-z0-9._-]+$/u);
-
-  const PublicP256JwkSchema = objectType({
-    kty: literalType("EC"),
-    crv: literalType("P-256"),
-    x: base64Url(43, 43),
-    y: base64Url(43, 43)
-  }).strict();
-
-  const ServerKeyUseSchema = enumType([ "transport-signing", "ecdh", "rule-signing" ]);
-
-  const ServerKeySchema = objectType({
-    kid: kid,
-    use: ServerKeyUseSchema,
-    publicJwk: PublicP256JwkSchema,
-    notBefore: timestamp,
-    expiresAt: timestamp
-  }).strict();
-
-  const UnsignedServerKeysetSchema = objectType({
-    keysetVersion: numberType().int().positive(),
-    issuedAt: timestamp,
-    expiresAt: timestamp,
-    keys: arrayType(ServerKeySchema).min(1).max(32)
-  }).strict();
-
-  const ServerKeysetSchema = UnsignedServerKeysetSchema.extend({
-    rootSignature: signature
-  }).strict();
-
-  const UnsignedBootstrapChallengeSchema = objectType({
-    protocolVersion: literalType(1),
-    minClientVersion: stringType().min(1).max(32),
-    serverTime: timestamp,
-    challenge: base64Url(22, 128),
-    challengeExpiresAt: timestamp,
-    keysetVersion: numberType().int().positive(),
-    keysetHash: base64Url(43, 43),
-    signingKid: kid
-  }).strict();
-
-  const BootstrapChallengeSchema = UnsignedBootstrapChallengeSchema.extend({
-    signature: signature
-  }).strict();
-
-  const BootstrapDocumentSchema = objectType({
-    keyset: ServerKeysetSchema,
-    challenge: BootstrapChallengeSchema
-  }).strict();
-
-  const SecurityScopeSchema = enumType([ "report", "user", "admin" ]);
-
-  const sessionOpenFields = {
-    protocolVersion: literalType(1),
-    challenge: base64Url(22, 128),
-    deviceId: base64Url(43, 43),
-    devicePublicJwk: PublicP256JwkSchema,
-    ecdhKid: kid,
-    clientEcdhPublicJwk: PublicP256JwkSchema,
-    timestamp: timestamp,
-    nonce: base64Url(22, 128),
-    signature: signature
-  };
-
-  objectType({
-    ...sessionOpenFields,
-    requestedScope: enumType([ "report", "user" ])
-  }).strict();
-
-  const AdminSessionOpenRequestSchema = objectType(sessionOpenFields).strict();
-
-  objectType({
-    username: stringType().min(3).max(64),
-    password: stringType().min(1).max(256)
-  }).strict();
-
-  const SessionOpenResponseSchema = objectType({
-    protocolVersion: literalType(1),
-    signingKid: kid,
-    ecdhKid: kid,
-    serverEcdhPublicJwk: PublicP256JwkSchema,
-    serverNonce: base64Url(22, 128),
-    iv: base64Url(16, 16),
-    ciphertext: base64Url(1, 16384),
-    signature: signature
-  }).strict();
-
-  const SessionOpenPlaintextSchema = objectType({
-    sessionId: base64Url(22, 64),
-    deviceId: base64Url(43, 43),
-    grantedScope: SecurityScopeSchema,
-    issuedAt: timestamp,
-    expiresAt: timestamp
-  }).strict();
-
-  const secureRequestFields = {
-    v: literalType(1),
-    sessionId: base64Url(22, 64),
-    requestId: stringType().uuid(),
-    timestamp: timestamp,
-    nonce: base64Url(22, 128),
-    iv: base64Url(16, 16),
-    ciphertext: base64Url(1, 14e5),
-    signature: signature
-  };
-
-  objectType(secureRequestFields).strict();
-
-  const SecureResponseEnvelopeSchema = objectType({
-    ...secureRequestFields,
-    kid: kid
-  }).strict();
-
-  const SecureClientAppSchema = enumType([ "userscript", "web" ]);
-
-  objectType({
-    app: SecureClientAppSchema,
-    version: stringType().min(1).max(32)
-  }).strict();
-
-  function validateServerKeyset(input, now, highestAcceptedVersion = 0) {
-    const keyset = ServerKeysetSchema.parse(input);
-    if (keyset.keysetVersion < highestAcceptedVersion) throw new Error("keyset downgrade");
-    if (keyset.issuedAt > now || keyset.expiresAt <= now) throw new Error("keyset expired");
-    const seen = new Set;
-    let activeEcdh = 0;
-    for (const key of keyset.keys) {
-      if (seen.has(key.kid)) throw new Error("duplicate kid");
-      seen.add(key.kid);
-      if (key.notBefore >= key.expiresAt || key.expiresAt <= now || key.expiresAt > keyset.expiresAt) throw new Error("key expired");
-      if (key.use === "ecdh" && key.notBefore <= now) activeEcdh += 1;
-    }
-    if (activeEcdh > 1) throw new Error("ambiguous ECDH key");
-  }
-
-  function validateBootstrapChallenge(input, keyset, now) {
-    const challenge = BootstrapChallengeSchema.parse(input);
-    if (challenge.challengeExpiresAt <= now) throw new Error("challenge expired");
-    if (challenge.keysetVersion !== keyset.keysetVersion) throw new Error("keyset mismatch");
-    const signingKey = keyset.keys.find(key => key.kid === challenge.signingKid && key.use === "transport-signing" && key.notBefore <= now && key.expiresAt > now);
-    if (!signingKey) throw new Error("invalid signing key");
-  }
-
-  function canonicalize(value) {
-    if (value === null || typeof value === "boolean") return JSON.stringify(value);
-    if (typeof value === "string") return JSON.stringify(value);
-    if (typeof value === "number") {
-      if (!Number.isFinite(value)) throw new Error("non-finite number");
-      return JSON.stringify(Object.is(value, -0) ? 0 : value);
-    }
-    if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
-    if (typeof value !== "object") throw new Error("unsupported canonical value");
-    const record = value;
-    const entries = Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${canonicalize(record[key])}`);
-    return `{${entries.join(",")}}`;
-  }
-
-  function canonicalPublicJwk(jwk) {
-    const parsed = PublicP256JwkSchema.parse(jwk);
-    return canonicalize({
-      crv: parsed.crv,
-      kty: parsed.kty,
-      x: parsed.x,
-      y: parsed.y
-    });
-  }
-
-  function requestEnvelopeInput(method, path, envelope) {
-    return [ "aiask-v1", method.toUpperCase(), path, envelope.sessionId, envelope.requestId, String(envelope.timestamp), envelope.nonce, envelope.iv, envelope.ciphertext ].join("\n");
-  }
-
-  function responseEnvelopeInput(method, path, envelope) {
-    return [ "aiask-v1-response", method.toUpperCase(), path, envelope.kid, envelope.sessionId, envelope.requestId, String(envelope.timestamp), envelope.nonce, envelope.iv, envelope.ciphertext ].join("\n");
-  }
-
-  function requestEnvelopeAad(method, path, envelope) {
-    return [ "aiask-v1-aad", method.toUpperCase(), path, envelope.sessionId, envelope.requestId, String(envelope.timestamp), envelope.nonce, envelope.iv ].join("\n");
-  }
-
-  function responseEnvelopeAad(method, path, envelope) {
-    return [ "aiask-v1-response-aad", method.toUpperCase(), path, envelope.kid, envelope.sessionId, envelope.requestId, String(envelope.timestamp), envelope.nonce, envelope.iv ].join("\n");
-  }
-
-  function unsignedServerKeyset(keyset) {
-    const {rootSignature: _rootSignature, ...unsigned} = keyset;
-    return unsigned;
-  }
-
-  function unsignedBootstrapChallenge(challenge) {
-    const {signature: _signature, ...unsigned} = challenge;
-    return unsigned;
-  }
-
-  const serverKeysetSigningInput = keyset => canonicalize(keyset);
-
-  const bootstrapChallengeSigningInput = challenge => canonicalize(challenge);
-
-  function sessionOpenRequestInput(path, request) {
-    return `aiask-v1-session-open\nPOST\n${path}\n${canonicalize(request)}`;
-  }
-
-  function sessionOpenResponseInput(path, response) {
-    return `aiask-v1-session-open-response\nPOST\n${path}\n${canonicalize(response)}`;
-  }
-
-  function sessionOpenResponseAad(path, response) {
-    return `aiask-v1-session-open-aad\nPOST\n${path}\n${canonicalize(response)}`;
-  }
-
-  const handshakeTranscript = context => canonicalize(context);
-
-  const trafficTranscript = context => canonicalize(context);
-
-  const subtle = () => globalThis.crypto.subtle;
-
-  const arrayBuffer = value => {
-    const copy = new Uint8Array(value.length);
-    copy.set(value);
-    return copy.buffer;
-  };
-
-  const publicJwk = jwk => {
-    const parsed = JSON.parse(canonicalPublicJwk(jwk));
-    return {
-      ...parsed,
-      ext: true
-    };
-  };
-
-  const privateJwk = jwk => {
-    if (jwk.kty !== "EC" || jwk.crv !== "P-256" || typeof jwk.x !== "string" || typeof jwk.y !== "string" || typeof jwk.d !== "string") throw new Error("invalid private P-256 JWK");
-    return {
-      kty: "EC",
-      crv: "P-256",
-      x: jwk.x,
-      y: jwk.y,
-      d: jwk.d,
-      ext: true
-    };
-  };
-
-  const importEcdsaPublicJwk = jwk => subtle().importKey("jwk", publicJwk(jwk), {
-    name: "ECDSA",
-    namedCurve: "P-256"
-  }, true, [ "verify" ]);
-
-  const importEcdsaPrivateJwk = jwk => subtle().importKey("jwk", privateJwk(jwk), {
-    name: "ECDSA",
-    namedCurve: "P-256"
-  }, false, [ "sign" ]);
-
-  const importEcdhPublicJwk = jwk => subtle().importKey("jwk", publicJwk(jwk), {
-    name: "ECDH",
-    namedCurve: "P-256"
-  }, true, []);
-
-  async function generateEcdsaDeviceKeyPair() {
-    return await subtle().generateKey({
-      name: "ECDSA",
-      namedCurve: "P-256"
-    }, true, [ "sign", "verify" ]);
-  }
-
-  async function generateEcdhKeyPair() {
-    return await subtle().generateKey({
-      name: "ECDH",
-      namedCurve: "P-256"
-    }, true, [ "deriveBits" ]);
-  }
-
-  const exportPublicJwk = async key => {
-    const exported = await subtle().exportKey("jwk", key);
-    return JSON.parse(canonicalPublicJwk({
-      kty: exported.kty,
-      crv: exported.crv,
-      x: exported.x,
-      y: exported.y
-    }));
-  };
-
-  const exportPrivateJwk = key => subtle().exportKey("jwk", key);
-
-  async function signEcdsaP1363(privateKey, data) {
-    const signature2 = new Uint8Array(await subtle().sign({
-      name: "ECDSA",
-      hash: "SHA-256"
-    }, privateKey, arrayBuffer(data)));
-    if (signature2.length !== 64) throw new Error("invalid ECDSA signature length");
-    return bytesToBase64Url(signature2);
-  }
-
-  async function verifyEcdsaP1363(publicKey, data, signature2) {
-    let bytes;
-    try {
-      bytes = base64UrlToBytes(signature2);
-    } catch {
-      return false;
-    }
-    if (bytes.length !== 64) return false;
-    return subtle().verify({
-      name: "ECDSA",
-      hash: "SHA-256"
-    }, publicKey, arrayBuffer(bytes), arrayBuffer(data));
-  }
-
-  async function deriveEcdhSecret(privateKey, publicKey) {
-    return new Uint8Array(await subtle().deriveBits({
-      name: "ECDH",
-      public: publicKey
-    }, privateKey, 256));
-  }
-
-  async function sha256(data) {
-    return new Uint8Array(await subtle().digest("SHA-256", arrayBuffer(data)));
-  }
-
-  const sha256Base64Url = async data => bytesToBase64Url(await sha256(data));
-
-  const fingerprintPublicJwk = jwk => sha256Base64Url(utf8Bytes(canonicalPublicJwk(jwk)));
-
-  async function hkdf(sharedSecret, saltLabel, infoLabel, transcript) {
-    const material = await subtle().importKey("raw", arrayBuffer(sharedSecret), "HKDF", false, [ "deriveBits" ]);
-    const salt = await sha256(utf8Bytes(`${saltLabel}\n${transcript}`));
-    return new Uint8Array(await subtle().deriveBits({
-      name: "HKDF",
-      hash: "SHA-256",
-      salt: arrayBuffer(salt),
-      info: arrayBuffer(utf8Bytes(`${infoLabel}\n${transcript}`))
-    }, material, 256));
-  }
-
-  const deriveHandshakeKey = (sharedSecret, context) => {
-    const transcript = handshakeTranscript(context);
-    return hkdf(sharedSecret, "aiask-v1-handshake-salt", "aiask-v1-handshake-key", transcript);
-  };
-
-  async function deriveTrafficKeys(sharedSecret, context) {
-    const transcript = trafficTranscript(context);
-    const [c2sKey, s2cKey] = await Promise.all([ hkdf(sharedSecret, "aiask-v1-traffic-salt", "aiask-v1-c2s-key", transcript), hkdf(sharedSecret, "aiask-v1-traffic-salt", "aiask-v1-s2c-key", transcript) ]);
-    return {
-      c2sKey: c2sKey,
-      s2cKey: s2cKey
-    };
-  }
-
-  const importAesKey = (raw, usage) => subtle().importKey("raw", arrayBuffer(raw), {
-    name: "AES-GCM",
-    length: 256
-  }, false, usage);
-
-  async function aesGcmEncrypt(rawKey, iv, plaintext, aad) {
-    if (rawKey.length !== 32 || iv.length !== 12) throw new Error("invalid AES-GCM key or IV");
-    const key = await importAesKey(rawKey, [ "encrypt" ]);
-    return new Uint8Array(await subtle().encrypt({
-      name: "AES-GCM",
-      iv: arrayBuffer(iv),
-      additionalData: arrayBuffer(aad),
-      tagLength: 128
-    }, key, arrayBuffer(plaintext)));
-  }
-
-  async function aesGcmDecrypt(rawKey, iv, ciphertext, aad) {
-    if (rawKey.length !== 32 || iv.length !== 12) throw new Error("invalid AES-GCM key or IV");
-    const key = await importAesKey(rawKey, [ "decrypt" ]);
-    return new Uint8Array(await subtle().decrypt({
-      name: "AES-GCM",
-      iv: arrayBuffer(iv),
-      additionalData: arrayBuffer(aad),
-      tagLength: 128
-    }, key, arrayBuffer(ciphertext)));
-  }
-
-  async function verifyServerKeysetSignature(rootPublicKey, keyset) {
-    return verifyEcdsaP1363(rootPublicKey, utf8Bytes(serverKeysetSigningInput(unsignedServerKeyset(keyset))), keyset.rootSignature);
-  }
-
-  const serverKeysetHash = keyset => sha256Base64Url(utf8Bytes(serverKeysetSigningInput(unsignedServerKeyset(keyset))));
-
-  async function verifyBootstrapChallengeSignature(keyset, challenge) {
-    const signingKey = keyset.keys.find(key => key.kid === challenge.signingKid && key.use === "transport-signing");
-    if (!signingKey) return false;
-    const publicKey = await importEcdsaPublicJwk(signingKey.publicJwk);
-    return verifyEcdsaP1363(publicKey, utf8Bytes(bootstrapChallengeSigningInput(unsignedBootstrapChallenge(challenge))), challenge.signature);
-  }
-
-  const withoutSignature = pkg => {
-    const {signature: _signature, ...unsigned} = pkg;
-    return unsigned;
-  };
-
-  const withoutContentHashAndSignature = pkg => {
-    const {contentHash: _contentHash, signature: _signature, ...hashable} = pkg;
-    return hashable;
-  };
-
-  const canonicalRulePackageContentHashInput = pkg => canonicalize(withoutContentHashAndSignature(pkg));
-
-  const canonicalRulePackageSignatureInput = pkg => canonicalize(withoutSignature(pkg));
-
-  const computeVerifiedRulePackageContentHash = pkg => sha256Base64Url(utf8Bytes(canonicalRulePackageContentHashInput(pkg)));
-
-  function parseVersion$1(value) {
-    const withoutBuild = value.split("+", 1)[0] ?? value;
-    const prereleaseIndex = withoutBuild.indexOf("-");
-    const coreText = prereleaseIndex === -1 ? withoutBuild : withoutBuild.slice(0, prereleaseIndex);
-    const prereleaseText = prereleaseIndex === -1 ? void 0 : withoutBuild.slice(prereleaseIndex + 1);
-    const parts = coreText.split(".").map(Number);
-    if (parts.length !== 3 || parts.some(part => !Number.isSafeInteger(part) || part < 0)) throw new Error(`invalid version: ${value}`);
-    return {
-      core: parts,
-      prerelease: prereleaseText ? prereleaseText.split(".").map(part => /^\d+$/u.test(part) ? Number(part) : part) : []
-    };
-  }
-
-  function compareRuleVersions$1(leftValue, rightValue) {
-    const left = parseVersion$1(leftValue);
-    const right = parseVersion$1(rightValue);
-    for (let index = 0; index < 3; index += 1) {
-      const difference = left.core[index] - right.core[index];
-      if (difference !== 0) return Math.sign(difference);
-    }
-    if (left.prerelease.length === 0 && right.prerelease.length === 0) return 0;
-    if (left.prerelease.length === 0) return 1;
-    if (right.prerelease.length === 0) return -1;
-    const length = Math.max(left.prerelease.length, right.prerelease.length);
-    for (let index = 0; index < length; index += 1) {
-      const leftPart = left.prerelease[index];
-      const rightPart = right.prerelease[index];
-      if (leftPart == null) return -1;
-      if (rightPart == null) return 1;
-      if (leftPart === rightPart) continue;
-      if (typeof leftPart === "number" && typeof rightPart === "string") return -1;
-      if (typeof leftPart === "string" && typeof rightPart === "number") return 1;
-      return leftPart < rightPart ? -1 : 1;
-    }
-    return 0;
-  }
-
-  const IMPORT_BRIDGE_ORIGIN = "https://www.aiask.site";
-
-  const IMPORT_BRIDGE_VERSION = 1;
-
-  const IMPORT_BRIDGE_CHANNEL = "aiask-import";
-
-  const IMPORT_BRIDGE_REPLY_CHANNEL = "aiask-import-reply";
-
-  const IMPORT_BRIDGE_ERROR_REASONS = [ "invalid-snapshot", "import-failed" ];
-
-  const ImportBridgeErrorReasonSchema = enumType(IMPORT_BRIDGE_ERROR_REASONS);
-
-  const requestId = stringType().uuid();
-
-  const snapshot = stringType().min(1);
-
-  const count = numberType().int().min(0);
-
-  const requestBase = {
-    channel: literalType(IMPORT_BRIDGE_CHANNEL),
-    v: literalType(IMPORT_BRIDGE_VERSION),
-    requestId: requestId
-  };
-
-  const ImportBridgeRequestSchema = discriminatedUnionType("kind", [ objectType({
-    ...requestBase,
-    kind: literalType("ping")
-  }).strict(), objectType({
-    ...requestBase,
-    kind: literalType("preview"),
-    snapshot: snapshot
-  }).strict(), objectType({
-    ...requestBase,
-    kind: literalType("commit"),
-    snapshot: snapshot
-  }).strict() ]);
-
-  const replyBase = {
-    channel: literalType(IMPORT_BRIDGE_REPLY_CHANNEL),
-    v: literalType(IMPORT_BRIDGE_VERSION),
-    requestId: requestId
-  };
-
-  discriminatedUnionType("kind", [ objectType({
-    ...replyBase,
-    kind: literalType("pong"),
-    scriptVersion: stringType().min(1)
-  }).strict(), objectType({
-    ...replyBase,
-    kind: literalType("preview"),
-    fileCount: count,
-    added: count,
-    replaced: count,
-    skipped: count
-  }).strict(), objectType({
-    ...replyBase,
-    kind: literalType("commit"),
-    added: count,
-    replaced: count,
-    skipped: count
-  }).strict(), objectType({
-    ...replyBase,
-    kind: literalType("error"),
-    reason: ImportBridgeErrorReasonSchema
-  }).strict() ]);
-
-  function parseImportBridgeRequest(data) {
-    const parsed = ImportBridgeRequestSchema.safeParse(data);
-    return parsed.success ? parsed.data : null;
-  }
-
-  function importBridgePreviewReply(requestId2, counts) {
-    return {
-      channel: IMPORT_BRIDGE_REPLY_CHANNEL,
-      v: IMPORT_BRIDGE_VERSION,
-      requestId: requestId2,
-      kind: "preview",
-      fileCount: counts.fileCount,
-      added: counts.added,
-      replaced: counts.replaced,
-      skipped: counts.skipped
-    };
-  }
-
-  function importBridgeCommitReply(requestId2, counts) {
-    return {
-      channel: IMPORT_BRIDGE_REPLY_CHANNEL,
-      v: IMPORT_BRIDGE_VERSION,
-      requestId: requestId2,
-      kind: "commit",
-      added: counts.added,
-      replaced: counts.replaced,
-      skipped: counts.skipped
-    };
-  }
-
-  const BUSY = Object.freeze({
-    code: AiAskCode.Busy,
-    found: false,
-    result: null
-  });
-
-  const DEFAULT_TIMEOUT_MS$3 = 8e3;
-
-  class RelayClient {
-    constructor(transport, baseUrl, timeoutMs = DEFAULT_TIMEOUT_MS$3) {
-      this.transport = transport;
-      this.baseUrl = baseUrl;
-      this.timeoutMs = timeoutMs;
-    }
-    async search(req, idempotencyKey) {
-      let timer;
-      try {
-        const deadline = new Promise((_, reject) => {
-          timer = setTimeout(() => reject(new Error("deadline")), this.timeoutMs);
-        });
-        const res = await Promise.race([ this.transport.send({
-          url: this.baseUrl + SEARCH_PATH,
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Idempotency-Key": idempotencyKey
-          },
-          body: JSON.stringify(req),
-          timeoutMs: this.timeoutMs
-        }), deadline ]);
-        if (res.status < 200 || res.status >= 300) return BUSY;
-        const parsed = SearchUnitResponseSchema.safeParse(JSON.parse(res.body));
-        return parsed.success ? parsed.data : BUSY;
-      } catch {
-        return BUSY;
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-  }
-
-  class RuleRuntime {
-    constructor(adapters) {
-      this.adapters = adapters;
-    }
-    resolve(ctx) {
-      return this.adapters.find(a => a.match(ctx)) ?? null;
-    }
-  }
-
-  function collapseWs(s) {
-    return s.replace(/\s+/g, " ").trim();
-  }
-
-  function stripOptionPrefix(text) {
-    return text.replace(/^\s*(?:[\uff08(][A-Za-z0-9]{1,2}[)\uff09]|[A-Za-z0-9]{1,2}\s*[.\u3001\uff0e,:\uff1a])\s*/, "").trim();
-  }
-
-  function normalizeForMatch(text) {
-    return normalizeQuestionContentForMatch(text).replace(/\s+/g, "").replace(/^[A-Za-z][.\u3001\uff0e,]/, "");
-  }
-
-  const TRUE_TOK = new Set([ "\u5bf9", "\u6b63\u786e", "\u221a", "\u2713", "\u2714", "\u2611", "\u662f", "t", "true", "y", "yes", "1" ]);
-
-  const FALSE_TOK = new Set([ "\u9519", "\u9519\u8bef", "\xd7", "\u2717", "\u2718", "\u2612", "x", "\u5426", "f", "false", "n", "no", "0" ]);
-
-  function normalizeTruth(s) {
-    const t = s.replace(/\s/g, "").toLowerCase();
-    if (!t) return null;
-    if (TRUE_TOK.has(t)) return "\u5bf9";
-    if (FALSE_TOK.has(t)) return "\u9519";
-    return null;
-  }
-
-  const LEAF_TYPE_ALIASES = {
-    single: "single",
-    single_choice: "single",
-    single_selection: "single",
-    "\u5355\u9009": "single",
-    "\u5355\u9009\u9898": "single",
-    multiple: "multiple",
-    multiple_choice: "multiple",
-    multiple_selection: "multiple",
-    "\u591a\u9009": "multiple",
-    "\u591a\u9009\u9898": "multiple",
-    judge: "judge",
-    judgement: "judge",
-    judgment: "judge",
-    true_false: "judge",
-    true_or_false: "judge",
-    "\u5224\u65ad": "judge",
-    "\u5224\u65ad\u9898": "judge",
-    fill: "fill",
-    completion: "fill",
-    blank: "fill",
-    fill_in_blank: "fill",
-    "\u586b\u7a7a": "fill",
-    "\u586b\u7a7a\u9898": "fill",
-    short_answer: "short_answer",
-    subjective: "short_answer",
-    essay: "short_answer",
-    "\u7b80\u7b54": "short_answer",
-    "\u7b80\u7b54\u9898": "short_answer"
-  };
-
-  function normalizeLeafQuestionType(value) {
-    if (!(value == null ? void 0 : value.trim())) return null;
-    return LEAF_TYPE_ALIASES[value.trim().toLocaleLowerCase().replace(/[\s-]+/gu, "_")] ?? null;
-  }
-
-  class DomContentError extends Error {
-    constructor(code, message) {
-      super(message);
-      this.code = code;
-      this.name = "DomContentError";
-    }
-  }
-
-  function serializeDomQuestionContent(element, options = {}) {
-    const stripSelectors = options.stripSelectors ?? [];
-    const maxNodes = options.maxNodes ?? 5e3;
-    if (!Number.isInteger(maxNodes) || maxNodes <= 0 || maxNodes > 5e4) throw new DomContentError("budget_exceeded", "invalid DOM content node limit");
-    for (const selector of stripSelectors) {
-      try {
-        element.matches(selector);
-      } catch (error) {
-        throw new DomContentError("invalid_selector", error instanceof Error ? error.message : "invalid strip selector");
-      }
-    }
-    const out = [];
-    let visited = 0;
-    const walk = node => {
-      var _a2, _b;
-      if ((_a2 = options.signal) == null ? void 0 : _a2.aborted) throw new DomContentError("cancelled", "DOM content capture cancelled");
-      visited += 1;
-      if (visited > maxNodes) throw new DomContentError("budget_exceeded", "DOM content node budget exceeded");
-      if (node.nodeType === node.TEXT_NODE) {
-        out.push(serializeQuestionText(node.textContent ?? ""));
-        return;
-      }
-      const document2 = node.ownerDocument;
-      const view = document2 == null ? void 0 : document2.defaultView;
-      if (!view || !(node instanceof view.Element)) return;
-      if (node !== element && stripSelectors.some(selector => node.matches(selector))) return;
-      const tag = node.tagName.toLowerCase();
-      if (tag === "script" || tag === "style" || tag === "noscript") return;
-      if (tag === "img") {
-        const raw = (_b = node.getAttribute("src")) == null ? void 0 : _b.trim();
-        if (!raw) return;
-        try {
-          const url = new URL(raw, document2.baseURI);
-          if (url.protocol === "http:" || url.protocol === "https:") out.push(serializeImageToken(url.href));
-        } catch {
-          return;
-        }
-        return;
-      }
-      for (const child of node.childNodes) walk(child);
-    };
-    walk(element);
-    return collapseWs(out.join(""));
-  }
-
-  function waitUntil(cond, opts) {
-    const interval = opts.interval ?? 100;
-    return new Promise(resolve => {
-      var _a2, _b;
-      if (cond()) return resolve(true);
-      if ((_a2 = opts.signal) == null ? void 0 : _a2.aborted) return resolve(false);
-      let waited = 0;
-      const onAbort = () => {
-        cleanup();
-        resolve(false);
-      };
-      const timer = setInterval(() => {
-        var _a3;
-        if (cond()) {
-          cleanup();
-          resolve(true);
-          return;
-        }
-        waited += interval;
-        if (((_a3 = opts.signal) == null ? void 0 : _a3.aborted) || waited >= opts.timeout) {
-          cleanup();
-          resolve(false);
-        }
-      }, interval);
-      (_b = opts.signal) == null ? void 0 : _b.addEventListener("abort", onAbort, {
-        once: true
-      });
-      function cleanup() {
-        var _a3;
-        clearInterval(timer);
-        (_a3 = opts.signal) == null ? void 0 : _a3.removeEventListener("abort", onAbort);
-      }
-    });
-  }
-
-  const issuedCapabilities = new WeakMap;
-
-  function createSafetyCapability() {
-    const capability = Object.freeze({
-      toJSON() {
-        throw new Error("safety capability cannot be serialized");
-      }
-    });
-    return capability;
-  }
-
-  function operationMatches$1(left, right) {
-    if (left.kind !== right.kind) return false;
-    if (left.kind === "choose" && right.kind === "choose") return left.optionId === right.optionId;
-    if (left.kind === "write" && right.kind === "write") return left.slotId === right.slotId && left.value === right.value;
-    return left.kind === "pair" && right.kind === "pair" && left.leftId === right.leftId && left.rightId === right.rightId;
-  }
-
-  function assertSafetyCapability(capability) {
-    if (typeof capability !== "object" && typeof capability !== "function" || capability === null || !issuedCapabilities.has(capability)) {
-      throw new Error("invalid safety capability");
-    }
-  }
-
-  function safetyPlanForCapability(capability) {
-    assertSafetyCapability(capability);
-    return issuedCapabilities.get(capability);
-  }
-
-  function assertSafetyOperation(capability, operation) {
-    const plan = safetyPlanForCapability(capability);
-    if (!plan.operations.some(candidate => operationMatches$1(candidate, operation))) throw new Error("operation is not allowed by safety capability");
-  }
-
-  function hasDuplicates(values) {
-    return new Set(values).size !== values.length;
-  }
-
-  function validateBinding(unit, binding) {
-    if (binding.path !== unit.unitPath) {
-      return {
-        kind: "unsafe",
-        reason: "missing-binding"
-      };
-    }
-    if (!binding.connected) return {
-      kind: "unsafe",
-      reason: "disconnected"
-    };
-    if (binding.capturedFingerprint !== unit.sourceNodeHash || binding.currentFingerprint !== binding.capturedFingerprint) {
-      return {
-        kind: "unsafe",
-        reason: "stale"
-      };
-    }
-    if (hasDuplicates(binding.optionIds) || hasDuplicates(binding.slotIds) || hasDuplicates(binding.leftIds) || hasDuplicates(binding.rightIds)) {
-      return {
-        kind: "unsafe",
-        reason: "ambiguous-binding"
-      };
-    }
-    return null;
-  }
-
-  function allPresent(expected, actual) {
-    const available = new Set(actual);
-    return expected.every(id => available.has(id));
-  }
-
-  function buildFillPlan(node, unit, answer, binding) {
-    const invalidBinding = validateBinding(unit, binding);
-    if (invalidBinding) return invalidBinding;
-    let operations;
-    let atomic = true;
-    if (answer.kind === "choice") {
-      if (node.kind !== "leaf" || unit.answerShape.kind !== "choice" || answer.optionIds.length === 0 || hasDuplicates(answer.optionIds) || !allPresent(answer.optionIds, binding.optionIds)) {
-        return {
-          kind: "unsafe",
-          reason: "missing-binding"
-        };
-      }
-      if (answer.optionIds.length < unit.answerShape.min || answer.optionIds.length > unit.answerShape.max) {
-        return {
-          kind: "unsafe",
-          reason: "shape-mismatch"
-        };
-      }
-      operations = answer.optionIds.map(optionId => ({
-        kind: "choose",
-        optionId: optionId
-      }));
-    } else if (answer.kind === "slots") {
-      if (node.kind !== "leaf" || unit.answerShape.kind !== "slots" || answer.slots.length === 0 || hasDuplicates(answer.slots.map(slot => slot.slotId)) || !allPresent(answer.slots.map(slot => slot.slotId), binding.slotIds)) {
-        return {
-          kind: "unsafe",
-          reason: "missing-binding"
-        };
-      }
-      if (!allPresent(unit.answerShape.slotIds, answer.slots.map(slot => slot.slotId)) && node.fillPolicy === "atomic") {
-        return {
-          kind: "unsafe",
-          reason: "shape-mismatch"
-        };
-      }
-      if (!allPresent(answer.slots.map(slot => slot.slotId), unit.answerShape.slotIds)) {
-        return {
-          kind: "unsafe",
-          reason: "shape-mismatch"
-        };
-      }
-      const writes = answer.slots.map(slot => ({
-        kind: "write",
-        slotId: slot.slotId,
-        value: slot.values.find(value => value.trim()) ?? ""
-      }));
-      if (writes.some(write => !write.value)) {
-        return {
-          kind: "unsafe",
-          reason: "shape-mismatch"
-        };
-      }
-      operations = writes;
-      atomic = node.fillPolicy === "atomic";
-    } else {
-      if (node.kind !== "matching" || unit.answerShape.kind !== "matching-pair" || unit.answerShape.leftId !== answer.leftId || !binding.leftIds.includes(answer.leftId) || !binding.rightIds.includes(answer.rightId) || !unit.answerShape.rightIds.includes(answer.rightId)) {
-        return {
-          kind: "unsafe",
-          reason: "missing-binding"
-        };
-      }
-      operations = [ {
-        kind: "pair",
-        leftId: answer.leftId,
-        rightId: answer.rightId
-      } ];
-      atomic = node.fillPolicy === "atomic";
-    }
-    const safetyCapability = createSafetyCapability();
-    const plan = Object.freeze({
-      path: unit.unitPath,
-      atomic: atomic,
-      operations: Object.freeze(operations.map(operation => Object.freeze({
-        ...operation
-      }))),
-      fingerprint: binding.currentFingerprint,
-      safetyCapability: safetyCapability
-    });
-    issuedCapabilities.set(safetyCapability, plan);
-    return {
-      kind: "safe",
-      plan: plan
-    };
-  }
-
-  const failed = path => ({
-    complete: false,
-    plans: [],
-    unsafePaths: [ path ]
-  });
-
-  function buildTreeFillPlans(root, answerTree, bindings) {
-    const units = flattenQuestionTree(root);
-    const unitByPath = new Map(units.map(unit => [ unit.unitPath, unit ]));
-    const visitLeaf = (node, answer) => {
-      if (answer.kind !== "leaf" || answer.path !== node.path || answer.status !== "hit" || !answer.answer) {
-        return failed(node.path);
-      }
-      const unit = unitByPath.get(node.path);
-      const binding = bindings.get(node.path);
-      if (!unit || !binding) return failed(node.path);
-      const result2 = buildFillPlan(node, unit, answer.answer, binding);
-      return result2.kind === "safe" ? {
-        complete: true,
-        plans: [ result2.plan ],
-        unsafePaths: []
-      } : failed(node.path);
-    };
-    const visitMatching = (node, answer) => {
-      if (answer.kind !== "matching" || answer.path !== node.path) {
-        return failed(node.path);
-      }
-      const rightIds = [];
-      const plans = [];
-      const unsafePaths = [];
-      for (const left of node.left) {
-        const pair = answer.pairs.find(candidate => candidate.leftId === left.id);
-        const unit = units.find(candidate => candidate.answerShape.kind === "matching-pair" && candidate.answerShape.leftId === left.id);
-        const pairPath = (unit == null ? void 0 : unit.unitPath) ?? `${node.path}/pairs/${left.id}`;
-        const binding = unit ? bindings.get(unit.unitPath) : void 0;
-        if (!pair || pair.status !== "hit" || !pair.rightId || !pair.displayValue || !unit || !binding) {
-          unsafePaths.push(pairPath);
-          continue;
-        }
-        rightIds.push(pair.rightId);
-        const payload = {
-          kind: "matching-pair",
-          leftId: left.id,
-          rightId: pair.rightId,
-          displayValue: pair.displayValue
-        };
-        const result2 = buildFillPlan(node, unit, payload, binding);
-        if (result2.kind === "safe") plans.push(result2.plan); else unsafePaths.push(pairPath);
-      }
-      if (node.cardinality === "one-to-one" && new Set(rightIds).size !== rightIds.length) {
-        return failed(node.path);
-      }
-      const complete = unsafePaths.length === 0 && plans.length === node.left.length;
-      if (!complete && node.fillPolicy === "atomic") return failed(node.path);
-      return {
-        complete: complete,
-        plans: plans,
-        unsafePaths: unsafePaths
-      };
-    };
-    const visit = (node, answer) => {
-      if (node.kind === "leaf") return visitLeaf(node, answer);
-      if (node.kind === "matching") return visitMatching(node, answer);
-      if (answer.kind !== "composite" || answer.path !== node.path) {
-        return failed(node.path);
-      }
-      const childAnswers = new Map(answer.children.map(child => [ child.path, child ]));
-      const childResults = node.children.map(child => {
-        const childAnswer = childAnswers.get(child.path);
-        return childAnswer ? visit(child, childAnswer) : failed(child.path);
-      });
-      const complete = childResults.every(result2 => result2.complete);
-      if (!complete && node.fillPolicy === "atomic") return failed(node.path);
-      return {
-        complete: complete,
-        plans: childResults.flatMap(result2 => result2.plans),
-        unsafePaths: childResults.flatMap(result2 => result2.unsafePaths)
-      };
-    };
-    const result = visit(root, answerTree);
-    return {
-      blocked: result.plans.length === 0 && result.unsafePaths.length > 0 && (root.kind === "composite" ? root.fillPolicy === "atomic" : root.kind === "matching" ? root.fillPolicy === "atomic" : false),
-      plans: result.plans,
-      unsafePaths: result.unsafePaths
-    };
-  }
-
-  const MAX_HARD_BINDINGS$1 = 5e3;
-
-  const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/u;
-
-  class RuleBindingRegistryError extends Error {
-    constructor(code, message) {
-      super(message);
-      this.code = code;
-      this.name = "RuleBindingRegistryError";
-    }
-  }
-
-  function validId$1(value) {
-    return value.length > 0 && value.length <= 256;
-  }
-
-  function targetKey(target) {
-    if (target.kind === "choose") return `choose:${target.optionId}`;
-    if (target.kind === "write") return `write:${target.slotId}`;
-    return `pair:${target.leftId}:${target.rightId}`;
-  }
-
-  function operationMatches(target, operation) {
-    if (target.kind !== operation.kind) return false;
-    if (target.kind === "choose" && operation.kind === "choose") return target.optionId === operation.optionId;
-    if (target.kind === "write" && operation.kind === "write") return target.slotId === operation.slotId;
-    return target.kind === "pair" && operation.kind === "pair" && target.leftId === operation.leftId && target.rightId === operation.rightId;
-  }
-
-  function unique(values) {
-    return [ ...new Set(values) ];
-  }
-
-  class RuleBindingRegistry {
-    constructor(options) {
-      __publicField(this, _a, "RuleBindingRegistry");
-      __publicField(this, "entriesByPath", new Map);
-      __publicField(this, "maxBindings");
-      __publicField(this, "sealed", false);
-      __publicField(this, "disposed", false);
-      if (!Number.isInteger(options.maxBindings) || options.maxBindings <= 0 || options.maxBindings > MAX_HARD_BINDINGS$1) throw new RuleBindingRegistryError("invalid_options", "invalid binding registry limit");
-      this.maxBindings = options.maxBindings;
-    }
-    get size() {
-      return this.disposed ? 0 : this.entriesByPath.size;
-    }
-    register(registration) {
-      if (this.sealed || this.disposed) throw new RuleBindingRegistryError("sealed", "binding registry is sealed");
-      if (this.entriesByPath.has(registration.path)) throw new RuleBindingRegistryError("duplicate_path", `duplicate binding path: ${registration.path}`);
-      if (this.entriesByPath.size >= this.maxBindings) throw new RuleBindingRegistryError("binding_limit", "binding registry limit exceeded");
-      if (!registration.path.startsWith("/") || registration.path.length > 1024 || !FINGERPRINT_PATTERN.test(registration.capturedFingerprint) || typeof registration.readCurrentFingerprint !== "function" || !Array.isArray(registration.targets) || registration.targets.length === 0) throw new RuleBindingRegistryError("invalid_registration", "invalid binding registration");
-      const targetKeys = new Set;
-      for (const target of registration.targets) {
-        const ids = target.kind === "choose" ? [ target.optionId ] : target.kind === "write" ? [ target.slotId ] : [ target.leftId, target.rightId ];
-        if (ids.some(id => !validId$1(id)) || typeof target.isConnected !== "function" || typeof target.apply !== "function" || typeof target.verify !== "function") throw new RuleBindingRegistryError("invalid_registration", "invalid binding target");
-        const key = targetKey(target);
-        if (targetKeys.has(key)) throw new RuleBindingRegistryError("duplicate_target", `duplicate binding target: ${key}`);
-        targetKeys.add(key);
-      }
-      this.entriesByPath.set(registration.path, {
-        path: registration.path,
-        capturedFingerprint: registration.capturedFingerprint,
-        readCurrentFingerprint: registration.readCurrentFingerprint,
-        targets: Object.freeze([ ...registration.targets ])
-      });
-    }
-    seal() {
-      this.sealed = true;
-    }
-    dispose() {
-      this.disposed = true;
-      this.sealed = true;
-      this.entriesByPath.clear();
-    }
-    get(path) {
-      if (this.disposed) return void 0;
-      const entry = this.entriesByPath.get(path);
-      if (!entry) return void 0;
-      let currentFingerprint = "";
-      let connected = true;
-      try {
-        currentFingerprint = entry.readCurrentFingerprint();
-        if (!FINGERPRINT_PATTERN.test(currentFingerprint)) {
-          currentFingerprint = "";
-          connected = false;
-        }
-      } catch {
-        currentFingerprint = "";
-        connected = false;
-      }
-      if (connected) {
-        try {
-          connected = entry.targets.every(target => target.isConnected());
-        } catch {
-          connected = false;
-        }
-      }
-      return {
-        path: entry.path,
-        capturedFingerprint: entry.capturedFingerprint,
-        currentFingerprint: currentFingerprint,
-        connected: connected,
-        optionIds: entry.targets.filter(target => target.kind === "choose").map(target => target.optionId),
-        slotIds: entry.targets.filter(target => target.kind === "write").map(target => target.slotId),
-        leftIds: unique(entry.targets.filter(target => target.kind === "pair").map(target => target.leftId)),
-        rightIds: unique(entry.targets.filter(target => target.kind === "pair").map(target => target.rightId))
-      };
-    }
-    has(path) {
-      return !this.disposed && this.entriesByPath.has(path);
-    }
-    targetForOperation(path, operation) {
-      var _a2;
-      if (this.disposed) return null;
-      return ((_a2 = this.entriesByPath.get(path)) == null ? void 0 : _a2.targets.find(target => operationMatches(target, operation))) ?? null;
-    }
-    entries() {
-      return new Map([ ...this.entriesByPath.keys() ].flatMap(path => {
-        const binding = this.get(path);
-        return binding ? [ [ path, binding ] ] : [];
-      })).entries();
-    }
-    keys() {
-      return new Map(this.entries()).keys();
-    }
-    values() {
-      return new Map(this.entries()).values();
-    }
-    forEach(callbackfn, thisArg) {
-      for (const [key, value] of this.entries()) callbackfn.call(thisArg, value, key, this);
-    }
-    [(_a = Symbol.toStringTag, Symbol.iterator)]() {
-      return this.entries();
-    }
-  }
-
-  const CJK_START = 19968;
-
-  const CJK_END = 40870;
-
-  const CJK_COUNT = CJK_END - CJK_START;
-
-  const cxFontMd5 = value => md5Exports.md5(value);
-
-  const asRecord = value => value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;
-
-  function cjkCodePointsFromCmap(font) {
-    var _a2;
-    const cmap = asRecord((_a2 = asRecord(font)) == null ? void 0 : _a2.cmap);
-    if (!cmap || !Array.isArray(cmap.tables)) return null;
-    const tableIndex = [ cmap.p0e4, cmap.p3e1, cmap.p1e0 ].find(value => typeof value === "number" && Number.isInteger(value) && value >= 0);
-    if (typeof tableIndex !== "number") return null;
-    const table = asRecord(cmap.tables[tableIndex]);
-    if (!table || typeof table.format !== "number") return null;
-    const codes = new Set;
-    let inspected = 0;
-    if (table.format === 0) {
-      if (!Array.isArray(table.map)) return null;
-      const upper = Math.min(CJK_END, table.map.length);
-      for (let code = CJK_START; code < upper; code++) if (table.map[code]) codes.add(code);
-    } else if (table.format === 4) {
-      if (!Array.isArray(table.startCount) || !Array.isArray(table.endCount) || !Array.isArray(table.idDelta) || !Array.isArray(table.idRangeOffset) || !Array.isArray(table.glyphIdArray)) return null;
-      const rangeCount = Math.min(table.startCount.length, table.endCount.length);
-      for (let index = 0; index < rangeCount; index++) {
-        const start = table.startCount[index];
-        const end = table.endCount[index];
-        const delta = table.idDelta[index];
-        const rangeOffset = table.idRangeOffset[index];
-        if (!Number.isInteger(start) || !Number.isInteger(end) || !Number.isInteger(delta) || !Number.isInteger(rangeOffset)) return null;
-        const lower = Math.max(CJK_START, start);
-        const upper = Math.min(CJK_END - 1, end);
-        for (let code = lower; code <= upper; code++) {
-          if (++inspected > CJK_COUNT) return [];
-          const glyph = rangeOffset === 0 ? code + delta & 65535 : table.glyphIdArray[code - start + (rangeOffset >> 1) - (table.idRangeOffset.length - index)];
-          if (glyph) codes.add(code);
-        }
-      }
-    } else if (table.format === 6) {
-      if (typeof table.firstCode !== "number" || !Number.isInteger(table.firstCode) || !Array.isArray(table.glyphIdArray)) return null;
-      const firstIndex = Math.max(0, CJK_START - table.firstCode);
-      const endIndex = Math.min(table.glyphIdArray.length, CJK_END - table.firstCode);
-      for (let index = firstIndex; index < endIndex; index++) {
-        const code = table.firstCode + index;
-        if (table.glyphIdArray[index]) codes.add(code);
-      }
-    } else if (table.format === 12) {
-      if (!Array.isArray(table.groups)) return null;
-      for (const group of table.groups) {
-        if (!Array.isArray(group) || !Number.isInteger(group[0]) || !Number.isInteger(group[1]) || !Number.isInteger(group[2])) return null;
-        const start = group[0];
-        const lower = Math.max(CJK_START, start);
-        const upper = Math.min(CJK_END - 1, group[1]);
-        for (let code = lower; code <= upper; code++) {
-          if (++inspected > CJK_COUNT) return [];
-          if (group[2] + code - start !== 0) codes.add(code);
-        }
-      }
-    } else {
-      return null;
-    }
-    return [ ...codes ].sort((left, right) => left - right);
-  }
-
-  function base64ToUint8Array(base64) {
-    const bin = atob(base64);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    return arr;
-  }
-
-  function extractCxFontBase64(styleText) {
-    const m = styleText.match(/base64,([\w\W]+?)'/);
-    return m ? m[1] : null;
-  }
-
-  function buildCharMap(fontData, table, typr) {
-    const font = typr.parse(fontData);
-    const map = {};
-    const subsetCodes = cjkCodePointsFromCmap(font);
-    const codes = subsetCodes ?? Array.from({
-      length: CJK_COUNT
-    }, (_, index) => CJK_START + index);
-    for (const i of codes) {
-      const g = typr.U.codeToGlyph(font, i);
-      if (!g) continue;
-      const path = typr.U.glyphToPath(font, g);
-      const real = table[cxFontMd5(JSON.stringify(path)).slice(24)];
-      if (typeof real === "number") map[i] = real;
-    }
-    return map;
-  }
-
-  function applyCharMap(text, map) {
-    return [ ...text ].map(ch => {
-      const real = map[ch.charCodeAt(0)];
-      return real == null ? ch : String.fromCharCode(real);
-    }).join("");
-  }
-
-  const LABEL_PATTERN = /^\s*(\u6b63\u786e\u7b54\u6848|\u6211\u7684\u7b54\u6848|\u7b54\u6848)\s*[:\uff1a]?\s*/;
-
-  const LETTER_ANSWER_PATTERN = /^[A-Z]([\s,\uff0c\u3001;\uff1b]*[A-Z])*$/;
-
-  const MAX_LETTERS = 26;
-
-  const SLOT_INDEX_PATTERN = /^\s*[(\uff08]\s*\d+\s*[)\uff09]\s*/;
-
-  function mapChaoxingHarvestedAnswer(text, options, slotValues = []) {
-    if (slotValues.length > 0) {
-      const slots = slotValues.map(value => value.replace(SLOT_INDEX_PATTERN, "").replace(/\s+/g, " ").trim());
-      return slots.every(Boolean) ? slots : [];
-    }
-    const stripped = text.replace(LABEL_PATTERN, "").replace(/\s+/g, " ").trim();
-    if (!stripped) return [];
-    if (options.length === 0) return [ stripped ];
-    const compact = stripped.replace(/[\s,\uff0c\u3001;\uff1b]/g, "");
-    if (!LETTER_ANSWER_PATTERN.test(stripped) || compact.length > MAX_LETTERS) return [ stripped ];
-    const values = [];
-    for (const letter2 of compact) {
-      const index = letter2.charCodeAt(0) - 65;
-      const option = options[index];
-      if (option === void 0) return [];
-      values.push(option);
-    }
-    return values;
-  }
-
-  function stripTitle(title) {
-    return collapseWs(title.replace(/^\s*\d+\s*[.\u3001\uff0e,]?\s*/, "").replace(/^[(\uff08][^()\uff08\uff09]*?\u9898[^()\uff08\uff09]*?[)\uff09]\s*/, "").replace(/\u3010.+?\u3011/, ""));
-  }
-
-  function compatibleType(unit, itemType) {
-    if (!(itemType == null ? void 0 : itemType.trim())) return true;
-    const normalized = normalizeLeafQuestionType(itemType);
-    if (!normalized) return false;
-    if (normalized === unit.queryType) return true;
-    return unit.answerShape.kind === "slots" && (normalized === "fill" || normalized === "short_answer");
-  }
-
-  function matchUniqueOption(value, options, queryType) {
-    var _a2, _b;
-    if (queryType === "judge") {
-      const wantedTruth = normalizeTruth(value);
-      if (wantedTruth) {
-        const truthMatches = options.filter(option => normalizeTruth(option.content) === wantedTruth);
-        if (truthMatches.length === 1) return {
-          kind: "matched",
-          option: truthMatches[0]
-        };
-        if (truthMatches.length > 1) return {
-          kind: "ambiguous"
-        };
-      }
-    }
-    const wanted = normalizeForMatch(value);
-    if (!wanted) return {
-      kind: "missing"
-    };
-    const normalized = options.map(option => ({
-      option: option,
-      value: normalizeForMatch(option.content)
-    }));
-    const exact = normalized.filter(option => option.value === wanted);
-    if (exact.length === 1) return {
-      kind: "matched",
-      option: (_a2 = exact[0]) == null ? void 0 : _a2.option
-    };
-    if (exact.length > 1) return {
-      kind: "ambiguous"
-    };
-    const contains = normalized.filter(option => option.value.includes(wanted));
-    if (contains.length === 1) return {
-      kind: "matched",
-      option: (_b = contains[0]) == null ? void 0 : _b.option
-    };
-    return contains.length > 1 ? {
-      kind: "ambiguous"
-    } : {
-      kind: "missing"
-    };
-  }
-
-  function mapOptions(values, unit) {
-    const matches = [];
-    for (const value of values) {
-      const match = matchUniqueOption(value, unit.options, unit.queryType);
-      if (match.kind !== "matched") return match;
-      matches.push(match.option);
-    }
-    return {
-      kind: "matched",
-      options: matches
-    };
-  }
-
-  function answeredOptionIndexes(unit, answer) {
-    if (!answer) return [];
-    if (answer.kind === "choice") {
-      const wanted = new Set(answer.optionIds);
-      return unit.options.flatMap((option, index) => wanted.has(option.id) ? [ index ] : []);
-    }
-    if (answer.kind === "matching-pair") {
-      return unit.options.flatMap((option, index) => option.id === answer.rightId ? [ index ] : []);
-    }
-    if (unit.answerShape.kind !== "slots" || unit.options.length === 0) return [];
-    const values = new Set(answer.slots.flatMap(slot => slot.values));
-    return unit.options.flatMap((option, index) => values.has(option.content) ? [ index ] : []);
-  }
-
-  function buildAnswerPlan(unit, hit) {
-    const values = hit.values.map(value => value.trim());
-    if (values.length === 0 || values.some(value => !normalizeForMatch(value))) {
-      return {
-        kind: "unusable",
-        reason: "empty"
-      };
-    }
-    if (!compatibleType(unit, hit.itemType)) {
-      return {
-        kind: "unusable",
-        reason: "type-mismatch"
-      };
-    }
-    if (unit.answerShape.kind === "choice") {
-      if (values.length < unit.answerShape.min || values.length > unit.answerShape.max || unit.queryType !== "multiple" && values.length !== 1) {
-        return {
-          kind: "unusable",
-          reason: "shape-mismatch"
-        };
-      }
-      const matched = mapOptions(values, unit);
-      if (matched.kind === "ambiguous") {
-        return {
-          kind: "unusable",
-          reason: "ambiguous"
-        };
-      }
-      if (matched.kind === "missing") {
-        return {
-          kind: "unusable",
-          reason: "shape-mismatch"
-        };
-      }
-      const optionIds = matched.options.map(option => option.id);
-      if (new Set(optionIds).size !== optionIds.length) {
-        return {
-          kind: "unusable",
-          reason: "shape-mismatch"
-        };
-      }
-      return {
-        kind: "usable",
-        answer: {
-          kind: "choice",
-          optionIds: optionIds,
-          displayValues: matched.options.map(option => option.content)
-        }
-      };
-    }
-    if (unit.answerShape.kind === "matching-pair") {
-      if (values.length !== 1) {
-        return {
-          kind: "unusable",
-          reason: "shape-mismatch"
-        };
-      }
-      const matched = mapOptions(values, unit);
-      if (matched.kind === "ambiguous") {
-        return {
-          kind: "unusable",
-          reason: "ambiguous"
-        };
-      }
-      const option = matched.kind === "matched" ? matched.options[0] : void 0;
-      if (!option || !unit.answerShape.rightIds.includes(option.id)) {
-        return {
-          kind: "unusable",
-          reason: "shape-mismatch"
-        };
-      }
-      return {
-        kind: "usable",
-        answer: {
-          kind: "matching-pair",
-          leftId: unit.answerShape.leftId,
-          rightId: option.id,
-          displayValue: option.content
-        }
-      };
-    }
-    const slotIds = unit.answerShape.slotIds;
-    if (unit.options.length > 0) {
-      if (slotIds.length !== 1 || values.length !== 1) {
-        return {
-          kind: "unusable",
-          reason: "shape-mismatch"
-        };
-      }
-      const matched = mapOptions(values, unit);
-      if (matched.kind === "ambiguous") {
-        return {
-          kind: "unusable",
-          reason: "ambiguous"
-        };
-      }
-      const option = matched.kind === "matched" ? matched.options[0] : void 0;
-      if (!option) return {
-        kind: "unusable",
-        reason: "shape-mismatch"
-      };
-      return {
-        kind: "usable",
-        answer: {
-          kind: "slots",
-          slots: [ {
-            slotId: slotIds[0],
-            values: [ option.content ]
-          } ]
-        }
-      };
-    }
-    if (slotIds.length === 1) {
-      return {
-        kind: "usable",
-        answer: {
-          kind: "slots",
-          slots: [ {
-            slotId: slotIds[0],
-            values: values
-          } ]
-        }
-      };
-    }
-    if (values.length !== slotIds.length) {
-      return {
-        kind: "unusable",
-        reason: "shape-mismatch"
-      };
-    }
-    return {
-      kind: "usable",
-      answer: {
-        kind: "slots",
-        slots: slotIds.map((slotId, index) => ({
-          slotId: slotId,
-          values: [ values[index] ]
-        }))
-      }
-    };
-  }
-
-  const displayValues = answer => {
-    switch (answer.kind) {
-     case "choice":
-      return answer.displayValues;
-
-     case "slots":
-      return answer.slots.flatMap(slot => slot.values);
-
-     case "matching-pair":
-      return [ answer.displayValue ];
-    }
-  };
-
-  const transportIdempotencyKey = unit => `v2:${semanticContentHash(`${unit.rootHash}\n${unit.unitPath}\n${unit.unitHash}`)}`;
-
-  class AnswerSession {
-    constructor(adapter, client, opts = {}, deps = {}, emit = () => {}) {
-      __publicField(this, "list", []);
-      __publicField(this, "trees", []);
-      __publicField(this, "currentInx", 0);
-      __publicField(this, "running", false);
-      __publicField(this, "lastHarvest", null);
-      __publicField(this, "stopFlag", false);
-      __publicField(this, "paidBlockReason", null);
-      __publicField(this, "opts");
-      __publicField(this, "ctx", null);
-      this.adapter = adapter;
-      this.client = client;
-      this.deps = deps;
-      this.emit = emit;
-      this.opts = {
-        autoFill: true,
-        delayMs: 1e3,
-        freeFirst: true,
-        ...opts
-      };
-    }
-    setOptions(opts) {
-      this.opts = {
-        ...this.opts,
-        ...opts
-      };
-    }
-    async loadTrees(ctx, capturedTrees) {
-      this.ctx = ctx;
-      this.paidBlockReason = null;
-      this.trees = capturedTrees.map(captured => ({
-        captured: captured,
-        answer: null,
-        results: new Map,
-        filledPaths: new Set
-      }));
-      this.list = this.trees.flatMap(treeState => flattenQuestionTree(treeState.captured.root).map(unit => {
-        const q = {
-          type: unit.queryType === "short_answer" ? "fill" : unit.queryType,
-          stem: unit.effectiveStem,
-          options: unit.options.map(option => option.content)
-        };
-        return {
-          q: q,
-          status: "pending",
-          answer: [],
-          answerPlan: null,
-          filled: false,
-          charged: false,
-          aiGenerated: false,
-          free: false,
-          root: treeState.captured.root,
-          unit: unit,
-          binding: treeState.captured.bindings.get(unit.unitPath),
-          capturedTree: treeState.captured
-        };
-      }));
-      this.currentInx = 0;
-      this.lastHarvest = this.persistHarvested();
-      return this.list.length;
-    }
-    isStale() {
-      var _a2;
-      let total = 0;
-      let disconnected = 0;
-      for (const item of this.list) {
-        if (!item.capturedTree || !item.unit) continue;
-        total += 1;
-        if (!((_a2 = item.capturedTree.bindings.get(item.unit.unitPath)) == null ? void 0 : _a2.connected)) disconnected += 1;
-      }
-      return total > 0 && disconnected === total;
-    }
-    adoptResults(previous) {
-      if (previous.length === 0 || previous.length !== this.list.length) return false;
-      for (const [index, item] of this.list.entries()) {
-        const source = previous[index];
-        if (!item.unit || !(source == null ? void 0 : source.unit) || source.unit.unitPath !== item.unit.unitPath || source.unit.unitHash !== item.unit.unitHash) return false;
-      }
-      for (const [index, item] of this.list.entries()) {
-        const source = previous[index];
-        if (!source || source.status === "pending") continue;
-        item.status = source.status;
-        item.answer = source.answer;
-        item.answerPlan = source.answerPlan;
-        item.filled = source.filled;
-        item.charged = source.charged;
-        item.free = source.free;
-        item.aiGenerated = source.aiGenerated;
-        item.unsafeReason = source.unsafeReason;
-        if (source.answerNode) this.recordResult(item, source.answerNode);
-      }
-      return true;
-    }
-    persistHarvested() {
-      var _a2;
-      const store = this.deps.localStore;
-      if (!this.adapter.takeHarvested) return null;
-      const harvested = this.adapter.takeHarvested();
-      if (!store) return null;
-      let persisted = 0;
-      const items = [];
-      for (const entry of harvested) {
-        let accepted = false;
-        try {
-          const meta = {
-            ...entry.stem ? {
-              stem: entry.stem
-            } : {},
-            ...entry.itemType ? {
-              itemType: entry.itemType
-            } : {},
-            ...((_a2 = entry.options) == null ? void 0 : _a2.length) ? {
-              options: entry.options
-            } : {}
-          };
-          accepted = store.write(entry.unitHash, {
-            values: entry.values
-          }, Object.keys(meta).length > 0 ? meta : void 0);
-          if (accepted) persisted += 1;
-        } catch {}
-        items.push({
-          ...entry,
-          persisted: accepted
-        });
-      }
-      return {
-        harvested: harvested.length,
-        persisted: persisted,
-        items: items
-      };
-    }
-    load(ctx) {
-      return this.adapter.captureTrees(ctx).then(trees => this.loadTrees(ctx, trees));
-    }
-    recordResult(item, result) {
-      item.answerNode = result;
-      if (item.capturedTree) {
-        const treeState = this.trees.find(candidate => candidate.captured === item.capturedTree);
-        if (!treeState) return;
-        treeState.results.set(result.path, result);
-        treeState.answer = assembleAnswerTree(treeState.captured.root, [ ...treeState.results.values() ]);
-        for (const candidate of this.list) {
-          if (candidate.capturedTree === treeState.captured) {
-            candidate.answerTree = treeState.answer;
-            candidate.treeProgress = {
-              hit: [ ...treeState.results.values() ].filter(answer => answer.status === "hit").length,
-              total: flattenQuestionTree(treeState.captured.root).length,
-              status: treeState.answer.status
-            };
-          }
-        }
-        return;
-      }
-      if (item.root) item.answerTree = assembleAnswerTree(item.root, [ result ]);
-    }
-    recordTerminal(item, status) {
-      if (!item.unit) return;
-      this.recordResult(item, {
-        kind: "leaf",
-        path: item.unit.unitPath,
-        unitHash: item.unit.unitHash,
-        status: status,
-        answer: null,
-        charged: false
-      });
-    }
-    async applyReadyTreePlans(capturedTree) {
-      if (!this.opts.autoFill || !this.ctx) return;
-      const treeState = this.trees.find(candidate => candidate.captured === capturedTree);
-      if (!(treeState == null ? void 0 : treeState.answer)) return;
-      const result = buildTreeFillPlans(capturedTree.root, treeState.answer, capturedTree.bindings);
-      if (result.blocked) {
-        for (const item of this.list) {
-          if (item.capturedTree === capturedTree && item.status === "hit" && !item.filled) {
-            item.unsafeReason = "atomic-tree-blocked";
-          }
-        }
-        return;
-      }
-      for (const plan of result.plans) {
-        if (treeState.filledPaths.has(plan.path)) continue;
-        const item = this.list.find(candidate => {
-          var _a2;
-          return candidate.capturedTree === capturedTree && ((_a2 = candidate.unit) == null ? void 0 : _a2.unitPath) === plan.path;
-        });
-        if (!item) continue;
-        const filled = await this.adapter.applyTreeFillPlan(capturedTree, plan, this.ctx);
-        item.filled = filled;
-        if (filled) treeState.filledPaths.add(plan.path); else item.unsafeReason = "adapter-rejected";
-      }
-    }
-    async applyHit(item, answer, options) {
-      item.answerPlan = answer;
-      item.answer = displayValues(answer);
-      item.status = "hit";
-      item.free = options.source === "free";
-      item.charged = options.charged;
-      item.aiGenerated = options.aiGenerated ?? false;
-      item.unsafeReason = void 0;
-      if (item.unit) {
-        this.recordResult(item, {
-          kind: "leaf",
-          path: item.unit.unitPath,
-          unitHash: item.unit.unitHash,
-          status: "hit",
-          answer: answer,
-          source: options.source,
-          aiGenerated: options.aiGenerated,
-          charged: options.charged
-        });
-      }
-      if (item.capturedTree) await this.applyReadyTreePlans(item.capturedTree);
-    }
-    async persistFilledAnswers() {
-      if (!this.opts.autoFill || !this.ctx || !this.adapter.persistAnswers || !this.list.some(item => item.filled)) return;
-      let persisted = false;
-      try {
-        persisted = await this.adapter.persistAnswers(this.ctx);
-      } catch {
-        persisted = false;
-      }
-      if (persisted) return;
-      for (const item of this.list) {
-        if (!item.filled) continue;
-        item.filled = false;
-        item.unsafeReason = "adapter-rejected";
-      }
-      for (const tree of this.trees) tree.filledPaths.clear();
-    }
-    async answerOne(inx) {
-      var _a2, _b, _c;
-      const item = this.list[inx];
-      if (!item || !this.ctx || !item.root || !item.unit) return;
-      if (item.status === "decodeFail" || item.status === "unsupported" || item.status === "hit") return;
-      this.currentInx = inx;
-      this.emit({
-        kind: "question",
-        inx: inx
-      });
-      try {
-        const cached = ((_a2 = this.deps.localStore) == null ? void 0 : _a2.read(item.unit.unitHash)) ?? null;
-        if (cached) {
-          const plan = buildAnswerPlan(item.unit, cached);
-          if (plan.kind === "usable") {
-            await this.applyHit(item, plan.answer, {
-              source: "local",
-              charged: false
-            });
-            return;
-          }
-        }
-        if (this.opts.freeFirst !== false && this.deps.freeSearch) {
-          try {
-            const freeHit = await this.deps.freeSearch(item.unit);
-            if (freeHit) {
-              const plan = buildAnswerPlan(item.unit, freeHit);
-              if (plan.kind === "usable") {
-                await this.applyHit(item, plan.answer, {
-                  source: "free",
-                  charged: false,
-                  aiGenerated: freeHit.aiGenerated
-                });
-                return;
-              }
-            }
-          } catch {}
-        }
-        const canPaid = this.paidBlockReason === null && (this.deps.canPaidSearch ? this.deps.canPaidSearch() : true);
-        if (!canPaid) {
-          item.status = "miss";
-          this.recordTerminal(item, this.paidBlockReason === "insufficient" ? "insufficient" : this.paidBlockReason === "ratelimited" ? "rate_limited" : "unauthorized");
-          return;
-        }
-        const request = {
-          requestSchemaVersion: 2,
-          root: item.root,
-          unitPath: item.unit.unitPath,
-          expectedRootHash: item.unit.rootHash,
-          expectedUnitHash: item.unit.unitHash
-        };
-        const key = this.deps.genKey ? this.deps.genKey() : transportIdempotencyKey(item.unit);
-        const res = await this.client.search(request, key);
-        if (res.code === AiAskCode.Ok && ((_b = res.result) == null ? void 0 : _b.status) === "hit") {
-          if (!res.result.answer) {
-            item.status = "unsafe";
-            return;
-          }
-          await this.applyHit(item, res.result.answer, {
-            source: res.result.source ?? "relay",
-            charged: res.result.charged,
-            aiGenerated: res.result.aiGenerated
-          });
-        } else if (res.code === AiAskCode.Ok) {
-          item.status = ((_c = res.result) == null ? void 0 : _c.status) === "unsafe" ? "unsafe" : "miss";
-          if (res.result) this.recordResult(item, res.result); else this.recordTerminal(item, "miss");
-        } else if (res.code === AiAskCode.Insufficient) {
-          this.paidBlockReason = "insufficient";
-          item.status = "miss";
-          this.recordTerminal(item, "insufficient");
-          this.emit({
-            kind: "insufficient"
-          });
-        } else if (res.code === AiAskCode.Unauthorized) {
-          item.status = "miss";
-          this.recordTerminal(item, "unauthorized");
-          this.emit({
-            kind: "unauthorized"
-          });
-        } else if (res.code === AiAskCode.RateLimited) {
-          this.paidBlockReason = "ratelimited";
-          item.status = "miss";
-          this.recordTerminal(item, "rate_limited");
-          this.emit({
-            kind: "ratelimited"
-          });
-        }
-      } catch (error) {
-        item.status = "miss";
-        this.recordTerminal(item, "busy");
-        this.emit({
-          kind: "search-failed",
-          inx: inx,
-          reason: error instanceof Error ? error.message : String(error ?? "")
-        });
-      }
-    }
-    async start(fromInx = 0) {
-      var _a2, _b;
-      if (this.running) return;
-      this.running = true;
-      this.stopFlag = false;
-      const sleep2 = this.deps.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
-      const random = this.deps.random ?? Math.random;
-      try {
-        if (this.ctx && await ((_b = (_a2 = this.adapter).prepareStart) == null ? void 0 : _b.call(_a2, this.ctx)) === "navigating") return;
-        for (let index = fromInx; index < this.list.length; index += 1) {
-          if (this.stopFlag) break;
-          if (this.isStale()) {
-            this.stopFlag = true;
-            break;
-          }
-          await this.answerOne(index);
-          if (this.stopFlag) break;
-          this.emit({
-            kind: "progress",
-            inx: index,
-            total: this.list.length
-          });
-          if (index < this.list.length - 1) {
-            await sleep2(this.opts.delayMs + random() * 1e3);
-          }
-        }
-        if (this.stopFlag) this.emit({
-          kind: "paused"
-        }); else {
-          await this.persistFilledAnswers();
-          this.emit({
-            kind: "done",
-            ...this.stats(),
-            total: this.list.length
-          });
-        }
-      } finally {
-        this.running = false;
-      }
-    }
-    async fillRandom(inx, pick = Math.random) {
-      return await this.fillRandomWithReason(inx, pick) === "ok";
-    }
-    async fillRandomWithReason(inx, pick = Math.random) {
-      const item = this.list[inx];
-      if (!item) return "missing";
-      if (item.filled) return "already-filled";
-      if (!this.opts.autoFill) return "no-autofill";
-      if (!this.ctx) return "no-ctx";
-      if (!item.root) return "no-root";
-      if (!item.binding) return "no-binding";
-      const unit = item.unit;
-      if (!unit) return "no-unit";
-      if (unit.queryType !== "single" && unit.queryType !== "judge") return "type-not-allowed";
-      const options = unit.options.filter(option => option.content.trim());
-      if (options.length === 0) return "no-options";
-      const chosen = options[Math.floor(pick() * options.length) % options.length];
-      if (!chosen) return "no-options";
-      const fillPlan = buildFillPlan(item.root, unit, {
-        kind: "choice",
-        optionIds: [ chosen.id ],
-        displayValues: [ chosen.content ]
-      }, item.binding);
-      if (fillPlan.kind === "unsafe") {
-        item.unsafeReason = fillPlan.reason;
-        return "gate-unsafe";
-      }
-      const filled = item.capturedTree ? await this.adapter.applyTreeFillPlan(item.capturedTree, fillPlan.plan, this.ctx) : false;
-      if (!filled) {
-        item.unsafeReason = "adapter-rejected";
-        return "adapter-rejected";
-      }
-      item.filled = true;
-      item.random = true;
-      return "ok";
-    }
-    async reAnswer(inx) {
-      var _a2;
-      if (this.running) return;
-      const item = this.list[inx];
-      if (!item || !this.ctx || item.status === "decodeFail" || item.status === "unsupported") return;
-      this.running = true;
-      this.stopFlag = false;
-      try {
-        if (item.status === "hit" && item.answerPlan) {
-          this.currentInx = inx;
-          this.emit({
-            kind: "question",
-            inx: inx
-          });
-          if (!item.filled) {
-            await this.applyHit(item, item.answerPlan, {
-              source: ((_a2 = item.answerNode) == null ? void 0 : _a2.source) ?? (item.free ? "free" : "relay"),
-              charged: item.charged,
-              aiGenerated: item.aiGenerated
-            });
-          }
-        } else {
-          await this.answerOne(inx);
-        }
-        await this.persistFilledAnswers();
-        this.emit({
-          kind: "progress",
-          inx: inx,
-          total: this.list.length
-        });
-      } finally {
-        this.running = false;
-      }
-    }
-    resumePaidAfterCredit() {
-      if (this.paidBlockReason === "insufficient") this.paidBlockReason = null;
-    }
-    pause() {
-      this.stopFlag = true;
-    }
-    stats() {
-      let hit = 0;
-      let miss = 0;
-      let charged = 0;
-      for (const item of this.list) {
-        if (item.status === "hit") {
-          hit += 1;
-          if (item.charged) charged += 1;
-        } else if (item.status === "miss" || item.status === "unsafe") {
-          miss += 1;
-        }
-      }
-      return {
-        hit: hit,
-        miss: miss,
-        charged: charged
-      };
-    }
-  }
-
-  async function withDeadline(operation, timeoutMs, label) {
-    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error(`${label} timeout`);
-    let timer;
-    const deadline = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${label} timeout`)), timeoutMs);
-    });
-    try {
-      return await Promise.race([ Promise.resolve().then(operation), deadline ]);
-    } finally {
-      if (timer !== void 0) clearTimeout(timer);
-    }
-  }
-
-  const DEVICE_KEY_STORAGE_KEY = "aiask.security.device-key.v1";
-
-  const DEFAULT_TIMEOUT_MS$2 = 8e3;
-
-  const PRIVATE_FIELDS = [ "crv", "d", "kty", "x", "y" ];
-
-  const STORED_FIELDS = [ "deviceId", "privateJwk", "publicJwk", "v" ];
-
-  const BASE64URL_32_BYTES = /^[A-Za-z0-9_-]{43}$/u;
-
-  const KEY_SELF_TEST = utf8Bytes("aiask-device-key-self-test-v1");
-
-  const hasOnlyFields = (value, fields) => {
-    const actual = Object.keys(value).sort();
-    const expected = [ ...fields ].sort();
-    return actual.length === expected.length && actual.every((field, index) => field === expected[index]);
-  };
-
-  function parsePrivateJwk(input) {
-    if (typeof input !== "object" || input === null || !hasOnlyFields(input, PRIVATE_FIELDS)) throw new Error("invalid stored device key");
-    const value = input;
-    const publicJwk2 = PublicP256JwkSchema.parse({
-      kty: value.kty,
-      crv: value.crv,
-      x: value.x,
-      y: value.y
-    });
-    if (typeof value.d !== "string" || !BASE64URL_32_BYTES.test(value.d)) throw new Error("invalid stored device key");
-    return {
-      ...publicJwk2,
-      d: value.d
-    };
-  }
-
-  async function parseStoredDeviceKey(input) {
-    if (typeof input !== "object" || input === null || !hasOnlyFields(input, STORED_FIELDS)) throw new Error("invalid stored device key");
-    const value = input;
-    if (value.v !== 1 || typeof value.deviceId !== "string") throw new Error("invalid stored device key");
-    const publicJwk2 = PublicP256JwkSchema.parse(value.publicJwk);
-    const privateJwk2 = parsePrivateJwk(value.privateJwk);
-    const deviceId = await fingerprintPublicJwk(publicJwk2);
-    if (deviceId !== value.deviceId) throw new Error("invalid stored device key fingerprint");
-    const [privateKey, publicKey] = await Promise.all([ importEcdsaPrivateJwk(privateJwk2), importEcdsaPublicJwk(publicJwk2) ]);
-    const signature2 = await signEcdsaP1363(privateKey, KEY_SELF_TEST);
-    if (!(await verifyEcdsaP1363(publicKey, KEY_SELF_TEST, signature2))) throw new Error("invalid stored device key pair");
-    return {
-      deviceId: deviceId,
-      publicJwk: publicJwk2,
-      privateKey: privateKey
-    };
-  }
-
-  async function generateStoredDeviceKey(generateKeyPair) {
-    const pair = await generateKeyPair();
-    const [publicJwk2, exportedPrivateJwk] = await Promise.all([ exportPublicJwk(pair.publicKey), exportPrivateJwk(pair.privateKey) ]);
-    const parsedPublicJwk = PublicP256JwkSchema.parse(publicJwk2);
-    const privateJwk2 = parsePrivateJwk({
-      ...parsedPublicJwk,
-      d: exportedPrivateJwk.d
-    });
-    const deviceId = await fingerprintPublicJwk(parsedPublicJwk);
-    return {
-      identity: {
-        deviceId: deviceId,
-        publicJwk: parsedPublicJwk,
-        privateKey: pair.privateKey
-      },
-      stored: {
-        v: 1,
-        deviceId: deviceId,
-        publicJwk: parsedPublicJwk,
-        privateJwk: privateJwk2
-      }
-    };
-  }
-
-  class DeviceKeyManager {
-    constructor(storage, options = {}) {
-      __publicField(this, "timeoutMs");
-      __publicField(this, "generateKeyPair");
-      __publicField(this, "identity");
-      __publicField(this, "pending");
-      this.storage = storage;
-      this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS$2;
-      this.generateKeyPair = options.generateKeyPair ?? generateEcdsaDeviceKeyPair;
-    }
-    getOrCreate() {
-      if (this.identity) return Promise.resolve(this.identity);
-      if (!this.pending) {
-        this.track(withDeadline(async () => {
-          const stored = await this.storage.get(DEVICE_KEY_STORAGE_KEY);
-          if (stored !== void 0 && stored !== null) return parseStoredDeviceKey(stored);
-          const generated = await generateStoredDeviceKey(this.generateKeyPair);
-          await this.storage.set(DEVICE_KEY_STORAGE_KEY, generated.stored);
-          return generated.identity;
-        }, this.timeoutMs, "device key"));
-      }
-      const pending = this.pending;
-      if (!pending) throw new Error("device key operation unavailable");
-      return pending;
-    }
-    async reset() {
-      if (this.pending) await this.pending.catch(() => void 0);
-      this.identity = void 0;
-      return this.track(withDeadline(async () => {
-        const generated = await generateStoredDeviceKey(this.generateKeyPair);
-        await this.storage.set(DEVICE_KEY_STORAGE_KEY, generated.stored);
-        return generated.identity;
-      }, this.timeoutMs, "device key reset"));
-    }
-    async clear() {
-      if (this.pending) await this.pending.catch(() => void 0);
-      await withDeadline(() => this.storage.delete(DEVICE_KEY_STORAGE_KEY), this.timeoutMs, "device key clear");
-      this.identity = void 0;
-    }
-    track(operation) {
-      this.pending = operation.then(identity => {
-        this.identity = identity;
-        this.pending = void 0;
-        return identity;
-      }, error => {
-        this.pending = void 0;
-        throw error;
-      });
-      const pending = this.pending;
-      if (!pending) throw new Error("device key operation unavailable");
-      return pending;
-    }
-  }
-
-  function createCaptchaFrameRequest(options) {
-    const channel = (options.channelFactory ?? (() => new MessageChannel))();
-    let settled = false;
-    let resolveResult = () => void 0;
-    let rejectResult = () => void 0;
-    const cleanup = () => {
-      clearTimeout(timer);
-      channel.port1.onmessage = null;
-      channel.port1.close();
-    };
-    const fail = reason => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      rejectResult(new Error(reason));
-    };
-    const succeed = token => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolveResult(token);
-    };
-    const result = new Promise((resolve, reject) => {
-      resolveResult = resolve;
-      rejectResult = reject;
-    });
-    const timer = setTimeout(() => fail("challenge-timeout"), options.timeoutMs);
-    channel.port1.onmessage = event => {
-      const data = event.data;
-      if ((data == null ? void 0 : data.type) !== "aiask:captcha:result" || data.state !== options.state) return;
-      if (typeof data.token === "string" && data.token.length > 0 && data.token.length <= 4096) {
-        succeed(data.token);
-        return;
-      }
-      fail(typeof data.error === "string" ? data.error : "challenge-failed");
-    };
-    channel.port1.start();
-    try {
-      options.frameWindow.postMessage({
-        type: "aiask:captcha:init",
-        state: options.state
-      }, options.targetOrigin, [ channel.port2 ]);
-    } catch {
-      fail("challenge-unavailable");
-    }
-    return {
-      result: result,
-      cancel: () => fail("cancelled")
-    };
-  }
-
-  const HIGHEST_KEYSET_VERSION_KEY = "aiask.security.highest-keyset-version.v1";
-
-  const KEYSET_WATERMARKS_KEY = "aiask.security.keyset-watermarks.v1";
-
-  const DEFAULT_TIMEOUT_MS$1 = 8e3;
-
-  const SESSION_EXPIRY_MARGIN_MS = 1e3;
-
-  function parseHighestKeysetVersion(value) {
-    if (value === void 0 || value === null) return 0;
-    if (!Number.isInteger(value) || value < 0) throw new Error("invalid stored keyset version");
-    return value;
-  }
-
-  function keysetWatermarkOrigin(baseUrl) {
-    return new URL(baseUrl).origin;
-  }
-
-  function parseKeysetWatermarks(value) {
-    if (value === void 0 || value === null) return {};
-    if (typeof value !== "object" || Array.isArray(value)) throw new Error("invalid stored keyset watermarks");
-    const entries = Object.entries(value);
-    for (const [, version] of entries) parseHighestKeysetVersion(version);
-    return Object.fromEntries(entries);
-  }
-
-  async function readKeysetWatermark(storage, baseUrl, inheritLegacy = true) {
-    const origin = keysetWatermarkOrigin(baseUrl);
-    const own = parseKeysetWatermarks(await storage.get(KEYSET_WATERMARKS_KEY))[origin] ?? 0;
-    if (!inheritLegacy) return own;
-    const legacy = parseHighestKeysetVersion(await storage.get(HIGHEST_KEYSET_VERSION_KEY));
-    return Math.max(own, legacy);
-  }
-
-  async function recordKeysetWatermark(storage, baseUrl, keysetVersion) {
-    const origin = keysetWatermarkOrigin(baseUrl);
-    const watermarks = parseKeysetWatermarks(await storage.get(KEYSET_WATERMARKS_KEY));
-    if ((watermarks[origin] ?? 0) >= keysetVersion) return;
-    await storage.set(KEYSET_WATERMARKS_KEY, {
-      ...watermarks,
-      [origin]: keysetVersion
-    });
-  }
-
-  const activeKey = (keyset, use, kid2, now) => keyset.keys.find(key => key.kid === kid2 && key.use === use && key.notBefore <= now && key.expiresAt > now);
-
-  const parseVersion = value => {
-    const main = value.split("-", 1)[0];
-    if (!/^\d+(?:\.\d+)*$/u.test(main)) throw new Error("invalid client version");
-    return main.split(".").map(segment => Number(segment));
-  };
-
-  function compareVersions(left, right) {
-    const a = parseVersion(left);
-    const b = parseVersion(right);
-    const length = Math.max(a.length, b.length);
-    for (let index = 0; index < length; index++) {
-      const difference = (a[index] ?? 0) - (b[index] ?? 0);
-      if (difference !== 0) return difference;
-    }
-    return 0;
-  }
-
-  const normalizedBaseUrl$1 = value => value.replace(/\/+$/u, "");
-
-  class SecureSessionClient {
-    constructor(options) {
-      __publicField(this, "timeoutMs");
-      __publicField(this, "now");
-      __publicField(this, "randomBytes");
-      __publicField(this, "generateEcdhKeyPair");
-      __publicField(this, "baseUrl");
-      __publicField(this, "session");
-      __publicField(this, "pending");
-      this.options = options;
-      if (options.rootPublicJwks.length === 0) throw new Error("missing root verification key");
-      this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS$1;
-      this.now = options.now ?? (() => Date.now());
-      this.randomBytes = options.randomBytes ?? (length => crypto.getRandomValues(new Uint8Array(length)));
-      this.generateEcdhKeyPair = options.generateEcdhKeyPair ?? generateEcdhKeyPair;
-      this.baseUrl = normalizedBaseUrl$1(options.baseUrl);
-    }
-    async getSession() {
-      return withDeadline(async () => {
-        var _a2;
-        const device = await this.options.deviceKeys.getOrCreate();
-        if (((_a2 = this.session) == null ? void 0 : _a2.deviceId) === device.deviceId && this.serverNow(this.session) + SESSION_EXPIRY_MARGIN_MS < this.session.expiresAt) return this.session;
-        if (!this.pending) {
-          this.pending = this.openSession(device).then(session2 => {
-            this.session = session2;
-            this.pending = void 0;
-            return session2;
-          }, error => {
-            this.pending = void 0;
-            throw error;
-          });
-        }
-        const session = await this.pending;
-        if (session.deviceId !== device.deviceId) {
-          this.session = void 0;
-          return this.getSession();
-        }
-        return session;
-      }, this.timeoutMs, "secure session");
-    }
-    invalidate(sessionId) {
-      var _a2;
-      if (!sessionId || ((_a2 = this.session) == null ? void 0 : _a2.sessionId) === sessionId) this.session = void 0;
-    }
-    serverNow(session = this.session) {
-      return this.now() + ((session == null ? void 0 : session.serverTimeOffsetMs) ?? 0);
-    }
-    async openSession(device) {
-      const openPath = this.options.requestedScope === "admin" ? "/api/admin/session/open" : "/api/session/open";
-      const bootstrap = await this.fetchAndVerifyBootstrap();
-      const ephemeral = await this.generateEcdhKeyPair();
-      const clientEcdhPublicJwk = PublicP256JwkSchema.parse(await exportPublicJwk(ephemeral.publicKey));
-      const nonce = this.randomBase64Url(16);
-      const baseRequest = {
-        protocolVersion: 1,
-        challenge: bootstrap.challenge,
-        deviceId: device.deviceId,
-        devicePublicJwk: device.publicJwk,
-        ecdhKid: bootstrap.ecdhKey.kid,
-        clientEcdhPublicJwk: clientEcdhPublicJwk,
-        timestamp: this.now() + bootstrap.serverTimeOffsetMs,
-        nonce: nonce
-      };
-      const unsignedRequest = this.options.requestedScope === "admin" ? AdminSessionOpenRequestSchema.omit({
-        signature: true
-      }).parse(baseRequest) : {
-        ...baseRequest,
-        requestedScope: this.options.requestedScope
-      };
-      const request = {
-        ...unsignedRequest,
-        signature: await signEcdsaP1363(device.privateKey, utf8Bytes(sessionOpenRequestInput(openPath, unsignedRequest)))
-      };
-      const response = await this.send({
-        url: `${this.baseUrl}${openPath}`,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(request),
-        timeoutMs: this.timeoutMs
-      });
-      if (response.status < 200 || response.status >= 300) throw new Error("session open failed");
-      const openResponse = SessionOpenResponseSchema.parse(JSON.parse(response.body));
-      if (openResponse.ecdhKid !== bootstrap.ecdhKey.kid || canonicalPublicJwk(openResponse.serverEcdhPublicJwk) !== canonicalPublicJwk(bootstrap.ecdhKey.publicJwk)) throw new Error("session ECDH key mismatch");
-      const serverNow = this.now() + bootstrap.serverTimeOffsetMs;
-      const signingKey = activeKey(bootstrap.keyset, "transport-signing", openResponse.signingKid, serverNow);
-      if (!signingKey) throw new Error("invalid session signing key");
-      const signingPublicKey = await importEcdsaPublicJwk(signingKey.publicJwk);
-      const {signature: _signature, ...unsignedResponse} = openResponse;
-      if (!(await verifyEcdsaP1363(signingPublicKey, utf8Bytes(sessionOpenResponseInput(openPath, unsignedResponse)), openResponse.signature))) throw new Error("invalid session response signature");
-      const serverEcdhPublicKey = await importEcdhPublicJwk(bootstrap.ecdhKey.publicJwk);
-      const sharedSecret = await deriveEcdhSecret(ephemeral.privateKey, serverEcdhPublicKey);
-      const handshakeContext = {
-        protocolVersion: 1,
-        challenge: bootstrap.challenge,
-        clientNonce: nonce,
-        serverNonce: openResponse.serverNonce,
-        deviceId: device.deviceId,
-        clientEcdhFingerprint: await fingerprintPublicJwk(clientEcdhPublicJwk),
-        serverEcdhFingerprint: await fingerprintPublicJwk(bootstrap.ecdhKey.publicJwk)
-      };
-      const handshakeKey = await deriveHandshakeKey(sharedSecret, handshakeContext);
-      const {ciphertext: _ciphertext, signature: _serverSignature, ...head} = openResponse;
-      const plaintext = SessionOpenPlaintextSchema.parse(JSON.parse(utf8Text(await aesGcmDecrypt(handshakeKey, base64UrlToBytes(openResponse.iv), base64UrlToBytes(openResponse.ciphertext), utf8Bytes(sessionOpenResponseAad(openPath, head))))));
-      if (plaintext.deviceId !== device.deviceId) throw new Error("session device mismatch");
-      if (plaintext.grantedScope !== this.options.requestedScope) throw new Error("session scope mismatch");
-      if (plaintext.issuedAt > serverNow + 12e4 || plaintext.expiresAt <= serverNow || plaintext.expiresAt > bootstrap.ecdhKey.expiresAt) throw new Error("invalid session lifetime");
-      const trafficKeys = await deriveTrafficKeys(sharedSecret, {
-        ...handshakeContext,
-        sessionId: plaintext.sessionId
-      });
-      return {
-        ...plaintext,
-        devicePublicJwk: device.publicJwk,
-        devicePrivateKey: device.privateKey,
-        serverTimeOffsetMs: bootstrap.serverTimeOffsetMs,
-        c2sKey: trafficKeys.c2sKey,
-        s2cKey: trafficKeys.s2cKey,
-        keyset: bootstrap.keyset
-      };
-    }
-    async fetchAndVerifyBootstrap() {
-      const response = await this.send({
-        url: `${this.baseUrl}/api/bootstrap`,
-        method: "GET",
-        timeoutMs: this.timeoutMs
-      });
-      if (response.status < 200 || response.status >= 300) throw new Error("bootstrap failed");
-      const document2 = BootstrapDocumentSchema.parse(JSON.parse(response.body));
-      let rootVerified = false;
-      for (const rootJwk of this.options.rootPublicJwks) {
-        const rootPublicKey = await importEcdsaPublicJwk(rootJwk);
-        if (await verifyServerKeysetSignature(rootPublicKey, document2.keyset)) {
-          rootVerified = true;
-          break;
-        }
-      }
-      if (!rootVerified) throw new Error("invalid keyset root signature");
-      if (await serverKeysetHash(document2.keyset) !== document2.challenge.keysetHash) throw new Error("keyset hash mismatch");
-      if (!(await verifyBootstrapChallengeSignature(document2.keyset, document2.challenge))) throw new Error("invalid bootstrap challenge signature");
-      const localNow = this.now();
-      const serverNow = document2.challenge.serverTime;
-      const highestAcceptedVersion = await this.readHighestKeysetVersion();
-      validateServerKeyset(document2.keyset, serverNow, highestAcceptedVersion);
-      validateBootstrapChallenge(document2.challenge, document2.keyset, serverNow);
-      if (compareVersions(this.options.clientVersion, document2.challenge.minClientVersion) < 0) throw new Error("client version too old");
-      const ecdhKey = document2.keyset.keys.find(key => key.use === "ecdh" && key.notBefore <= serverNow && key.expiresAt > serverNow);
-      if (!ecdhKey) throw new Error("missing active ECDH key");
-      await recordKeysetWatermark(this.options.stateStorage, this.baseUrl, document2.keyset.keysetVersion);
-      return {
-        keyset: document2.keyset,
-        challenge: document2.challenge.challenge,
-        serverTimeOffsetMs: serverNow - localNow,
-        ecdhKey: ecdhKey
-      };
-    }
-    async readHighestKeysetVersion() {
-      return readKeysetWatermark(this.options.stateStorage, this.baseUrl, this.options.inheritLegacyKeysetWatermark);
-    }
-    randomBase64Url(length) {
-      const bytes = this.randomBytes(length);
-      if (!(bytes instanceof Uint8Array) || bytes.length !== length) throw new Error("invalid random source");
-      return bytesToBase64Url(bytes);
-    }
-    send(request) {
-      return withDeadline(() => this.options.transport.send(request), request.timeoutMs ?? this.timeoutMs, "security transport");
-    }
-  }
-
-  const DEFAULT_TIMEOUT_MS = 8e3;
-
-  const DEFAULT_MAX_ATTEMPTS = 2;
-
-  const RESPONSE_TIME_WINDOW_MS = 12e4;
-
-  class RetryableSecureTransportError extends Error {}
-
-  const headerEntries = (headers, name) => Object.entries(headers ?? {}).filter(([key]) => key.toLowerCase() === name.toLowerCase()).map(([, value]) => value);
-
-  function singleHeader(headers, name) {
-    const values = headerEntries(headers, name);
-    if (values.length > 1) throw new Error(`duplicate ${name} header`);
-    return values[0];
-  }
-
-  class SecureTransport {
-    constructor(options) {
-      __publicField(this, "timeoutMs");
-      __publicField(this, "maxAttempts");
-      __publicField(this, "randomBytes");
-      __publicField(this, "randomUuid");
-      this.options = options;
-      this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-      this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-      if (!Number.isInteger(this.maxAttempts) || this.maxAttempts < 1) throw new Error("invalid secure transport attempts");
-      this.randomBytes = options.randomBytes ?? (length => crypto.getRandomValues(new Uint8Array(length)));
-      this.randomUuid = options.randomUuid ?? (() => crypto.randomUUID());
-    }
-    async send(request) {
-      if (headerEntries(request.headers, "Authorization").length > 0) throw new Error("Authorization header is forbidden on SecureTransport");
-      const idempotencyKey = singleHeader(request.headers, "Idempotency-Key");
-      const url = new URL(request.url);
-      if (url.username || url.password || url.search) throw new Error("secure request URL must not contain credentials or query");
-      const payload = request.body === void 0 ? null : JSON.parse(request.body);
-      const accessToken = this.options.getAccessToken ? await withDeadline(() => {
-        var _a2, _b;
-        return Promise.resolve(((_b = (_a2 = this.options).getAccessToken) == null ? void 0 : _b.call(_a2)) ?? "");
-      }, request.timeoutMs ?? this.timeoutMs, "access token") : "";
-      const plaintext = {
-        ...accessToken ? {
-          auth: {
-            accessToken: accessToken
-          }
-        } : {},
-        ...idempotencyKey ? {
-          idempotencyKey: idempotencyKey
-        } : {},
-        ...this.options.client ? {
-          client: this.options.client
-        } : {},
-        payload: payload
-      };
-      const attempts = idempotencyKey ? this.maxAttempts : 1;
-      let lastError;
-      for (let attempt = 0; attempt < attempts; attempt++) {
-        try {
-          return await this.sendAttempt(request, url.pathname, plaintext);
-        } catch (error) {
-          lastError = error;
-          if (!(error instanceof RetryableSecureTransportError)) throw error;
-        }
-      }
-      throw lastError;
-    }
-    async sendAttempt(request, path, plaintext) {
-      const timeoutMs = request.timeoutMs ?? this.timeoutMs;
-      const session = await this.options.sessions.getSession();
-      const iv = this.randomBase64Url(12);
-      const requestHead = {
-        v: 1,
-        sessionId: session.sessionId,
-        requestId: this.randomUuid(),
-        timestamp: this.options.sessions.serverNow(session),
-        nonce: this.randomBase64Url(16),
-        iv: iv
-      };
-      const ciphertext = bytesToBase64Url(await aesGcmEncrypt(session.c2sKey, base64UrlToBytes(iv), utf8Bytes(JSON.stringify(plaintext)), utf8Bytes(requestEnvelopeAad(request.method, path, requestHead))));
-      const unsignedEnvelope = {
-        ...requestHead,
-        ciphertext: ciphertext
-      };
-      const envelope = {
-        ...unsignedEnvelope,
-        signature: await signEcdsaP1363(session.devicePrivateKey, utf8Bytes(requestEnvelopeInput(request.method, path, unsignedEnvelope)))
-      };
-      let response;
-      try {
-        response = await withDeadline(() => this.options.transport.send({
-          url: request.url,
-          method: request.method,
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(envelope),
-          timeoutMs: timeoutMs
-        }), timeoutMs, "secure request");
-      } catch (error) {
-        throw new RetryableSecureTransportError(error instanceof Error ? error.message : "secure request failed");
-      }
-      if (!response.body) {
-        if (response.status === 401 || response.status === 409) {
-          this.options.sessions.invalidate(session.sessionId);
-          throw new RetryableSecureTransportError("secure session rejected");
-        }
-        if (response.status >= 200 && response.status < 300) throw new Error("missing secure response");
-        return response;
-      }
-      const responseEnvelope = SecureResponseEnvelopeSchema.parse(JSON.parse(response.body));
-      if (responseEnvelope.sessionId !== session.sessionId || responseEnvelope.requestId !== requestHead.requestId) throw new Error("secure response correlation mismatch");
-      const serverNow = this.options.sessions.serverNow(session);
-      if (Math.abs(responseEnvelope.timestamp - serverNow) > RESPONSE_TIME_WINDOW_MS) throw new Error("secure response timestamp rejected");
-      const signingKey = session.keyset.keys.find(key => key.kid === responseEnvelope.kid && key.use === "transport-signing" && key.notBefore <= serverNow && key.expiresAt > serverNow);
-      if (!signingKey) throw new Error("secure response signing key rejected");
-      const publicKey = await importEcdsaPublicJwk(signingKey.publicJwk);
-      const {signature: _signature, ...unsignedResponse} = responseEnvelope;
-      if (!(await verifyEcdsaP1363(publicKey, utf8Bytes(responseEnvelopeInput(request.method, path, unsignedResponse)), responseEnvelope.signature))) throw new Error("secure response signature rejected");
-      const {ciphertext: _ciphertext, ...responseHead} = unsignedResponse;
-      const body = utf8Text(await aesGcmDecrypt(session.s2cKey, base64UrlToBytes(responseEnvelope.iv), base64UrlToBytes(responseEnvelope.ciphertext), utf8Bytes(responseEnvelopeAad(request.method, path, responseHead))));
-      return {
-        status: response.status,
-        body: body
-      };
-    }
-    randomBase64Url(length) {
-      const bytes = this.randomBytes(length);
-      if (!(bytes instanceof Uint8Array) || bytes.length !== length) throw new Error("invalid random source");
-      return bytesToBase64Url(bytes);
-    }
-  }
-
-  class RuleExecutionError extends Error {
-    constructor(code, message) {
-      super(message);
-      __publicField(this, "fatal", true);
-      this.code = code;
-      this.name = "RuleExecutionError";
-    }
-  }
-
-  class RuleDomainError extends Error {
-    constructor(code, message) {
-      super(message);
-      this.code = code;
-      this.name = "RuleDomainError";
-    }
-    toRuleValue() {
-      return {
-        code: this.code,
-        message: this.message
-      };
-    }
-  }
-
-  class PrimitiveRegistry {
-    constructor() {
-      __publicField(this, "definitions", new Map);
-    }
-    register(definition) {
-      if (this.definitions.has(definition.id)) {
-        throw new Error(`duplicate primitive: ${definition.id}`);
-      }
-      this.definitions.set(definition.id, definition);
-    }
-    get(id) {
-      return this.definitions.get(id);
-    }
-    ids() {
-      return [ ...this.definitions.keys() ];
-    }
-  }
-
-  function assertPrimitiveAllowed(registry, policy, invocation) {
-    if (!policy.primitives.has(invocation.id)) {
-      throw new RuleExecutionError("capability_denied", `primitive is not allowed by runtime policy: ${invocation.id}`);
-    }
-    const definition = registry.get(invocation.id);
-    if (!definition) {
-      throw new RuleExecutionError("unknown_primitive", `unknown primitive: ${invocation.id}`);
-    }
-    if (!definition.phases.includes(invocation.phase)) {
-      throw new RuleExecutionError("capability_denied", `primitive is not allowed in ${invocation.phase}: ${invocation.id}`);
-    }
-    if (definition.capability && (!policy.capabilities.has(definition.capability) || !invocation.requestedCapabilities.has(definition.capability))) {
-      throw new RuleExecutionError("capability_denied", `capability is not allowed: ${definition.capability}`);
-    }
-    if (definition.requiresSafetyCapability) {
-      const argument = definition.safetyArgument ?? "safety";
-      try {
-        assertSafetyCapability(invocation.args[argument]);
-      } catch {
-        throw new RuleExecutionError("security_violation", `primitive requires a valid safety capability: ${invocation.id}`);
-      }
-    }
-    return definition;
-  }
-
-  async function invokePrimitive(definition, invocation) {
-    try {
-      return await definition.execute({
-        args: invocation.args,
-        phase: invocation.phase,
-        signal: invocation.signal,
-        variables: invocation.variables
-      });
-    } catch (error) {
-      if (error instanceof RuleExecutionError || error instanceof RuleDomainError) throw error;
-      throw new RuleDomainError("primitive_failed", error instanceof Error ? error.message : "primitive failed");
-    }
-  }
-
-  function safetyArgument(args) {
-    return args.safety;
-  }
-
-  function stringArgument$2(args, name) {
-    const value = args[name];
-    if (typeof value !== "string" || value.length === 0) throw new RuleDomainError("invalid_type", `${name} must be a string`);
-    return value;
-  }
-
-  function assertAllowedOperation(capability, operation) {
-    const plan = safetyPlanForCapability(capability);
-    if (plan.atomic && plan.operations.length > 1) throw new RuleDomainError("partial_not_allowed", "atomic fill plan cannot be split into individual writes");
-    try {
-      assertSafetyOperation(capability, operation);
-    } catch {
-      throw new RuleExecutionError("security_violation", "answer operation is not allowed by safety capability");
-    }
-    return plan;
-  }
-
-  async function applyAndVerifyOperation(writer, capability, operation, signal) {
-    const plan = assertAllowedOperation(capability, operation);
-    if (!(await writer.applyOperation(plan, operation, signal))) throw new RuleDomainError("write_refused", "answer writer refused operation");
-    if (!(await writer.verifyOperation(plan, operation, signal))) throw new RuleDomainError("write_verify_failed", "answer write read-back verification failed");
-    return true;
-  }
-
-  function registerAnswerWritePrimitives(registry, writer) {
-    registry.register({
-      id: "answer.applyPlan",
-      phases: [ "fill" ],
-      capability: "answer-write",
-      requiresSafetyCapability: true,
-      execute: async ({args: args, signal: signal}) => {
-        const plan = safetyPlanForCapability(safetyArgument(args));
-        if (!(await writer.applyPlan(plan, signal))) throw new RuleDomainError("write_refused", "answer writer refused plan");
-        if (!(await writer.verifyPlan(plan, signal))) throw new RuleDomainError("write_verify_failed", "answer plan read-back verification failed");
-        return true;
-      }
-    });
-    const registerChoice = id => registry.register({
-      id: id,
-      phases: [ "fill" ],
-      capability: "answer-write",
-      requiresSafetyCapability: true,
-      execute: ({args: args, signal: signal}) => {
-        if (id === "dom.setChecked" && args.checked !== true) throw new RuleExecutionError("security_violation", "dom.setChecked only accepts checked=true for planned answers");
-        return applyAndVerifyOperation(writer, safetyArgument(args), {
-          kind: "choose",
-          optionId: stringArgument$2(args, "optionId")
-        }, signal);
-      }
-    });
-    registerChoice("dom.clickAnswer");
-    registerChoice("dom.setChecked");
-    const registerSlot = id => registry.register({
-      id: id,
-      phases: [ "fill" ],
-      capability: "answer-write",
-      requiresSafetyCapability: true,
-      execute: ({args: args, signal: signal}) => applyAndVerifyOperation(writer, safetyArgument(args), {
-        kind: "write",
-        slotId: stringArgument$2(args, "slotId"),
-        value: stringArgument$2(args, "value")
-      }, signal)
-    });
-    registerSlot("dom.setValue");
-    registerSlot("dom.setSelected");
-    registry.register({
-      id: "matching.pair",
-      phases: [ "fill" ],
-      capability: "answer-write",
-      requiresSafetyCapability: true,
-      execute: ({args: args, signal: signal}) => applyAndVerifyOperation(writer, safetyArgument(args), {
-        kind: "pair",
-        leftId: stringArgument$2(args, "leftId"),
-        rightId: stringArgument$2(args, "rightId")
-      }, signal)
-    });
-  }
-
-  const MAX_HARD_TREES = 5e3;
-
-  const MAX_HARD_BINDINGS = 5e3;
-
-  class RuleCaptureRegistryError extends Error {
-    constructor(code, message) {
-      super(message);
-      this.code = code;
-      this.name = "RuleCaptureRegistryError";
-    }
-  }
-
-  function freezeJson$1(value) {
-    if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
-    for (const child of Object.values(value)) freezeJson$1(child);
-    return Object.freeze(value);
-  }
-
-  class RuleCaptureRegistry {
-    constructor(options) {
-      __publicField(this, "bindings");
-      __publicField(this, "trees", []);
-      __publicField(this, "pendingBindings", new Map);
-      __publicField(this, "harvested", new Map);
-      __publicField(this, "finishedResults", new WeakSet);
-      __publicField(this, "maxTrees");
-      __publicField(this, "maxBindings");
-      __publicField(this, "finished", false);
-      __publicField(this, "disposed", false);
-      const maxBindings = options.maxBindings ?? MAX_HARD_BINDINGS;
-      if (!Number.isInteger(options.maxTrees) || options.maxTrees <= 0 || options.maxTrees > MAX_HARD_TREES || !Number.isInteger(maxBindings) || maxBindings <= 0 || maxBindings > MAX_HARD_BINDINGS) throw new RuleCaptureRegistryError("invalid_options", "invalid capture tree limit");
-      this.maxTrees = options.maxTrees;
-      this.maxBindings = maxBindings;
-      this.bindings = new RuleBindingRegistry({
-        maxBindings: this.maxBindings
-      });
-    }
-    registerLeafBinding(input, registration) {
-      if (this.finished || this.disposed) throw new RuleCaptureRegistryError("finished", "capture registry is finished");
-      const parsed = LeafQuestionNodeSchema.safeParse(input);
-      if (!parsed.success) throw new RuleCaptureRegistryError("invalid_question_node", "capture node is not a valid leaf question");
-      const node = freezeJson$1(parsed.data);
-      if (this.pendingBindings.has(node.path) || this.bindings.has(node.path)) throw new RuleCaptureRegistryError("binding_registration", `duplicate binding path: ${node.path}`);
-      if (this.bindings.size + this.pendingBindings.size >= this.maxBindings) throw new RuleCaptureRegistryError("binding_registration", "binding registry limit exceeded");
-      const pending = {
-        path: node.path,
-        capturedFingerprint: questionNodeHash(node),
-        readCurrentFingerprint: registration.readCurrentFingerprint,
-        targets: registration.targets
-      };
-      const validation = new RuleBindingRegistry({
-        maxBindings: 1
-      });
-      try {
-        validation.register(pending);
-      } catch (error) {
-        if (error instanceof RuleBindingRegistryError) throw new RuleCaptureRegistryError("binding_registration", error.message);
-        throw error;
-      } finally {
-        validation.dispose();
-      }
-      this.pendingBindings.set(node.path, pending);
-      return node.path;
-    }
-    registerHarvestLeaf(input, values) {
-      if (this.finished || this.disposed) throw new RuleCaptureRegistryError("finished", "capture registry is finished");
-      const parsed = LeafQuestionNodeSchema.safeParse(input);
-      if (!parsed.success) throw new RuleCaptureRegistryError("invalid_question_node", "harvest node is not a valid leaf question");
-      const units = flattenQuestionTree(freezeJson$1(parsed.data));
-      const unit = units[0];
-      if (units.length !== 1 || !unit) throw new RuleCaptureRegistryError("harvest_registration", "harvest node must produce exactly one query unit");
-      if (!Array.isArray(values) || values.length === 0) throw new RuleCaptureRegistryError("harvest_registration", "harvest requires a non-empty value array");
-      const normalized = values.map(value => {
-        if (typeof value !== "string" || !value.trim()) throw new RuleCaptureRegistryError("harvest_registration", "harvest values must be non-blank strings");
-        return value.trim();
-      });
-      if (this.harvested.size >= this.maxBindings && !this.harvested.has(unit.unitHash)) throw new RuleCaptureRegistryError("harvest_registration", "harvest registry limit exceeded");
-      this.harvested.set(unit.unitHash, {
-        values: normalized,
-        stem: unit.effectiveStem,
-        itemType: unit.queryType,
-        options: unit.options.map(option => option.content)
-      });
-      return unit.unitHash;
-    }
-    takeHarvested() {
-      const result = [ ...this.harvested ].map(([unitHash, entry]) => ({
-        unitHash: unitHash,
-        values: [ ...entry.values ],
-        stem: entry.stem,
-        itemType: entry.itemType,
-        options: [ ...entry.options ]
-      }));
-      this.harvested.clear();
-      return result;
-    }
-    registerTree(input) {
-      if (this.finished || this.disposed) throw new RuleCaptureRegistryError("finished", "capture registry is finished");
-      if (this.trees.length >= this.maxTrees) throw new RuleCaptureRegistryError("tree_limit", "capture tree limit exceeded");
-      const parsed = QuestionNodeSchema.safeParse(input);
-      if (!parsed.success) throw new RuleCaptureRegistryError("invalid_question_node", "capture root is not a valid question tree");
-      try {
-        assertValidQuestionTree(parsed.data);
-      } catch (error) {
-        throw new RuleCaptureRegistryError("invalid_question_node", error instanceof Error ? error.message : "invalid question tree");
-      }
-      const root = freezeJson$1(parsed.data);
-      const units = flattenQuestionTree(root);
-      try {
-        const pending = units.map(unit => {
-          const binding = this.pendingBindings.get(unit.unitPath);
-          if (!binding || binding.capturedFingerprint !== unit.sourceNodeHash) throw new RuleCaptureRegistryError("binding_registration", `missing or stale binding for query unit: ${unit.unitPath}`);
-          if (this.bindings.has(unit.unitPath)) throw new RuleCaptureRegistryError("binding_registration", `duplicate binding path: ${unit.unitPath}`);
-          return binding;
-        });
-        if (this.bindings.size + pending.length > this.maxBindings) throw new RuleCaptureRegistryError("binding_registration", "binding registry limit exceeded");
-        for (const binding of pending) this.bindings.register(binding);
-        for (const binding of pending) this.pendingBindings.delete(binding.path);
-      } catch (error) {
-        for (const unit of units) this.pendingBindings.delete(unit.unitPath);
-        if (error instanceof RuleBindingRegistryError) throw new RuleCaptureRegistryError("binding_registration", error.message);
-        throw error;
-      }
-      const tree = Object.freeze({
-        root: root,
-        bindings: this.bindings
-      });
-      this.trees.push(tree);
-      return tree;
-    }
-    registerLeaf(input, registration) {
-      if (this.finished || this.disposed) throw new RuleCaptureRegistryError("finished", "capture registry is finished");
-      if (this.trees.length >= this.maxTrees) throw new RuleCaptureRegistryError("tree_limit", "capture tree limit exceeded");
-      this.registerLeafBinding(input, registration);
-      return this.registerTree(input);
-    }
-    finish() {
-      if (this.disposed) return [];
-      if (this.pendingBindings.size > 0) throw new RuleCaptureRegistryError("binding_registration", "capture has uncommitted question bindings");
-      if (!this.finished) {
-        this.bindings.seal();
-        this.finished = true;
-      }
-      const result = [ ...this.trees ];
-      this.finishedResults.add(result);
-      return result;
-    }
-    ownsFinishedResult(value) {
-      return Array.isArray(value) && this.finished && !this.disposed && this.finishedResults.has(value);
-    }
-    dispose() {
-      this.disposed = true;
-      this.finished = true;
-      this.trees.length = 0;
-      this.pendingBindings.clear();
-      this.harvested.clear();
-      this.bindings.dispose();
-    }
-  }
-
-  function writeText(el, value) {
-    var _a2;
-    if (!el.isConnected) return false;
-    const win = el.ownerDocument.defaultView;
-    if (!win) return false;
-    const Ctor = el.tagName === "TEXTAREA" ? win.HTMLTextAreaElement : win.HTMLInputElement;
-    const setter = (_a2 = Object.getOwnPropertyDescriptor(Ctor.prototype, "value")) == null ? void 0 : _a2.set;
-    el.focus();
-    if (setter) setter.call(el, value); else el.value = value;
-    el.dispatchEvent(new win.Event("input", {
-      bubbles: true
-    }));
-    el.dispatchEvent(new win.Event("change", {
-      bubbles: true
-    }));
-    el.blur();
-    return true;
-  }
-
-  function validId(value) {
-    return value.length > 0 && value.length <= 256;
-  }
-
-  function assertActive$2(signal) {
-    if (signal.aborted) throw new RuleExecutionError("cancelled", "DOM answer target was cancelled");
-  }
-
-  function isLiveElement(element) {
-    return element.isConnected && element.ownerDocument.defaultView !== null;
-  }
-
-  function htmlElement(element, label) {
-    const view = element.ownerDocument.defaultView;
-    if (!view || !(element instanceof view.HTMLElement)) throw new RuleExecutionError("security_violation", `${label} must be an HTMLElement`);
-    return element;
-  }
-
-  function assertSafeChoiceTarget(element, location2, depth = 0) {
-    const target = htmlElement(element, "choice target");
-    const view = target.ownerDocument.defaultView;
-    if (!view) throw new RuleExecutionError("security_violation", "choice target has no window");
-    if (target instanceof view.HTMLFormElement) throw new RuleExecutionError("security_violation", "choice target cannot be a submit form");
-    if (target instanceof view.HTMLButtonElement && target.type !== "button") throw new RuleExecutionError("security_violation", "choice target cannot be a submit button");
-    if (target instanceof view.HTMLInputElement && ![ "radio", "checkbox" ].includes(target.type)) throw new RuleExecutionError("security_violation", "choice target input type must be radio or checkbox");
-    if (target instanceof view.HTMLAnchorElement) {
-      const url = new URL(target.href, location2.href);
-      if (url.protocol === "javascript:" || url.origin !== location2.origin) throw new RuleExecutionError("security_violation", "choice target cannot navigate outside the current origin");
-      throw new RuleExecutionError("security_violation", "choice target cannot be a navigation link");
-    }
-    if (/\u63d0\u4ea4|\u4ea4\u5377|\u5b8c\u6210\u8003\u8bd5|\bsubmit\b/iu.test(target.textContent ?? "")) throw new RuleExecutionError("security_violation", "choice target cannot activate submit controls");
-    if (target instanceof view.HTMLLabelElement && depth === 0) {
-      const control = target.control;
-      if (control) assertSafeChoiceTarget(control, location2, depth + 1);
-    }
-    return target;
-  }
-
-  function checkedInput(element) {
-    const view = element.ownerDocument.defaultView;
-    const candidate = view && element instanceof view.HTMLInputElement ? element : element.querySelector('input[type="radio"], input[type="checkbox"]');
-    if (!view || !candidate || !(candidate instanceof view.HTMLInputElement) || ![ "radio", "checkbox" ].includes(candidate.type)) throw new RuleExecutionError("security_violation", "checked strategy requires a radio or checkbox input");
-    return candidate;
-  }
-
-  function selectedReader(target, strategy) {
-    if (strategy.kind === "checked") {
-      checkedInput(target);
-      return () => {
-        try {
-          return checkedInput(target).checked;
-        } catch {
-          return false;
-        }
-      };
-    }
-    if (strategy.kind === "class") {
-      if (!strategy.name || strategy.name.length > 128 || /\s/u.test(strategy.name)) throw new RuleExecutionError("security_violation", "invalid selected class name");
-      return () => target.classList.contains(strategy.name);
-    }
-    if (strategy.kind === "descendant") {
-      if (!strategy.selector || strategy.selector.length > 1024) throw new RuleExecutionError("security_violation", "invalid selected descendant selector");
-      try {
-        target.querySelector(strategy.selector);
-      } catch {
-        throw new RuleExecutionError("security_violation", "invalid selected descendant selector");
-      }
-      return () => target.querySelector(strategy.selector) != null;
-    }
-    if (!/^[A-Za-z_:][A-Za-z0-9_.:-]*$/u.test(strategy.name) || /^on/iu.test(strategy.name) || strategy.value.length > 1024) throw new RuleExecutionError("security_violation", "invalid selected attribute strategy");
-    return () => target.getAttribute(strategy.name) === strategy.value;
-  }
-
-  function createDomChoiceBindingTarget(options) {
-    if (!validId(options.optionId)) throw new RuleExecutionError("security_violation", "invalid option id");
-    const clickTarget = assertSafeChoiceTarget(options.clickTarget, options.location);
-    const readTarget = options.readTarget ?? clickTarget;
-    const isSelected = selectedReader(readTarget, options.selected);
-    let clicked = false;
-    return {
-      kind: "choose",
-      optionId: options.optionId,
-      isConnected: () => isLiveElement(clickTarget) && isLiveElement(readTarget),
-      apply: async (operation, signal) => {
-        assertActive$2(signal);
-        if (operation.kind !== "choose" || operation.optionId !== options.optionId || !isLiveElement(clickTarget) || !isLiveElement(readTarget)) return false;
-        if (isSelected()) return true;
-        clickTarget.click();
-        clicked = true;
-        return true;
-      },
-      verify: async (operation, signal) => {
-        assertActive$2(signal);
-        return operation.kind === "choose" && operation.optionId === options.optionId && isLiveElement(clickTarget) && isLiveElement(readTarget) && isSelected();
-      },
-      revert: async signal => {
-        assertActive$2(signal);
-        if (!clicked) return true;
-        if (!isLiveElement(clickTarget) || !isLiveElement(readTarget)) return false;
-        if (!isCheckboxControl(clickTarget)) return false;
-        if (isSelected()) clickTarget.click();
-        clicked = false;
-        return !isSelected();
-      }
-    };
-  }
-
-  function isCheckboxControl(target) {
-    const view = target.ownerDocument.defaultView;
-    if (!view) return false;
-    const control = target instanceof view.HTMLLabelElement ? target.control : target;
-    return control instanceof view.HTMLInputElement && control.type === "checkbox";
-  }
-
-  function writeEvents(element) {
-    const view = element.ownerDocument.defaultView;
-    if (!view) return;
-    element.dispatchEvent(new view.Event("input", {
-      bubbles: true
-    }));
-    element.dispatchEvent(new view.Event("change", {
-      bubbles: true
-    }));
-  }
-
-  function writeSelect(element, value) {
-    var _a2;
-    if (!isLiveElement(element)) return false;
-    if (![ ...element.options ].some(option => option.value === value)) return false;
-    const view = element.ownerDocument.defaultView;
-    if (!view) return false;
-    const setter = (_a2 = Object.getOwnPropertyDescriptor(view.HTMLSelectElement.prototype, "value")) == null ? void 0 : _a2.set;
-    element.focus();
-    if (setter) setter.call(element, value); else element.value = value;
-    writeEvents(element);
-    element.blur();
-    return true;
-  }
-
-  function normalizeSelectContent(value) {
-    return value.replace(/\s+/gu, " ").trim();
-  }
-
-  function selectOptionMaps(select, options) {
-    var _a2;
-    if (options == null) return null;
-    if (options.length === 0) throw new RuleExecutionError("security_violation", "select option mapping cannot be empty");
-    const valueByContent = new Map;
-    const contentByValue = new Map;
-    for (const option of options) {
-      if (!validId(option.id) || !option.content.trim() || valueByContent.has(option.content) || contentByValue.has(option.id)) throw new RuleExecutionError("security_violation", "select option mapping is ambiguous");
-      const domMatches = [ ...select.options ].filter(candidate => candidate.value === option.id);
-      if (domMatches.length !== 1 || normalizeSelectContent(((_a2 = domMatches[0]) == null ? void 0 : _a2.textContent) ?? "") !== normalizeSelectContent(option.content)) throw new RuleExecutionError("security_violation", "select option mapping does not match DOM");
-      valueByContent.set(option.content, option.id);
-      contentByValue.set(option.id, option.content);
-    }
-    return {
-      valueByContent: valueByContent,
-      contentByValue: contentByValue
-    };
-  }
-
-  function contentEditable(element) {
-    var _a2;
-    const value = (_a2 = element.getAttribute("contenteditable")) == null ? void 0 : _a2.toLowerCase();
-    return value === "" || value === "true" || value === "plaintext-only";
-  }
-
-  function createDomWriteBindingTarget(options) {
-    if (!validId(options.slotId)) throw new RuleExecutionError("security_violation", "invalid slot id");
-    const element = htmlElement(options.element, "write target");
-    const view = element.ownerDocument.defaultView;
-    if (!view) throw new RuleExecutionError("security_violation", "write target has no window");
-    const input = element instanceof view.HTMLInputElement ? element : void 0;
-    const textarea = element instanceof view.HTMLTextAreaElement ? element : void 0;
-    const select = element instanceof view.HTMLSelectElement ? element : void 0;
-    const editor = !input && !textarea && !select && contentEditable(element);
-    if (options.selectOptions && !select) throw new RuleExecutionError("security_violation", "select option mapping requires a select target");
-    if (input && ![ "text", "search", "tel", "url", "email", "number" ].includes(input.type)) throw new RuleExecutionError("security_violation", `write target input type is not allowed: ${input.type}`);
-    if (!input && !textarea && !select && !editor) throw new RuleExecutionError("security_violation", "write target must be a text input, textarea, select, or contenteditable");
-    const selectMaps = select ? selectOptionMaps(select, options.selectOptions) : null;
-    const write = value => {
-      if (input || textarea) return writeText(input ?? textarea, value);
-      if (select) {
-        const selectValue = (selectMaps == null ? void 0 : selectMaps.valueByContent.get(value)) ?? value;
-        if (selectMaps && !selectMaps.valueByContent.has(value)) return false;
-        return writeSelect(select, selectValue);
-      }
-      if (!isLiveElement(element)) return false;
-      element.focus();
-      element.textContent = value;
-      writeEvents(element);
-      element.blur();
-      return true;
-    };
-    const read = () => {
-      var _a2;
-      if (input || textarea) return ((_a2 = input ?? textarea) == null ? void 0 : _a2.value) ?? "";
-      if (select) return (selectMaps == null ? void 0 : selectMaps.contentByValue.get(select.value)) ?? select.value;
-      return element.textContent ?? "";
-    };
-    let previous = null;
-    return {
-      kind: "write",
-      slotId: options.slotId,
-      isConnected: () => isLiveElement(element),
-      apply: async (operation, signal) => {
-        assertActive$2(signal);
-        if (operation.kind !== "write" || operation.slotId !== options.slotId || !isLiveElement(element)) return false;
-        const before = read();
-        if (!write(operation.value)) return false;
-        previous ?? (previous = before);
-        return true;
-      },
-      revert: async signal => {
-        assertActive$2(signal);
-        if (previous == null) return true;
-        if (!isLiveElement(element)) return false;
-        const restored = write(previous);
-        if (restored) previous = null;
-        return restored;
-      },
-      verify: async (operation, signal) => {
-        assertActive$2(signal);
-        return operation.kind === "write" && operation.slotId === options.slotId && isLiveElement(element) && read() === operation.value;
-      }
-    };
-  }
-
-  const MAX_TARGETS = 256;
-
-  function domArgument$1(args, name, refs) {
-    return refs.getDom(args[name]);
-  }
-
-  function domArrayArgument(args, name, refs) {
-    const value = args[name];
-    if (value == null) return [];
-    if (!Array.isArray(value) || value.length > MAX_TARGETS) throw new RuleDomainError("invalid_type", `${name} must be a bounded DOM reference array`);
-    return value.map(item => refs.getDom(item));
-  }
-
-  function stringArrayArgument$1(args, name) {
-    const value = args[name];
-    if (value == null) return [];
-    if (!Array.isArray(value) || value.length > 64) throw new RuleDomainError("invalid_type", `${name} must be a bounded string array`);
-    return value.map(item => {
-      if (typeof item !== "string" || !item || item.length > 1024) throw new RuleDomainError("invalid_type", `${name} contains an invalid selector`);
-      return item;
-    });
-  }
-
-  function optionalString(args, name, maxLength = 1024) {
-    const value = args[name];
-    if (value == null) return void 0;
-    if (typeof value !== "string" || value.length === 0 || value.length > maxLength) throw new RuleDomainError("invalid_type", `${name} must be a bounded string`);
-    return value;
-  }
-
-  function parseLeafNode(value) {
-    const parsed = LeafQuestionNodeSchema.safeParse(value);
-    if (!parsed.success) throw new RuleDomainError("invalid_question_node", "capture node is not a valid leaf question");
-    return parsed.data;
-  }
-
-  function selectedStrategy(args) {
-    const kind = args.selectedBy;
-    if (kind === "checked") return {
-      kind: kind
-    };
-    if (kind === "class") {
-      const name = optionalString(args, "selectedClass", 128);
-      if (!name) throw new RuleDomainError("invalid_type", "selectedClass is required for class strategy");
-      return {
-        kind: kind,
-        name: name
-      };
-    }
-    if (kind === "attribute") {
-      const name = optionalString(args, "selectedAttribute", 128);
-      const value = optionalString(args, "selectedValue");
-      if (!name || value == null) throw new RuleDomainError("invalid_type", "selectedAttribute and selectedValue are required");
-      return {
-        kind: kind,
-        name: name,
-        value: value
-      };
-    }
-    if (kind === "descendant") {
-      const selector = optionalString(args, "selectedDescendantSelector");
-      if (!selector) throw new RuleDomainError("invalid_type", "selectedDescendantSelector is required for descendant strategy");
-      return {
-        kind: kind,
-        selector: selector
-      };
-    }
-    throw new RuleDomainError("invalid_type", "selectedBy must be checked, class, descendant, or attribute");
-  }
-
-  function queryReadTarget(element, selector) {
-    if (!selector) return element;
-    try {
-      const target = element.querySelector(selector);
-      if (!target) throw new RuleDomainError("binding_target_mismatch", `choice read target is missing: ${selector}`);
-      return target;
-    } catch (error) {
-      if (error instanceof RuleDomainError) throw error;
-      throw new RuleDomainError("invalid_selector", error instanceof Error ? error.message : "invalid read selector");
-    }
-  }
-
-  function position(element) {
-    return element.parentElement ? Array.from(element.parentElement.children).indexOf(element) : -1;
-  }
-
-  function targetDescriptor(element) {
-    const view = element.ownerDocument.defaultView;
-    const input = view && element instanceof view.HTMLInputElement ? element : void 0;
-    const select = view && element instanceof view.HTMLSelectElement ? element : void 0;
-    return [ element.tagName.toLowerCase(), (input == null ? void 0 : input.type) ?? "", element.getAttribute("name") ?? "", element.id, position(element), select ? [ ...select.options ].map(option => [ option.value, option.textContent ]) : [] ];
-  }
-
-  function domFingerprint(source) {
-    const allTargets = [ source.stem, ...source.contentTargets, ...source.answerTargets ];
-    if (allTargets.some(target => !target.isConnected)) throw new Error("binding fingerprint target is disconnected");
-    return semanticContentHash(JSON.stringify([ serializeDomQuestionContent(source.stem, {
-      stripSelectors: source.stemStripSelectors
-    }), source.contentTargets.map(target => serializeDomQuestionContent(target, {
-      stripSelectors: source.optionStripSelectors
-    })), source.answerTargets.map(targetDescriptor) ]));
-  }
-
-  function leafDomRegistration(node, args, environment) {
-    const stem = domArgument$1(args, "stemTarget", environment.refs);
-    const stemStripSelectors = stringArrayArgument$1(args, "stemStripSelectors");
-    const optionStripSelectors = stringArrayArgument$1(args, "optionStripSelectors");
-    const choiceTargets2 = domArrayArgument(args, "choiceTargets", environment.refs);
-    const rawContentTargets = domArrayArgument(args, "choiceContentTargets", environment.refs);
-    let slotTargets = domArrayArgument(args, "slotTargets", environment.refs);
-    if (args.slotTarget != null) {
-      if (slotTargets.length > 0) throw new RuleDomainError("invalid_type", "slotTarget and slotTargets cannot be combined");
-      slotTargets = [ domArgument$1(args, "slotTarget", environment.refs) ];
-    }
-    const targets = [];
-    let contentTargets = [];
-    let answerTargets = [];
-    if ([ "single", "multiple", "judge" ].includes(node.type)) {
-      contentTargets = rawContentTargets.length ? rawContentTargets : choiceTargets2;
-      if (choiceTargets2.length !== node.options.length || contentTargets.length !== node.options.length || slotTargets.length !== 0) throw new RuleDomainError("binding_target_mismatch", "choice target count does not match question options");
-      const selected2 = selectedStrategy(args);
-      const readSelector = optionalString(args, "readSelector");
-      for (let index = 0; index < node.options.length; index += 1) {
-        const option = node.options[index];
-        const clickTarget = choiceTargets2[index];
-        if (!option || !clickTarget) throw new RuleDomainError("binding_target_mismatch", "choice target is missing");
-        targets.push(createDomChoiceBindingTarget({
-          optionId: option.id,
-          clickTarget: clickTarget,
-          readTarget: queryReadTarget(clickTarget, readSelector),
-          selected: selected2,
-          location: environment.location
-        }));
-      }
-      answerTargets = choiceTargets2;
-    } else {
-      if (slotTargets.length !== node.slots.length || choiceTargets2.length !== 0 || rawContentTargets.length !== 0) throw new RuleDomainError("binding_target_mismatch", "slot target count does not match question slots");
-      for (let index = 0; index < node.slots.length; index += 1) {
-        const slot = node.slots[index];
-        const element = slotTargets[index];
-        if (!slot || !element) throw new RuleDomainError("binding_target_mismatch", "slot target is missing");
-        targets.push(createDomWriteBindingTarget({
-          slotId: slot.id,
-          element: element,
-          selectOptions: slot.options
-        }));
-      }
-      answerTargets = slotTargets;
-    }
-    const fingerprintSource = {
-      stem: stem,
-      contentTargets: contentTargets,
-      answerTargets: answerTargets,
-      stemStripSelectors: stemStripSelectors,
-      optionStripSelectors: optionStripSelectors
-    };
-    const capturedDomFingerprint = domFingerprint(fingerprintSource);
-    const capturedQuestionFingerprint = questionNodeHash(node);
-    return {
-      readCurrentFingerprint: () => {
-        const current = domFingerprint(fingerprintSource);
-        return current === capturedDomFingerprint ? capturedQuestionFingerprint : current;
-      },
-      targets: targets
-    };
-  }
-
-  function captureCall(operation) {
-    try {
-      return operation();
-    } catch (error) {
-      if (error instanceof RuleCaptureRegistryError) throw new RuleDomainError(error.code, error.message);
-      throw error;
-    }
-  }
-
-  function registerLeafDom(args, environment) {
-    const node = parseLeafNode(args.node);
-    captureCall(() => environment.capture.registerLeaf(node, leafDomRegistration(node, args, environment)));
-    return node.path;
-  }
-
-  function registerLeafBindingDom(args, environment) {
-    const node = parseLeafNode(args.node);
-    captureCall(() => environment.capture.registerLeafBinding(node, leafDomRegistration(node, args, environment)));
-    return node.path;
-  }
-
-  function registerTree(args, environment) {
-    const parsed = QuestionNodeSchema.safeParse(args.root);
-    if (!parsed.success) throw new RuleDomainError("invalid_question_node", "capture root is not a valid question tree");
-    try {
-      assertValidQuestionTree(parsed.data);
-    } catch (error) {
-      throw new RuleDomainError("invalid_question_node", error instanceof Error ? error.message : "invalid question tree");
-    }
-    captureCall(() => environment.capture.registerTree(parsed.data));
-    return parsed.data.path;
-  }
-
-  function registerCapturePrimitives(registry, environment) {
-    registry.register({
-      id: "capture.registerLeafDom",
-      phases: [ "capture" ],
-      capability: "dom-read",
-      execute: ({args: args}) => registerLeafDom(args, environment)
-    });
-    registry.register({
-      id: "capture.registerLeafBindingDom",
-      phases: [ "capture" ],
-      capability: "dom-read",
-      execute: ({args: args}) => registerLeafBindingDom(args, environment)
-    });
-    registry.register({
-      id: "capture.registerTree",
-      phases: [ "capture" ],
-      execute: ({args: args}) => registerTree(args, environment)
-    });
-    registry.register({
-      id: "capture.harvestLeaf",
-      phases: [ "capture" ],
-      capability: "dom-read",
-      execute: ({args: args}) => captureCall(() => environment.capture.registerHarvestLeaf(args.node, args.values))
-    });
-    registry.register({
-      id: "capture.finish",
-      phases: [ "capture" ],
-      execute: () => captureCall(() => environment.capture.finish())
-    });
-  }
-
-  const READ_PHASES = [ "match", "capture", "diagnostic", "lifecycle", "fill" ];
-
-  const SAFE_PROPERTIES = new Set([ "value", "checked", "selected", "disabled", "tagName", "type", "name", "id", "className" ]);
-
-  function stringArgument$1(args, name) {
-    const value = args[name];
-    if (typeof value !== "string") throw new RuleDomainError("invalid_type", `${name} must be a string`);
-    return value;
-  }
-
-  function domArgument(args, name, refs) {
-    return refs.getDom(args[name]);
-  }
-
-  function stringArrayArgument(args, name) {
-    const value = args[name];
-    if (value == null) return [];
-    if (!Array.isArray(value) || value.length > 64) throw new RuleDomainError("invalid_type", `${name} must be an array with at most 64 strings`);
-    return value.map(item => {
-      if (typeof item !== "string" || !item || item.length > 1024) throw new RuleDomainError("invalid_type", `${name} must contain non-empty bounded strings`);
-      return item;
-    });
-  }
-
-  function queryRoot(args, refs, fallback) {
-    const from = args.from;
-    if (from == null) return fallback;
-    try {
-      return refs.getDom(from);
-    } catch (domError) {
-      try {
-        return refs.getFrame(from);
-      } catch {
-        throw domError;
-      }
-    }
-  }
-
-  function safeQuery(root, selector) {
-    try {
-      return root.querySelector(selector);
-    } catch (error) {
-      throw new RuleDomainError("invalid_selector", error instanceof Error ? error.message : "invalid selector");
-    }
-  }
-
-  function safeQueryAll(root, selector) {
-    try {
-      return Array.from(root.querySelectorAll(selector));
-    } catch (error) {
-      throw new RuleDomainError("invalid_selector", error instanceof Error ? error.message : "invalid selector");
-    }
-  }
-
-  function safeXPath(root, xpath, all) {
-    var _a2;
-    const document2 = root.nodeType === 9 ? root : root.ownerDocument;
-    if (!document2) throw new RuleDomainError("xpath_unavailable", "XPath document is missing");
-    const XPathResult = (_a2 = document2.defaultView) == null ? void 0 : _a2.XPathResult;
-    if (!XPathResult) throw new RuleDomainError("xpath_unavailable", "XPath is unavailable");
-    try {
-      if (!all) {
-        const result = document2.evaluate(xpath, root, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-        return (result == null ? void 0 : result.nodeType) === 1 ? [ result ] : [];
-      }
-      const iterator = document2.evaluate(xpath, root, null, XPathResult.ORDERED_NODE_ITERATOR_TYPE, null);
-      const elements = [];
-      let node = iterator.iterateNext();
-      while (node) {
-        if (node.nodeType === 1) elements.push(node);
-        node = iterator.iterateNext();
-      }
-      return elements;
-    } catch (error) {
-      throw new RuleDomainError("invalid_xpath", error instanceof Error ? error.message : "invalid XPath");
-    }
-  }
-
-  function intervalArgument(args) {
-    const value = args.intervalMs ?? 25;
-    if (!Number.isInteger(value) || value < 10 || value > 1e3) throw new RuleDomainError("invalid_type", "intervalMs must be an integer between 10 and 1000");
-    return value;
-  }
-
-  function boundedIntegerArgument(args, name, minimum, maximum) {
-    const value = args[name];
-    if (!Number.isInteger(value) || value < minimum || value > maximum) throw new RuleDomainError("invalid_type", `${name} must be an integer between ${minimum} and ${maximum}`);
-    return value;
-  }
-
-  function findSameOriginFrameDocument(root, selector, maxDepth, maxFrames) {
-    const queue = [ {
-      document: root,
-      depth: 0
-    } ];
-    const seen = new Set;
-    let frames = 0;
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (!current || seen.has(current.document)) continue;
-      seen.add(current.document);
-      if (safeQuery(current.document, selector)) return current.document;
-      if (current.depth >= maxDepth) continue;
-      for (const element of safeQueryAll(current.document, "iframe")) {
-        frames += 1;
-        if (frames > maxFrames) return null;
-        let frameDocument = null;
-        try {
-          frameDocument = element.contentDocument;
-        } catch {
-          frameDocument = null;
-        }
-        if (frameDocument && !seen.has(frameDocument)) queue.push({
-          document: frameDocument,
-          depth: current.depth + 1
-        });
-      }
-    }
-    return null;
-  }
-
-  function collectSameOriginFrameDocuments(root, selector, maxDepth, maxFrames, maxResults) {
-    const queue = [ {
-      document: root,
-      depth: 0
-    } ];
-    const seen = new Set;
-    const found = [];
-    let frames = 0;
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (!current || seen.has(current.document)) continue;
-      seen.add(current.document);
-      if (safeQuery(current.document, selector)) {
-        found.push(current.document);
-        if (found.length >= maxResults) return found;
-      }
-      if (current.depth >= maxDepth) continue;
-      for (const element of safeQueryAll(current.document, "iframe")) {
-        frames += 1;
-        if (frames > maxFrames) return found;
-        let frameDocument = null;
-        try {
-          frameDocument = element.contentDocument;
-        } catch {
-          frameDocument = null;
-        }
-        if (frameDocument && !seen.has(frameDocument)) queue.push({
-          document: frameDocument,
-          depth: current.depth + 1
-        });
-      }
-    }
-    return found;
-  }
-
-  function waitForSameOriginFrames(args, document2, refs, signal) {
-    const selector = stringArgument$1(args, "selector");
-    const maxDepth = boundedIntegerArgument(args, "maxDepth", 0, 8);
-    const maxFrames = boundedIntegerArgument(args, "maxFrames", 1, 128);
-    const maxResults = boundedIntegerArgument(args, "maxResults", 1, 32);
-    const waitMs = boundedIntegerArgument(args, "waitMs", 0, 8e3);
-    const settleMs = boundedIntegerArgument(args, "settleMs", 0, 2e3);
-    const intervalMs = intervalArgument(args);
-    const find = () => collectSameOriginFrameDocuments(document2, selector, maxDepth, maxFrames, maxResults);
-    const wrap = documents => documents.map(item => refs.createFrameRef(item));
-    if (waitMs === 0) return wrap(find());
-    return new Promise((resolve, reject) => {
-      const startedAt = Date.now();
-      let lastCount = -1;
-      let changedAt = startedAt;
-      const cleanup = () => {
-        clearInterval(timer);
-        signal.removeEventListener("abort", onAbort);
-      };
-      const onAbort = () => {
-        cleanup();
-        reject(new RuleExecutionError("cancelled", "frame.findAllSameOrigin cancelled"));
-      };
-      const timer = setInterval(() => {
-        try {
-          const found = find();
-          const now = Date.now();
-          if (found.length !== lastCount) {
-            lastCount = found.length;
-            changedAt = now;
-          }
-          if (found.length > 0 && now - changedAt >= settleMs || now - startedAt >= waitMs) {
-            cleanup();
-            resolve(wrap(found));
-          }
-        } catch (error) {
-          cleanup();
-          reject(error);
-        }
-      }, intervalMs);
-      signal.addEventListener("abort", onAbort, {
-        once: true
-      });
-    });
-  }
-
-  function waitForSameOriginFrame(args, document2, refs, signal) {
-    const selector = stringArgument$1(args, "selector");
-    const maxDepth = boundedIntegerArgument(args, "maxDepth", 0, 8);
-    const maxFrames = boundedIntegerArgument(args, "maxFrames", 1, 128);
-    const waitMs = boundedIntegerArgument(args, "waitMs", 0, 8e3);
-    const intervalMs = intervalArgument(args);
-    const find = () => findSameOriginFrameDocument(document2, selector, maxDepth, maxFrames);
-    const immediate = find();
-    if (immediate) return refs.createFrameRef(immediate);
-    if (waitMs === 0) return null;
-    return new Promise((resolve, reject) => {
-      const startedAt = Date.now();
-      const cleanup = () => {
-        clearInterval(timer);
-        signal.removeEventListener("abort", onAbort);
-      };
-      const onAbort = () => {
-        cleanup();
-        reject(new RuleExecutionError("cancelled", "frame.findSameOrigin cancelled"));
-      };
-      const timer = setInterval(() => {
-        try {
-          const found = find();
-          if (found) {
-            cleanup();
-            resolve(refs.createFrameRef(found));
-          } else if (Date.now() - startedAt >= waitMs) {
-            cleanup();
-            resolve(null);
-          }
-        } catch (error) {
-          cleanup();
-          reject(error);
-        }
-      }, intervalMs);
-      signal.addEventListener("abort", onAbort, {
-        once: true
-      });
-    });
-  }
-
-  function assertRevealTarget(element, location2, depth = 0) {
-    const view = element.ownerDocument.defaultView;
-    if (!view || !(element instanceof view.HTMLElement)) throw new RuleExecutionError("security_violation", "ui.reveal target must be an HTMLElement");
-    const htmlElement2 = element;
-    const tagName = htmlElement2.tagName.toLowerCase();
-    if (tagName === "form") throw new RuleExecutionError("security_violation", "ui.reveal cannot activate forms");
-    if (htmlElement2 instanceof view.HTMLButtonElement) {
-      if (htmlElement2.type !== "button") throw new RuleExecutionError("security_violation", "ui.reveal cannot activate submit controls");
-    }
-    if (htmlElement2 instanceof view.HTMLInputElement) {
-      if ([ "submit", "reset", "image" ].includes(htmlElement2.type)) throw new RuleExecutionError("security_violation", "ui.reveal cannot activate submit controls");
-    }
-    const label = htmlElement2 instanceof view.HTMLInputElement ? htmlElement2.value : "";
-    if (/\u63d0\u4ea4|\u4ea4\u5377|\u5b8c\u6210\u8003\u8bd5|\bsubmit\b/iu.test(`${htmlElement2.textContent ?? ""}\n${label}`)) throw new RuleExecutionError("security_violation", "ui.reveal cannot activate submit controls");
-    if (htmlElement2 instanceof view.HTMLLabelElement && depth === 0) {
-      const control = htmlElement2.control;
-      if (control) assertRevealTarget(control, location2, depth + 1);
-    }
-    if (htmlElement2 instanceof view.HTMLAnchorElement) {
-      const target = new URL(htmlElement2.href, location2.href);
-      if (target.protocol === "javascript:" || target.origin !== location2.origin) throw new RuleExecutionError("security_violation", "ui.reveal cannot navigate outside the current origin");
-    }
-    return htmlElement2;
-  }
-
-  function registerDomPrimitives(registry, environment) {
-    const {document: document2, location: location2, refs: refs} = environment;
-    registry.register({
-      id: "dom.queryCss",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args}) => {
-        const element = safeQuery(queryRoot(args, refs, document2), stringArgument$1(args, "selector"));
-        return element ? refs.createDomRef(element) : null;
-      }
-    });
-    registry.register({
-      id: "dom.queryCssAll",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args}) => safeQueryAll(queryRoot(args, refs, document2), stringArgument$1(args, "selector")).map(element => refs.createDomRef(element))
-    });
-    registry.register({
-      id: "dom.queryXPath",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args}) => {
-        const element = safeXPath(queryRoot(args, refs, document2), stringArgument$1(args, "xpath"), false)[0];
-        return element ? refs.createDomRef(element) : null;
-      }
-    });
-    registry.register({
-      id: "dom.queryXPathAll",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args}) => safeXPath(queryRoot(args, refs, document2), stringArgument$1(args, "xpath"), true).map(element => refs.createDomRef(element))
-    });
-    registry.register({
-      id: "dom.text",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args}) => domArgument(args, "target", refs).textContent ?? ""
-    });
-    registry.register({
-      id: "dom.content",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args, signal: signal}) => {
-        try {
-          return serializeDomQuestionContent(domArgument(args, "target", refs), {
-            stripSelectors: stringArrayArgument(args, "stripSelectors"),
-            signal: signal
-          });
-        } catch (error) {
-          if (error instanceof DomContentError) {
-            if (error.code === "budget_exceeded" || error.code === "cancelled") throw new RuleExecutionError(error.code, error.message);
-            throw new RuleDomainError(error.code, error.message);
-          }
-          throw error;
-        }
-      }
-    });
-    registry.register({
-      id: "dom.attr",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args}) => domArgument(args, "target", refs).getAttribute(stringArgument$1(args, "name"))
-    });
-    registry.register({
-      id: "dom.property",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args}) => {
-        const name = stringArgument$1(args, "name");
-        if (!SAFE_PROPERTIES.has(name)) throw new RuleExecutionError("security_violation", `DOM property is not exposed: ${name}`);
-        return domArgument(args, "target", refs)[name];
-      }
-    });
-    registry.register({
-      id: "dom.closest",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args}) => {
-        let element;
-        try {
-          element = domArgument(args, "target", refs).closest(stringArgument$1(args, "selector"));
-        } catch (error) {
-          throw new RuleDomainError("invalid_selector", error instanceof Error ? error.message : "invalid selector");
-        }
-        return element ? refs.createDomRef(element) : null;
-      }
-    });
-    registry.register({
-      id: "dom.parent",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args}) => {
-        const parent = domArgument(args, "target", refs).parentElement;
-        return parent ? refs.createDomRef(parent) : null;
-      }
-    });
-    registry.register({
-      id: "dom.children",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args}) => Array.from(domArgument(args, "target", refs).children).map(element => refs.createDomRef(element))
-    });
-    registry.register({
-      id: "dom.index",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args}) => {
-        const element = domArgument(args, "target", refs);
-        return element.parentElement ? Array.from(element.parentElement.children).indexOf(element) : -1;
-      }
-    });
-    registry.register({
-      id: "frame.list",
-      phases: READ_PHASES,
-      capability: "frame-read",
-      execute: ({args: args}) => safeQueryAll(queryRoot(args, refs, document2), "iframe").map(frame => refs.createDomRef(frame))
-    });
-    registry.register({
-      id: "frame.enter",
-      phases: READ_PHASES,
-      capability: "frame-read",
-      execute: ({args: args}) => {
-        const frame = domArgument(args, "target", refs);
-        if (frame.tagName.toLowerCase() !== "iframe") throw new RuleDomainError("invalid_type", "target is not an iframe");
-        let frameDocument;
-        try {
-          frameDocument = frame.contentDocument;
-        } catch {
-          return null;
-        }
-        return frameDocument ? refs.createFrameRef(frameDocument) : null;
-      }
-    });
-    registry.register({
-      id: "frame.findSameOrigin",
-      phases: READ_PHASES,
-      capability: "frame-read",
-      execute: ({args: args, signal: signal}) => waitForSameOriginFrame(args, document2, refs, signal)
-    });
-    registry.register({
-      id: "frame.findAllSameOrigin",
-      phases: READ_PHASES,
-      capability: "frame-read",
-      execute: ({args: args, signal: signal}) => waitForSameOriginFrames(args, document2, refs, signal)
-    });
-    registry.register({
-      id: "page.location",
-      phases: READ_PHASES,
-      capability: "runtime-read",
-      execute: () => ({
-        href: location2.href,
-        origin: location2.origin,
-        protocol: location2.protocol,
-        host: location2.host,
-        pathname: location2.pathname
-      })
-    });
-    registry.register({
-      id: "page.queryParam",
-      phases: READ_PHASES,
-      capability: "runtime-read",
-      execute: ({args: args}) => new URL(location2.href).searchParams.get(stringArgument$1(args, "name"))
-    });
-    registry.register({
-      id: "ui.reveal",
-      phases: [ "lifecycle" ],
-      capability: "ui-reveal",
-      execute: ({args: args}) => {
-        const element = assertRevealTarget(domArgument(args, "target", refs), location2);
-        element.click();
-        return true;
-      }
-    });
-    registry.register({
-      id: "wait.selector",
-      phases: READ_PHASES,
-      capability: "dom-read",
-      execute: ({args: args, signal: signal}) => {
-        const root = queryRoot(args, refs, document2);
-        const selector = stringArgument$1(args, "selector");
-        const intervalMs = intervalArgument(args);
-        const immediate = safeQuery(root, selector);
-        if (immediate) return refs.createDomRef(immediate);
-        return new Promise((resolve, reject) => {
-          const cleanup = () => {
-            clearInterval(timer);
-            signal.removeEventListener("abort", onAbort);
-          };
-          const onAbort = () => {
-            cleanup();
-            reject(new RuleExecutionError("cancelled", "wait.selector cancelled"));
-          };
-          const timer = setInterval(() => {
-            try {
-              const element = safeQuery(root, selector);
-              if (!element) return;
-              cleanup();
-              resolve(refs.createDomRef(element));
-            } catch (error) {
-              cleanup();
-              reject(error);
-            }
-          }, intervalMs);
-          signal.addEventListener("abort", onAbort, {
-            once: true
-          });
-        });
-      }
-    });
-  }
-
-  function maxTriggers(args) {
-    const value = args.maxTriggers;
-    if (!Number.isInteger(value) || value <= 0 || value > 1e3) throw new RuleDomainError("invalid_type", "maxTriggers must be an integer between 1 and 1000");
-    return value;
-  }
-
-  function registerObserverPrimitives(registry, environment) {
-    const {window: window2, document: document2, MutationObserver: MutationObserver, refs: refs, resources: resources, emit: emit} = environment;
-    registry.register({
-      id: "observe.mutation",
-      phases: [ "lifecycle" ],
-      capability: "dom-read",
-      execute: ({args: args}) => {
-        const limit = maxTriggers(args);
-        const target = args.target == null ? document2.documentElement : refs.getDom(args.target);
-        if (!target) throw new RuleDomainError("missing_target", "mutation target is missing");
-        let active2 = true;
-        let trigger = 0;
-        const observer = new MutationObserver(mutations => {
-          if (!active2) return;
-          trigger += 1;
-          emit({
-            event: "dom-change",
-            payload: {
-              mutationCount: mutations.length,
-              trigger: trigger
-            }
-          });
-          if (trigger >= limit) cleanup();
-        });
-        const cleanup = () => {
-          if (!active2) return;
-          active2 = false;
-          observer.disconnect();
-        };
-        resources.add(cleanup);
-        observer.observe(target, {
-          attributes: true,
-          childList: true,
-          subtree: true
-        });
-        return true;
-      }
-    });
-    let urlHookInstalled = false;
-    registry.register({
-      id: "observe.urlChange",
-      phases: [ "lifecycle" ],
-      capability: "runtime-read",
-      execute: ({args: args}) => {
-        if (urlHookInstalled) throw new RuleExecutionError("security_violation", "URL observer is already installed");
-        urlHookInstalled = true;
-        const limit = maxTriggers(args);
-        const history = window2.history;
-        const originalPushState = history.pushState;
-        const originalReplaceState = history.replaceState;
-        let active2 = true;
-        let trigger = 0;
-        const cleanup = () => {
-          if (!active2) return;
-          active2 = false;
-          window2.removeEventListener("popstate", notify);
-          if (history.pushState === wrappedPushState) history.pushState = originalPushState;
-          if (history.replaceState === wrappedReplaceState) history.replaceState = originalReplaceState;
-          urlHookInstalled = false;
-        };
-        const notify = () => {
-          if (!active2) return;
-          trigger += 1;
-          emit({
-            event: "url-change",
-            payload: {
-              origin: window2.location.origin,
-              pathname: window2.location.pathname
-            }
-          });
-          if (trigger >= limit) cleanup();
-        };
-        const wrappedPushState = function pushState(data, unused, url) {
-          originalPushState.call(history, data, unused, url);
-          notify();
-        };
-        const wrappedReplaceState = function replaceState(data, unused, url) {
-          originalReplaceState.call(history, data, unused, url);
-          notify();
-        };
-        history.pushState = wrappedPushState;
-        history.replaceState = wrappedReplaceState;
-        window2.addEventListener("popstate", notify);
-        resources.add(cleanup);
-        return true;
-      }
-    });
-  }
-
-  const TRANSFORM_PHASES = [ "match", "capture", "diagnostic", "lifecycle" ];
-
-  const MAX_TRANSFORM_TEXT_BYTES = 128 * 1024;
-
-  const BLOCKED_HTML_CONTENT = /<(script|style|noscript)\b[^>]*>[\s\S]*?<\/\1\s*>/giu;
-
-  function stringArgument(args, name) {
-    const value = args[name];
-    if (typeof value !== "string") throw new RuleDomainError("invalid_type", `${name} must be a string`);
-    if ((new TextEncoder).encode(value).length > MAX_TRANSFORM_TEXT_BYTES) throw new RuleExecutionError("budget_exceeded", `${name} exceeds transform byte limit`);
-    return value;
-  }
-
-  function sanitizeQuestionContent(value) {
-    const withoutBlockedContent = value.replace(BLOCKED_HTML_CONTENT, "");
-    return collapseWs(parseQuestionContent(withoutBlockedContent).map(part => part.type === "image" ? serializeImageToken(part.value) : serializeQuestionText(part.value)).join(""));
-  }
-
-  function registerTransformPrimitives(registry) {
-    registry.register({
-      id: "content.sanitize",
-      phases: TRANSFORM_PHASES,
-      execute: ({args: args, signal: signal}) => {
-        if (signal.aborted) throw new RuleExecutionError("cancelled", "content.sanitize was cancelled");
-        return sanitizeQuestionContent(stringArgument(args, "value"));
-      }
-    });
-    registry.register({
-      id: "text.stripOptionPrefix",
-      phases: TRANSFORM_PHASES,
-      execute: ({args: args}) => stripOptionPrefix(stringArgument(args, "value"))
-    });
-    registry.register({
-      id: "text.includes",
-      phases: TRANSFORM_PHASES,
-      execute: ({args: args}) => stringArgument(args, "value").includes(stringArgument(args, "search"))
-    });
-    registry.register({
-      id: "text.normalizeTruth",
-      phases: TRANSFORM_PHASES,
-      execute: ({args: args}) => normalizeTruth(stringArgument(args, "value"))
-    });
-    registry.register({
-      id: "question.normalizeLeafType",
-      phases: TRANSFORM_PHASES,
-      execute: ({args: args}) => normalizeLeafQuestionType(stringArgument(args, "value"))
-    });
-    registry.register({
-      id: "array.append",
-      phases: TRANSFORM_PHASES,
-      execute: ({args: args}) => {
-        const items = JsonRuleValueSchema.safeParse(args.items);
-        const value = JsonRuleValueSchema.safeParse(args.value);
-        if (!items.success || !Array.isArray(items.data) || !value.success) throw new RuleDomainError("invalid_type", "array.append requires JSON items and value");
-        const maxItems = args.maxItems;
-        if (!Number.isInteger(maxItems) || maxItems <= 0 || maxItems > RULE_HARD_LIMITS.maxLoopIterations) throw new RuleDomainError("invalid_type", "maxItems must be a bounded positive integer");
-        if (items.data.length >= maxItems) throw new RuleExecutionError("budget_exceeded", "array.append item budget exceeded");
-        return [ ...items.data, value.data ];
-      }
-    });
-  }
-
-  const RULE_DISPATCHED_EVENTS = new Set([ "dom-change", "url-change" ]);
-
-  function registerCoreRulePrimitives(registry, environment) {
-    const {document: document2, location: location2, refs: refs, capture: capture2, writer: writer, resources: resources, emit: emit} = environment;
-    registerDomPrimitives(registry, {
-      document: document2,
-      location: location2,
-      refs: refs
-    });
-    registerTransformPrimitives(registry);
-    registerCapturePrimitives(registry, {
-      refs: refs,
-      capture: capture2,
-      location: location2
-    });
-    registerAnswerWritePrimitives(registry, writer);
-    const view = document2.defaultView;
-    if (!view) return;
-    registerObserverPrimitives(registry, {
-      window: view,
-      document: document2,
-      MutationObserver: view.MutationObserver,
-      refs: refs,
-      resources: resources,
-      emit: emit ?? (() => void 0)
-    });
-  }
-
-  const FORBIDDEN_KEYS$2 = new Set([ "__proto__", "prototype", "constructor" ]);
-
-  class ReturnSignal {
-    constructor(value) {
-      this.value = value;
-    }
-  }
-
-  function validatePositiveLimit(name, value, maximum) {
-    if (!Number.isInteger(value) || value <= 0 || value > maximum) {
-      throw new RuleExecutionError("security_violation", `invalid runtime limit ${name}: ${value}`);
-    }
-  }
-
-  function resolveLimits(policy, requested) {
-    validatePositiveLimit("maxSteps", policy.limits.maxSteps, RULE_HARD_LIMITS.maxSteps);
-    validatePositiveLimit("maxWallMs", policy.limits.maxWallMs, RULE_HARD_LIMITS.maxWallMs);
-    validatePositiveLimit("maxAsyncMs", policy.limits.maxAsyncMs, RULE_HARD_LIMITS.maxAsyncMs);
-    validatePositiveLimit("maxLoopIterations", policy.limits.maxLoopIterations, RULE_HARD_LIMITS.maxLoopIterations);
-    validatePositiveLimit("maxCallDepth", policy.limits.maxCallDepth, RULE_HARD_LIMITS.maxCallDepth);
-    validatePositiveLimit("maxDomRefs", policy.limits.maxDomRefs, RULE_HARD_LIMITS.maxDomRefs);
-    const limits = {
-      ...policy.limits,
-      ...requested
-    };
-    for (const key of Object.keys(limits)) {
-      if (limits[key] > policy.limits[key]) {
-        throw new RuleExecutionError("security_violation", `rule cannot expand runtime limit: ${key}`);
-      }
-    }
-    return limits;
-  }
-
-  function checkExecution(state) {
-    var _a2;
-    if ((_a2 = state.signal) == null ? void 0 : _a2.aborted) {
-      throw new RuleExecutionError("cancelled", "rule execution cancelled");
-    }
-    if (state.now() - state.startedAt >= state.limits.maxWallMs) {
-      throw new RuleExecutionError("timeout", "rule execution timed out");
-    }
-  }
-
-  function consumeStep(state) {
-    checkExecution(state);
-    state.steps += 1;
-    if (state.steps > state.limits.maxSteps) {
-      throw new RuleExecutionError("budget_exceeded", "rule step budget exceeded");
-    }
-  }
-
-  function requireBoolean(value, label) {
-    if (typeof value !== "boolean") {
-      throw new RuleDomainError("invalid_type", `${label} must be boolean`);
-    }
-    return value;
-  }
-
-  function requireString(value, label) {
-    if (typeof value !== "string") {
-      throw new RuleDomainError("invalid_type", `${label} must be string`);
-    }
-    return value;
-  }
-
-  function ownDataProperty$1(value, key) {
-    const normalizedKey = String(key);
-    if (FORBIDDEN_KEYS$2.has(normalizedKey)) {
-      throw new RuleExecutionError("security_violation", `forbidden property path: ${normalizedKey}`);
-    }
-    if (typeof value !== "object" && typeof value !== "function" || value == null) {
-      throw new RuleDomainError("invalid_type", "path source must be an object");
-    }
-    const descriptor = Object.getOwnPropertyDescriptor(value, normalizedKey);
-    if (!descriptor) return null;
-    if (!("value" in descriptor)) {
-      throw new RuleExecutionError("security_violation", `property getter is not readable: ${normalizedKey}`);
-    }
-    return descriptor.value;
-  }
-
-  function isJsonComparable(value) {
-    if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
-      return typeof value !== "number" || Number.isFinite(value);
-    }
-    if (Array.isArray(value)) return value.every(isJsonComparable);
-    if (typeof value !== "object") return false;
-    const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) return false;
-    const record = value;
-    return Object.keys(record).every(key => {
-      if (FORBIDDEN_KEYS$2.has(key)) return false;
-      const descriptor = Object.getOwnPropertyDescriptor(record, key);
-      return Boolean(descriptor && "value" in descriptor && isJsonComparable(descriptor.value));
-    });
-  }
-
-  function valuesEqual(left, right) {
-    if (Object.is(left, right)) return true;
-    if (!isJsonComparable(left) || !isJsonComparable(right)) return false;
-    return canonicalize(left) === canonicalize(right);
-  }
-
-  function compareValues(kind, left, right) {
-    if (kind === "eq") return valuesEqual(left, right);
-    if (kind === "ne") return !valuesEqual(left, right);
-    if (typeof left !== "number" && typeof left !== "string" || typeof left !== typeof right) {
-      throw new RuleDomainError("invalid_type", `comparison ${kind} requires matching strings or numbers`);
-    }
-    if (typeof left === "number") {
-      const numericRight = right;
-      if (kind === "gt") return left > numericRight;
-      if (kind === "gte") return left >= numericRight;
-      if (kind === "lt") return left < numericRight;
-      return left <= numericRight;
-    }
-    const stringRight = right;
-    if (kind === "gt") return left > stringRight;
-    if (kind === "gte") return left >= stringRight;
-    if (kind === "lt") return left < stringRight;
-    return left <= stringRight;
-  }
-
-  function formatValue(value) {
-    if (value === null) return "";
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-      return String(value);
-    }
-    if (isJsonComparable(value)) return canonicalize(value);
-    throw new RuleDomainError("invalid_type", "format argument is not JSON data");
-  }
-
-  function restoreVariable(variables, name, previous) {
-    if (previous.present) variables.set(name, previous.value); else variables.delete(name);
-  }
-
-  function requireArray(value, label) {
-    if (!Array.isArray(value)) {
-      throw new RuleDomainError("invalid_type", `${label} must be an array`);
-    }
-    return value;
-  }
-
-  function requireJsonValue(value, label) {
-    if (!isJsonComparable(value)) {
-      throw new RuleDomainError("invalid_type", `${label} must be JSON data`);
-    }
-    return value;
-  }
-
-  function assertCollectionBudget(length, maxIterations, state) {
-    if (!Number.isInteger(maxIterations) || maxIterations <= 0 || maxIterations > state.limits.maxLoopIterations || length > maxIterations) {
-      throw new RuleExecutionError("budget_exceeded", "collection iteration budget exceeded");
-    }
-  }
-
-  function assertDistinctVariables(names) {
-    const present = names.filter(name => name != null);
-    if (new Set(present).size !== present.length || present.some(name => name.startsWith("$") || FORBIDDEN_KEYS$2.has(name))) {
-      throw new RuleExecutionError("security_violation", "collection variables must be distinct non-reserved names");
-    }
-  }
-
-  async function raceBounded(operation, state, timeoutMs) {
-    checkExecution(state);
-    const remainingWall = Math.max(1, state.limits.maxWallMs - (state.now() - state.startedAt));
-    const boundedTimeout = Math.min(timeoutMs, state.limits.maxAsyncMs, remainingWall);
-    const controller = new AbortController;
-    let timer;
-    let onAbort;
-    const boundary = new Promise((_, reject) => {
-      timer = setTimeout(() => {
-        reject(new RuleExecutionError("timeout", "rule async operation timed out"));
-        controller.abort();
-      }, boundedTimeout);
-      if (state.signal) {
-        onAbort = () => {
-          reject(new RuleExecutionError("cancelled", "rule execution cancelled"));
-          controller.abort();
-        };
-        state.signal.addEventListener("abort", onAbort, {
-          once: true
-        });
-      }
-    });
-    try {
-      return await Promise.race([ operation(controller.signal), boundary ]);
-    } finally {
-      if (timer !== void 0) clearTimeout(timer);
-      if (state.signal && onAbort) state.signal.removeEventListener("abort", onAbort);
-      controller.abort();
-    }
-  }
-
-  async function evaluateExpr(expr, variables, state) {
-    consumeStep(state);
-    switch (expr.op) {
-     case "literal":
-      return expr.value;
-
-     case "var":
-      if (!variables.has(expr.name)) {
-        throw new RuleDomainError("missing_variable", `missing variable: ${expr.name}`);
-      }
-      return variables.get(expr.name);
-
-     case "path":
-      {
-        let value = await evaluateExpr(expr.from, variables, state);
-        for (const segment of expr.path) value = ownDataProperty$1(value, segment);
-        return value;
-      }
-
-     case "coalesce":
-      for (const candidate of expr.values) {
-        const value = await evaluateExpr(candidate, variables, state);
-        if (value !== null && value !== void 0) return value;
-      }
-      return null;
-
-     case "compare":
-      return compareValues(expr.kind, await evaluateExpr(expr.left, variables, state), await evaluateExpr(expr.right, variables, state));
-
-     case "logic":
-      {
-        if (expr.kind === "and") {
-          for (const valueExpr of expr.values) {
-            if (!requireBoolean(await evaluateExpr(valueExpr, variables, state), "logic operand")) return false;
-          }
-          return true;
-        }
-        for (const valueExpr of expr.values) {
-          if (requireBoolean(await evaluateExpr(valueExpr, variables, state), "logic operand")) return true;
-        }
-        return false;
-      }
-
-     case "not":
-      return !requireBoolean(await evaluateExpr(expr.value, variables, state), "not operand");
-
-     case "array":
-      {
-        const result = [];
-        for (const item of expr.items) {
-          result.push(requireJsonValue(await evaluateExpr(item, variables, state), "array item"));
-        }
-        return result;
-      }
-
-     case "object":
-      {
-        const result = Object.create(null);
-        for (const [key, value] of Object.entries(expr.entries)) {
-          if (FORBIDDEN_KEYS$2.has(key)) {
-            throw new RuleExecutionError("security_violation", `forbidden object key: ${key}`);
-          }
-          result[key] = requireJsonValue(await evaluateExpr(value, variables, state), `object entry ${key}`);
-        }
-        return result;
-      }
-
-     case "map":
-     case "filter":
-      {
-        const items = requireArray(await evaluateExpr(expr.items, variables, state), `${expr.op} items`);
-        assertCollectionBudget(items.length, expr.maxIterations, state);
-        assertDistinctVariables([ expr.item, expr.index ]);
-        const itemPrevious = {
-          present: variables.has(expr.item),
-          value: variables.get(expr.item)
-        };
-        const indexPrevious = expr.index ? {
-          present: variables.has(expr.index),
-          value: variables.get(expr.index)
-        } : null;
-        const result = [];
-        try {
-          for (let index = 0; index < items.length; index += 1) {
-            consumeStep(state);
-            variables.set(expr.item, items[index]);
-            if (expr.index) variables.set(expr.index, index);
-            if (expr.op === "map") {
-              result.push(requireJsonValue(await evaluateExpr(expr.value, variables, state), "map result"));
-            } else if (requireBoolean(await evaluateExpr(expr.when, variables, state), "filter condition")) {
-              result.push(requireJsonValue(items[index], "filter result"));
-            }
-          }
-        } finally {
-          restoreVariable(variables, expr.item, itemPrevious);
-          if (expr.index && indexPrevious) restoreVariable(variables, expr.index, indexPrevious);
-        }
-        return result;
-      }
-
-     case "reduce":
-      {
-        const items = requireArray(await evaluateExpr(expr.items, variables, state), "reduce items");
-        assertCollectionBudget(items.length, expr.maxIterations, state);
-        assertDistinctVariables([ expr.item, expr.index, expr.accumulator ]);
-        let accumulator = requireJsonValue(await evaluateExpr(expr.initial, variables, state), "reduce initial value");
-        const itemPrevious = {
-          present: variables.has(expr.item),
-          value: variables.get(expr.item)
-        };
-        const indexPrevious = expr.index ? {
-          present: variables.has(expr.index),
-          value: variables.get(expr.index)
-        } : null;
-        const accumulatorPrevious = {
-          present: variables.has(expr.accumulator),
-          value: variables.get(expr.accumulator)
-        };
-        try {
-          for (let index = 0; index < items.length; index += 1) {
-            consumeStep(state);
-            variables.set(expr.item, items[index]);
-            if (expr.index) variables.set(expr.index, index);
-            variables.set(expr.accumulator, accumulator);
-            accumulator = requireJsonValue(await evaluateExpr(expr.value, variables, state), "reduce result");
-          }
-        } finally {
-          restoreVariable(variables, expr.item, itemPrevious);
-          if (expr.index && indexPrevious) restoreVariable(variables, expr.index, indexPrevious);
-          restoreVariable(variables, expr.accumulator, accumulatorPrevious);
-        }
-        return accumulator;
-      }
-
-     case "string":
-      {
-        const value = requireString(await evaluateExpr(expr.value, variables, state), "string operand");
-        if (expr.kind === "trim") return value.trim();
-        if (expr.kind === "collapseWs") return value.replace(/\s+/gu, " ").trim();
-        if (expr.kind === "lower") return value.toLocaleLowerCase();
-        return value.toLocaleUpperCase();
-      }
-
-     case "regex":
-      {
-        if (!state.services.regex) {
-          throw new RuleExecutionError("unsupported_expression", "regex executor is not installed");
-        }
-        const value = requireString(await evaluateExpr(expr.value, variables, state), "regex operand");
-        return raceBounded(signal => {
-          var _a2, _b;
-          return (_b = (_a2 = state.services).regex) == null ? void 0 : _b.call(_a2, {
-            kind: expr.kind,
-            value: value,
-            pattern: expr.pattern,
-            flags: expr.flags,
-            replacement: expr.replacement,
-            signal: signal,
-            timeoutMs: state.limits.maxAsyncMs
-          });
-        }, state, state.limits.maxAsyncMs);
-      }
-
-     case "jsonPath":
-      {
-        if (!state.services.jsonPath) {
-          throw new RuleExecutionError("unsupported_expression", "JSONPath executor is not installed");
-        }
-        const value = await evaluateExpr(expr.from, variables, state);
-        return raceBounded(async signal => {
-          var _a2, _b;
-          return (_b = (_a2 = state.services).jsonPath) == null ? void 0 : _b.call(_a2, {
-            value: value,
-            query: expr.query,
-            signal: signal
-          });
-        }, state, state.limits.maxAsyncMs);
-      }
-
-     case "format":
-      {
-        const values = new Map;
-        for (const [name, argument] of Object.entries(expr.args)) {
-          values.set(name, formatValue(await evaluateExpr(argument, variables, state)));
-        }
-        return expr.template.replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/gu, (_, name) => values.has(name) ? values.get(name) ?? "" : `{${name}}`);
-      }
-    }
-  }
-
-  async function executeFlow(flow, variables, state, depth) {
-    if (depth > state.limits.maxCallDepth) {
-      throw new RuleExecutionError("call_depth_exceeded", "rule call depth exceeded");
-    }
-    try {
-      await executeSteps(flow.steps, variables, state, depth);
-      return null;
-    } catch (error) {
-      if (error instanceof ReturnSignal) return error.value;
-      throw error;
-    }
-  }
-
-  async function executeSteps(steps, variables, state, depth) {
-    for (const step of steps) {
-      consumeStep(state);
-      switch (step.type) {
-       case "set":
-        if (step.name.startsWith("$") || FORBIDDEN_KEYS$2.has(step.name)) {
-          throw new RuleExecutionError("security_violation", `cannot set reserved variable: ${step.name}`);
-        }
-        variables.set(step.name, await evaluateExpr(step.value, variables, state));
-        break;
-
-       case "if":
-        if (requireBoolean(await evaluateExpr(step.when, variables, state), "if condition")) await executeSteps(step.then, variables, state, depth); else if (step.else) await executeSteps(step.else, variables, state, depth);
-        break;
-
-       case "switch":
-        {
-          const value = await evaluateExpr(step.value, variables, state);
-          const selected2 = step.cases.find(candidate => valuesEqual(value, candidate.equals));
-          if (selected2) await executeSteps(selected2.steps, variables, state, depth); else if (step.default) await executeSteps(step.default, variables, state, depth);
-          break;
-        }
-
-       case "forEach":
-        {
-          const items = await evaluateExpr(step.items, variables, state);
-          if (!Array.isArray(items)) {
-            throw new RuleDomainError("invalid_type", "forEach items must be an array");
-          }
-          if (step.maxIterations > state.limits.maxLoopIterations || items.length > step.maxIterations) {
-            throw new RuleExecutionError("budget_exceeded", "forEach iteration budget exceeded");
-          }
-          const itemPrevious = {
-            present: variables.has(step.item),
-            value: variables.get(step.item)
-          };
-          const indexPrevious = step.index ? {
-            present: variables.has(step.index),
-            value: variables.get(step.index)
-          } : null;
-          try {
-            for (let index = 0; index < items.length; index += 1) {
-              consumeStep(state);
-              variables.set(step.item, items[index]);
-              if (step.index) variables.set(step.index, index);
-              await executeSteps(step.steps, variables, state, depth);
-            }
-          } finally {
-            restoreVariable(variables, step.item, itemPrevious);
-            if (step.index && indexPrevious) restoreVariable(variables, step.index, indexPrevious);
-          }
-          break;
-        }
-
-       case "while":
-        {
-          if (step.maxIterations > state.limits.maxLoopIterations) {
-            throw new RuleExecutionError("budget_exceeded", "while iteration budget exceeded");
-          }
-          let iterations = 0;
-          while (requireBoolean(await evaluateExpr(step.when, variables, state), "while condition")) {
-            if (iterations >= step.maxIterations) {
-              throw new RuleExecutionError("budget_exceeded", "while iteration budget exceeded");
-            }
-            iterations += 1;
-            consumeStep(state);
-            await executeSteps(step.steps, variables, state, depth);
-          }
-          break;
-        }
-
-       case "callFlow":
-        {
-          const target = state.flows.get(step.flowId);
-          if (!target) {
-            throw new RuleDomainError("missing_flow", `missing flow: ${step.flowId}`);
-          }
-          const childVariables = new Map(variables);
-          const evaluatedArgs = new Map;
-          for (const [name, argument] of Object.entries(step.args ?? {})) {
-            evaluatedArgs.set(name, await evaluateExpr(argument, variables, state));
-          }
-          for (const param of target.params ?? []) {
-            if (evaluatedArgs.has(param)) childVariables.set(param, evaluatedArgs.get(param)); else if (!childVariables.has(param)) throw new RuleDomainError("missing_variable", `missing flow argument: ${param}`);
-          }
-          const result = await executeFlow(target, childVariables, state, depth + 1);
-          if (step.result) variables.set(step.result, result);
-          break;
-        }
-
-       case "return":
-        throw new ReturnSignal(step.value ? await evaluateExpr(step.value, variables, state) : null);
-
-       case "try":
-        {
-          try {
-            await executeSteps(step.steps, variables, state, depth);
-          } catch (error) {
-            if (!(error instanceof RuleDomainError) || !step.catch) throw error;
-            const previous = {
-              present: variables.has("$error"),
-              value: variables.get("$error")
-            };
-            variables.set("$error", error.toRuleValue());
-            try {
-              await executeSteps(step.catch, variables, state, depth);
-            } finally {
-              restoreVariable(variables, "$error", previous);
-            }
-          } finally {
-            if (step.finally) await executeSteps(step.finally, variables, state, depth);
-          }
-          break;
-        }
-
-       case "primitive":
-        {
-          const args = Object.create(null);
-          for (const [name, argument] of Object.entries(step.args ?? {})) {
-            args[name] = await evaluateExpr(argument, variables, state);
-          }
-          const invocation = {
-            id: step.id,
-            args: args,
-            phase: state.phase,
-            signal: (new AbortController).signal,
-            variables: variables,
-            requestedCapabilities: state.requestedCapabilities
-          };
-          const definition = assertPrimitiveAllowed(state.registry, state.policy, invocation);
-          const result = await raceBounded(signal => invokePrimitive(definition, {
-            ...invocation,
-            signal: signal
-          }), state, step.timeoutMs ?? state.limits.maxAsyncMs);
-          if (step.result) variables.set(step.result, result);
-          break;
-        }
-      }
-    }
-  }
-
-  class RuleInterpreter {
-    constructor(options) {
-      __publicField(this, "now");
-      this.options = options;
-      this.now = options.now ?? Date.now;
-    }
-    async run(flow, options) {
-      var _a2, _b;
-      const startedAt = this.now();
-      (_a2 = options.resources) == null ? void 0 : _a2.bind(options.signal);
-      try {
-        const requestedCapabilities = options.capabilities ?? this.options.policy.capabilities;
-        for (const capability of requestedCapabilities) {
-          if (!this.options.policy.capabilities.has(capability)) {
-            throw new RuleExecutionError("capability_denied", `rule cannot expand runtime capability: ${capability}`);
-          }
-        }
-        const flows = new Map;
-        for (const candidate of [ flow, ...options.flows ?? [] ]) {
-          const existing = flows.get(candidate.id);
-          if (existing && existing !== candidate) {
-            throw new RuleExecutionError("security_violation", `duplicate flow id: ${candidate.id}`);
-          }
-          flows.set(candidate.id, candidate);
-        }
-        const variables = new Map;
-        for (const [name, value2] of Object.entries(options.variables ?? {})) {
-          if (name.startsWith("$") || FORBIDDEN_KEYS$2.has(name)) {
-            throw new RuleExecutionError("security_violation", `invalid input variable: ${name}`);
-          }
-          variables.set(name, value2);
-        }
-        for (const [name, value2] of Object.entries(options.reserved ?? {})) {
-          if (!name.startsWith("$") || FORBIDDEN_KEYS$2.has(name.slice(1))) {
-            throw new RuleExecutionError("security_violation", `invalid reserved variable: ${name}`);
-          }
-          variables.set(name, value2);
-        }
-        const state = {
-          phase: options.phase,
-          policy: this.options.policy,
-          registry: this.options.registry,
-          services: this.options.services ?? {},
-          requestedCapabilities: requestedCapabilities,
-          signal: options.signal,
-          limits: resolveLimits(this.options.policy, options.limits),
-          startedAt: startedAt,
-          now: this.now,
-          flows: flows,
-          steps: 0
-        };
-        checkExecution(state);
-        const value = await executeFlow(flow, variables, state, 1);
-        return {
-          value: value,
-          steps: state.steps,
-          elapsedMs: this.now() - startedAt,
-          variables: new Map(variables)
-        };
-      } catch (error) {
-        await ((_b = options.resources) == null ? void 0 : _b.dispose());
-        throw error;
-      }
-    }
-  }
-
-  const utf8Length$2 = value => (new TextEncoder).encode(value).length;
-
-  function validateRequest(input) {
-    if (!input || typeof input !== "object") throw new Error("invalid regex request");
-    const request = input;
-    if (![ "test", "extract", "replace" ].includes(String(request.kind))) throw new Error("invalid regex kind");
-    if (typeof request.value !== "string" || typeof request.pattern !== "string" || request.flags != null && typeof request.flags !== "string" || request.replacement != null && typeof request.replacement !== "string") throw new Error("invalid regex request");
-    if (utf8Length$2(request.pattern) > RULE_HARD_LIMITS.maxRegexPatternBytes || utf8Length$2(request.value) > RULE_HARD_LIMITS.maxRegexValueBytes || typeof request.replacement === "string" && utf8Length$2(request.replacement) > RULE_HARD_LIMITS.maxRegexValueBytes) throw new Error("regex input exceeds byte limit");
-    const flags = request.flags ?? "";
-    if (!/^[dgimsuvy]*$/u.test(flags) || new Set(flags).size !== flags.length) throw new Error("invalid regex flags");
-    return {
-      kind: request.kind,
-      value: request.value,
-      pattern: request.pattern,
-      flags: flags,
-      replacement: request.replacement
-    };
-  }
-
-  function outputWithinLimit(value) {
-    try {
-      return isJsonRuleValue(value) && utf8Length$2(JSON.stringify(value)) <= RULE_HARD_LIMITS.maxRegexValueBytes;
-    } catch {
-      return false;
-    }
-  }
-
-  function isJsonRuleValue(value) {
-    if (value === null || typeof value === "boolean" || typeof value === "string") return true;
-    if (typeof value === "number") return Number.isFinite(value);
-    if (Array.isArray(value)) return value.every(isJsonRuleValue);
-    if (!value || typeof value !== "object") return false;
-    return Object.keys(value).every(key => ![ "__proto__", "prototype", "constructor" ].includes(key) && isJsonRuleValue(value[key]));
-  }
-
-  function parseWorkerResponse(input) {
-    if (!input || typeof input !== "object") throw new RuleExecutionError("security_violation", "invalid regex worker response");
-    const response = input;
-    if (response.ok === true && Object.hasOwn(response, "value")) {
-      const value = response.value;
-      if (!outputWithinLimit(value)) throw new RuleExecutionError("security_violation", "regex worker output exceeds byte limit");
-      return {
-        ok: true,
-        value: value
-      };
-    }
-    if (response.ok === false && (response.code === "regex_error" || response.code === "security_violation") && typeof response.error === "string") {
-      return {
-        ok: false,
-        code: response.code,
-        error: response.error
-      };
-    }
-    throw new RuleExecutionError("security_violation", "invalid regex worker response");
-  }
-
-  function validateExecutionRequest(request) {
-    if (!Number.isInteger(request.timeoutMs) || request.timeoutMs <= 0 || request.timeoutMs > RULE_HARD_LIMITS.maxAsyncMs) throw new RuleExecutionError("security_violation", "invalid regex timeout");
-    const validated = validateRequest(request);
-    if (validated.kind !== request.kind) throw new RuleExecutionError("security_violation", "invalid regex request");
-  }
-
-  class IsolatedRegexExecutor {
-    constructor(createWorker) {
-      this.createWorker = createWorker;
-    }
-    execute(request) {
-      try {
-        validateExecutionRequest(request);
-      } catch (error) {
-        return Promise.reject(error instanceof RuleExecutionError ? error : new RuleExecutionError("security_violation", error instanceof Error ? error.message : "invalid regex request"));
-      }
-      if (request.signal.aborted) {
-        return Promise.reject(new RuleExecutionError("cancelled", "regex execution cancelled"));
-      }
-      let worker;
-      try {
-        worker = this.createWorker();
-      } catch (error) {
-        return Promise.reject(new RuleDomainError("regex_worker_failed", error instanceof Error ? error.message : "regex worker failed"));
-      }
-      return new Promise((resolve, reject) => {
-        let settled = false;
-        const finish = callback => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          request.signal.removeEventListener("abort", onAbort);
-          worker.removeEventListener("message", onMessage);
-          worker.removeEventListener("error", onError);
-          worker.terminate();
-          callback();
-        };
-        const onMessage = event => {
-          try {
-            const response = parseWorkerResponse(event == null ? void 0 : event.data);
-            if (response.ok) finish(() => resolve(response.value)); else if (response.code === "security_violation") finish(() => reject(new RuleExecutionError("security_violation", response.error))); else finish(() => reject(new RuleDomainError("regex_error", response.error)));
-          } catch (error) {
-            finish(() => reject(error));
-          }
-        };
-        const onError = event => finish(() => reject(new RuleDomainError("regex_worker_failed", (event == null ? void 0 : event.message) ?? "regex worker failed")));
-        const onAbort = () => finish(() => reject(new RuleExecutionError("cancelled", "regex execution cancelled")));
-        const timer = setTimeout(() => finish(() => reject(new RuleExecutionError("timeout", "regex execution timed out"))), request.timeoutMs);
-        request.signal.addEventListener("abort", onAbort, {
-          once: true
-        });
-        worker.addEventListener("message", onMessage);
-        worker.addEventListener("error", onError);
-        try {
-          worker.postMessage({
-            kind: request.kind,
-            value: request.value,
-            pattern: request.pattern,
-            flags: request.flags,
-            replacement: request.replacement
-          });
-        } catch (error) {
-          finish(() => reject(new RuleDomainError("regex_worker_failed", error instanceof Error ? error.message : "regex worker failed")));
-        }
-      });
-    }
-  }
-
-  const FORBIDDEN_KEYS$1 = new Set([ "__proto__", "prototype", "constructor" ]);
-
-  function readIdentifier(query, start) {
-    const match = /^[A-Za-z_][A-Za-z0-9_-]*/u.exec(query.slice(start));
-    if (!match) throw new Error(`invalid JSONPath at ${start}`);
-    if (FORBIDDEN_KEYS$1.has(match[0])) throw new Error("forbidden JSONPath key");
-    return [ match[0], start + match[0].length ];
-  }
-
-  function readQuotedKey(query, start) {
-    const quote = query[start];
-    if (quote !== "'" && quote !== '"') throw new Error(`invalid JSONPath at ${start}`);
-    let key = "";
-    let index = start + 1;
-    while (index < query.length) {
-      const character = query[index];
-      if (character === quote) {
-        if (FORBIDDEN_KEYS$1.has(key)) throw new Error("forbidden JSONPath key");
-        return [ key, index + 1 ];
-      }
-      if (character === "\\") {
-        index += 1;
-        const escaped = query[index];
-        if (escaped !== quote && escaped !== "\\") throw new Error(`invalid JSONPath escape at ${index}`);
-        key += escaped;
-        index += 1;
-        continue;
-      }
-      if (!character || character.charCodeAt(0) < 32) throw new Error(`invalid JSONPath key at ${index}`);
-      key += character;
-      index += 1;
-    }
-    throw new Error("unterminated JSONPath key");
-  }
-
-  function parseJsonPath(query) {
-    if (query.length === 0 || query.length > 4096 || query[0] !== "$") throw new Error("invalid JSONPath root");
-    const tokens = [];
-    let index = 1;
-    while (index < query.length) {
-      if (query.startsWith("..", index)) {
-        const [key, next] = readIdentifier(query, index + 2);
-        tokens.push({
-          type: "recursive-property",
-          key: key
-        });
-        index = next;
-        continue;
-      }
-      if (query[index] === ".") {
-        index += 1;
-        if (query[index] === "*") {
-          tokens.push({
-            type: "wildcard"
-          });
-          index += 1;
-          continue;
-        }
-        const [key, next] = readIdentifier(query, index);
-        tokens.push({
-          type: "property",
-          key: key
-        });
-        index = next;
-        continue;
-      }
-      if (query[index] === "[") {
-        index += 1;
-        if (query[index] === "*") {
-          if (query[index + 1] !== "]") throw new Error(`invalid JSONPath wildcard at ${index}`);
-          tokens.push({
-            type: "wildcard"
-          });
-          index += 2;
-          continue;
-        }
-        if (query[index] === "'" || query[index] === '"') {
-          const [key, next2] = readQuotedKey(query, index);
-          if (query[next2] !== "]") throw new Error(`invalid JSONPath bracket at ${next2}`);
-          tokens.push({
-            type: "property",
-            key: key
-          });
-          index = next2 + 1;
-          continue;
-        }
-        const number = /^\d+/u.exec(query.slice(index));
-        if (!number) throw new Error(`invalid JSONPath bracket at ${index}`);
-        const next = index + number[0].length;
-        if (query[next] !== "]") throw new Error(`invalid JSONPath index at ${index}`);
-        tokens.push({
-          type: "index",
-          index: Number(number[0])
-        });
-        index = next + 1;
-        continue;
-      }
-      throw new Error(`invalid JSONPath at ${index}`);
-    }
-    return tokens;
-  }
-
-  function assertActive$1(signal) {
-    if (signal == null ? void 0 : signal.aborted) throw new RuleExecutionError("cancelled", "JSONPath execution cancelled");
-  }
-
-  function ownDataProperty(value, key) {
-    if (FORBIDDEN_KEYS$1.has(key)) throw new RuleExecutionError("security_violation", `forbidden JSONPath key: ${key}`);
-    if (!value || typeof value !== "object") return void 0;
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor) return void 0;
-    if (!("value" in descriptor)) throw new RuleExecutionError("security_violation", `JSONPath getter is not readable: ${key}`);
-    return descriptor.value;
-  }
-
-  function enumerableChildren(value) {
-    if (!value || typeof value !== "object") return [];
-    const children = [];
-    for (const key of Object.keys(value)) {
-      if (FORBIDDEN_KEYS$1.has(key)) continue;
-      const child = ownDataProperty(value, key);
-      if (child !== void 0) children.push(child);
-    }
-    return children;
-  }
-
-  function executeJsonPath(value, query, options = {}) {
-    assertActive$1(options.signal);
-    const tokens = parseJsonPath(query);
-    const maxVisitedNodes = options.maxVisitedNodes ?? 5e4;
-    const maxResults = options.maxResults ?? 5e3;
-    if (maxVisitedNodes <= 0 || maxResults <= 0) throw new RuleExecutionError("security_violation", "invalid JSONPath limits");
-    let visitedNodes = 0;
-    const visit = () => {
-      assertActive$1(options.signal);
-      visitedNodes += 1;
-      if (visitedNodes > maxVisitedNodes) throw new RuleExecutionError("budget_exceeded", "JSONPath node budget exceeded");
-    };
-    const enforceResults = results => {
-      if (results.length > maxResults) throw new RuleExecutionError("budget_exceeded", "JSONPath result limit exceeded");
-      return results;
-    };
-    let current = [ value ];
-    for (const token of tokens) {
-      const next = [];
-      for (const candidate of current) {
-        visit();
-        if (token.type === "property") {
-          const property = ownDataProperty(candidate, token.key);
-          if (property !== void 0) next.push(property);
-        } else if (token.type === "index") {
-          if (Array.isArray(candidate) && token.index < candidate.length) next.push(ownDataProperty(candidate, String(token.index)));
-        } else if (token.type === "wildcard") {
-          next.push(...enumerableChildren(candidate));
-        } else {
-          const seen = new WeakSet;
-          const walk = node => {
-            visit();
-            if (!node || typeof node !== "object" || seen.has(node)) return;
-            seen.add(node);
-            const property = ownDataProperty(node, token.key);
-            if (property !== void 0) {
-              next.push(property);
-              enforceResults(next);
-            }
-            for (const child of enumerableChildren(node)) walk(child);
-          };
-          walk(candidate);
-        }
-        enforceResults(next);
-      }
-      current = next;
-    }
-    return enforceResults(current);
-  }
-
-  const createReference = kind => Object.freeze({
-    kind: kind,
-    toJSON() {
-      throw new Error("runtime reference cannot be serialized");
-    }
-  });
-
-  class RuntimeReferenceRegistry {
-    constructor(options) {
-      __publicField(this, "domValues", new WeakMap);
-      __publicField(this, "domRefs", new WeakMap);
-      __publicField(this, "frameValues", new WeakMap);
-      __publicField(this, "frameRefs", new WeakMap);
-      __publicField(this, "responseValues", new WeakMap);
-      __publicField(this, "domRefCount", 0);
-      __publicField(this, "disposed", false);
-      __publicField(this, "maxDomRefs");
-      this.options = options;
-      if (!Number.isInteger(options.maxDomRefs) || options.maxDomRefs <= 0) throw new Error("invalid DOM ref limit");
-      this.maxDomRefs = options.maxDomRefs;
-    }
-    tightenDomRefCap(limit) {
-      if (limit == null || !Number.isInteger(limit) || limit <= 0) return;
-      if (limit < this.maxDomRefs) this.maxDomRefs = limit;
-    }
-    createDomRef(element) {
-      this.assertActive();
-      const existing = this.domRefs.get(element);
-      if (existing) return existing;
-      if (this.domRefCount >= this.maxDomRefs) throw new RuleExecutionError("budget_exceeded", "DOM reference limit exceeded");
-      const reference = createReference("dom-ref");
-      this.domValues.set(reference, element);
-      this.domRefs.set(element, reference);
-      this.domRefCount += 1;
-      return reference;
-    }
-    createFrameRef(document2) {
-      this.assertActive();
-      const existing = this.frameRefs.get(document2);
-      if (existing) return existing;
-      const reference = createReference("frame-ref");
-      this.frameValues.set(reference, document2);
-      this.frameRefs.set(document2, reference);
-      return reference;
-    }
-    createResponseRef(response) {
-      this.assertActive();
-      const reference = createReference("response-ref");
-      this.responseValues.set(reference, response);
-      return reference;
-    }
-    getDom(reference) {
-      return this.resolve(reference, this.domValues, "DOM");
-    }
-    getFrame(reference) {
-      return this.resolve(reference, this.frameValues, "frame");
-    }
-    getResponse(reference) {
-      return this.resolve(reference, this.responseValues, "response");
-    }
-    dispose() {
-      this.disposed = true;
-    }
-    assertActive() {
-      if (this.disposed) throw new RuleExecutionError("security_violation", "runtime reference registry is disposed");
-    }
-    resolve(reference, values, label) {
-      this.assertActive();
-      if (reference == null) throw new RuleDomainError("missing_reference", `missing ${label} reference`);
-      if (typeof reference !== "object" && typeof reference !== "function") throw new RuleExecutionError("security_violation", `invalid ${label} reference`);
-      if (!values.has(reference)) throw new RuleExecutionError("security_violation", `invalid ${label} reference`);
-      return values.get(reference);
-    }
-  }
-
-  class RuleResourceScope {
-    constructor() {
-      __publicField(this, "cleanups", []);
-      __publicField(this, "disposePromise", null);
-      __publicField(this, "resolveDisposed");
-      __publicField(this, "disposed", new Promise(resolve => {
-        this.resolveDisposed = resolve;
-      }));
-    }
-    add(cleanup) {
-      if (this.disposePromise) throw new Error("rule resource scope is already disposed");
-      this.cleanups.push(cleanup);
-    }
-    bind(signal) {
-      if (!signal) return;
-      if (signal.aborted) {
-        void this.dispose();
-        return;
-      }
-      const onAbort = () => void this.dispose();
-      signal.addEventListener("abort", onAbort, {
-        once: true
-      });
-      this.add(() => signal.removeEventListener("abort", onAbort));
-    }
-    dispose() {
-      if (this.disposePromise) return this.disposePromise;
-      this.disposePromise = (async () => {
-        for (const cleanup of this.cleanups.reverse()) {
-          try {
-            await cleanup();
-          } catch {}
-        }
-        this.cleanups.length = 0;
-        this.resolveDisposed();
-      })();
-      return this.disposePromise;
-    }
-  }
-
-  const recordFromMap = values => {
-    const record = Object.create(null);
-    for (const [name, value] of values) record[name] = value;
-    return record;
-  };
-
-  const userVariables = result => new Map([ ...result.variables ].filter(([name]) => !name.startsWith("$")));
-
-  class RuleStateMachine {
-    constructor(options) {
-      __publicField(this, "variables");
-      __publicField(this, "started", false);
-      __publicField(this, "transitions", 0);
-      __publicField(this, "queue", Promise.resolve());
-      __publicField(this, "maxTransitions");
-      __publicField(this, "state");
-      this.options = options;
-      this.state = options.definition.initial;
-      if (!options.definition.states[this.state]) throw new RuleExecutionError("security_violation", "state machine initial state does not exist");
-      this.variables = new Map(Object.entries(options.variables ?? {}));
-      this.maxTransitions = options.maxTransitions ?? 1e4;
-      if (!Number.isInteger(this.maxTransitions) || this.maxTransitions <= 0 || this.maxTransitions > 1e4) throw new RuleExecutionError("security_violation", "invalid state transition limit");
-    }
-    getVariable(name) {
-      return this.variables.get(name);
-    }
-    start() {
-      return this.enqueue(async () => {
-        if (this.started) return {
-          state: this.state
-        };
-        const initial = this.options.definition.states[this.state];
-        if (!initial) throw new RuleExecutionError("security_violation", "state machine initial state does not exist");
-        const working = await this.runSteps(initial.enter ?? [], this.variables, null, `state:${this.state}:enter`);
-        this.variables = working;
-        this.started = true;
-        return {
-          state: this.state
-        };
-      });
-    }
-    dispatch(event, payload = null) {
-      return this.enqueue(async () => {
-        if (!this.started) throw new RuleDomainError("state_machine_not_started", "state machine is not started");
-        const source = this.options.definition.states[this.state];
-        if (!source) throw new RuleExecutionError("security_violation", `state does not exist: ${this.state}`);
-        let selected2;
-        for (const transition of source.transitions) {
-          if (transition.event !== event) continue;
-          if (!transition.when) {
-            selected2 = transition;
-            break;
-          }
-          const matches = await this.evaluateCondition(transition.when, this.variables, payload);
-          if (matches) {
-            selected2 = transition;
-            break;
-          }
-        }
-        if (!selected2) return {
-          state: this.state,
-          transitioned: false
-        };
-        if (this.transitions >= this.maxTransitions) throw new RuleExecutionError("budget_exceeded", "state transition budget exceeded");
-        const target = this.options.definition.states[selected2.target];
-        if (!target) throw new RuleExecutionError("security_violation", `state transition target does not exist: ${selected2.target}`);
-        let working = new Map(this.variables);
-        working = await this.runSteps(selected2.actions ?? [], working, payload, `state:${this.state}:${event}:actions`);
-        working = await this.runSteps(target.enter ?? [], working, payload, `state:${selected2.target}:enter`);
-        this.variables = working;
-        this.state = selected2.target;
-        this.transitions += 1;
-        return {
-          state: this.state,
-          transitioned: true
-        };
-      });
-    }
-    async evaluateCondition(when, variables, payload) {
-      const result = await this.runFlow({
-        id: `state:${this.state}:condition`,
-        steps: [ {
-          type: "return",
-          value: when
-        } ]
-      }, variables, payload);
-      if (typeof result.value !== "boolean") throw new RuleDomainError("invalid_type", "state transition condition must be boolean");
-      return result.value;
-    }
-    async runSteps(steps, variables, payload, flowId) {
-      if (steps.length === 0) return new Map(variables);
-      return userVariables(await this.runFlow({
-        id: flowId,
-        steps: [ ...steps ]
-      }, variables, payload));
-    }
-    runFlow(flow, variables, payload) {
-      return this.options.interpreter.run(flow, {
-        phase: "lifecycle",
-        variables: recordFromMap(variables),
-        reserved: {
-          ...this.options.reserved ?? {},
-          $event: payload
-        },
-        flows: this.options.flows,
-        capabilities: this.options.capabilities,
-        signal: this.options.signal,
-        resources: this.options.resources,
-        limits: this.options.limits
-      });
-    }
-    enqueue(operation) {
-      const task = this.queue.then(operation);
-      this.queue = task.catch(() => void 0);
-      return task;
-    }
-  }
-
-  function operationsEqual(left, right) {
-    if (left.kind !== right.kind) return false;
-    if (left.kind === "choose" && right.kind === "choose") return left.optionId === right.optionId;
-    if (left.kind === "write" && right.kind === "write") return left.slotId === right.slotId && left.value === right.value;
-    return left.kind === "pair" && right.kind === "pair" && left.leftId === right.leftId && left.rightId === right.rightId;
-  }
-
-  function assertActive(signal) {
-    if (signal.aborted) throw new RuleExecutionError("cancelled", "answer write was cancelled");
-  }
-
-  class BindingRegistryAnswerWriter {
-    constructor(registry) {
-      this.registry = registry;
-    }
-    async applyPlan(plan, signal) {
-      const resolved = this.resolveTargets(plan, plan.operations, signal);
-      if (!resolved) return false;
-      const applied = [];
-      try {
-        for (const {operation: operation, target: target} of resolved) {
-          assertActive(signal);
-          if (!(await target.apply(operation, signal))) {
-            await this.revertApplied(applied, signal);
-            return false;
-          }
-          applied.push(target);
-        }
-        return true;
-      } catch (error) {
-        await this.revertApplied(applied, signal);
-        throw error;
-      }
-    }
-    async revertApplied(applied, signal) {
-      var _a2;
-      for (const target of [ ...applied ].reverse()) {
-        try {
-          await ((_a2 = target.revert) == null ? void 0 : _a2.call(target, signal));
-        } catch {}
-      }
-    }
-    async verifyPlan(plan, signal) {
-      const resolved = this.resolveTargets(plan, plan.operations, signal);
-      if (!resolved) return false;
-      for (const {operation: operation, target: target} of resolved) {
-        assertActive(signal);
-        if (!(await target.verify(operation, signal))) return false;
-      }
-      return true;
-    }
-    async applyOperation(plan, operation, signal) {
-      if (!plan.operations.some(candidate => operationsEqual(candidate, operation))) return false;
-      const resolved = this.resolveTargets(plan, [ operation ], signal);
-      if (!resolved) return false;
-      return resolved[0] ? resolved[0].target.apply(operation, signal) : false;
-    }
-    async verifyOperation(plan, operation, signal) {
-      if (!plan.operations.some(candidate => operationsEqual(candidate, operation))) return false;
-      const resolved = this.resolveTargets(plan, [ operation ], signal);
-      if (!resolved) return false;
-      return resolved[0] ? resolved[0].target.verify(operation, signal) : false;
-    }
-    resolveTargets(plan, operations, signal) {
-      assertActive(signal);
-      const binding = this.registry.get(plan.path);
-      if (!binding || !binding.connected || binding.capturedFingerprint !== plan.fingerprint || binding.currentFingerprint !== plan.fingerprint) return null;
-      const resolved = [];
-      for (const operation of operations) {
-        const target = this.registry.targetForOperation(plan.path, operation);
-        if (!target) return null;
-        try {
-          if (!target.isConnected()) return null;
-        } catch {
-          return null;
-        }
-        resolved.push({
-          operation: operation,
-          target: target
-        });
-      }
-      return resolved;
-    }
-  }
-
-  class RuleVerificationError extends Error {
-    constructor(code, message) {
-      super(message);
-      this.code = code;
-      this.name = "RuleVerificationError";
-    }
-  }
-
-  function compareRuleVersions(leftValue, rightValue) {
-    try {
-      return compareRuleVersions$1(leftValue, rightValue);
-    } catch {
-      throw new RuleVerificationError("engine_incompatible", `invalid version: ${leftValue} or ${rightValue}`);
-    }
-  }
-
-  function nestedSteps(step) {
-    switch (step.type) {
-     case "if":
-      return [ step.then, step.else ?? [] ];
-
-     case "switch":
-      return [ ...step.cases.map(item => item.steps), step.default ?? [] ];
-
-     case "forEach":
-     case "while":
-      return [ step.steps ];
-
-     case "try":
-      return [ step.steps, step.catch ?? [], step.finally ?? [] ];
-
-     default:
-      return [];
-    }
-  }
-
-  function visitSteps(steps, visitor) {
-    for (const step of steps) {
-      visitor(step);
-      for (const nested of nestedSteps(step)) visitSteps(nested, visitor);
-    }
-  }
-
-  function stepExpressions(step) {
-    switch (step.type) {
-     case "set":
-     case "switch":
-      return [ step.value ];
-
-     case "if":
-     case "while":
-      return [ step.when ];
-
-     case "forEach":
-      return [ step.items ];
-
-     case "callFlow":
-     case "primitive":
-      return Object.values(step.args ?? {});
-
-     case "return":
-      return step.value ? [ step.value ] : [];
-
-     default:
-      return [];
-    }
-  }
-
-  function childExpressions(expr) {
-    switch (expr.op) {
-     case "path":
-     case "jsonPath":
-      return [ expr.from ];
-
-     case "coalesce":
-     case "logic":
-      return expr.values;
-
-     case "array":
-      return expr.items;
-
-     case "object":
-     case "format":
-      return Object.values(expr.op === "object" ? expr.entries : expr.args);
-
-     case "compare":
-      return [ expr.left, expr.right ];
-
-     case "not":
-     case "string":
-     case "regex":
-      return [ expr.value ];
-
-     case "map":
-      return [ expr.items, expr.value ];
-
-     case "filter":
-      return [ expr.items, expr.when ];
-
-     case "reduce":
-      return [ expr.items, expr.initial, expr.value ];
-
-     default:
-      return [];
-    }
-  }
-
-  function visitExpressions(expr, visitor) {
-    visitor(expr);
-    for (const child of childExpressions(expr)) visitExpressions(child, visitor);
-  }
-
-  function lifecycleSteps(lifecycle) {
-    const result = [];
-    for (const state of Object.values(lifecycle.states)) {
-      result.push(state.enter ?? []);
-      for (const transition of state.transitions) result.push(transition.actions ?? []);
-    }
-    return result;
-  }
-
-  const LIMIT_KEYS = [ "maxSteps", "maxWallMs", "maxAsyncMs", "maxLoopIterations", "maxCallDepth", "maxDomRefs" ];
-
-  class RuleVerifier {
-    constructor(options) {
-      __publicField(this, "now");
-      __publicField(this, "keyset");
-      this.options = options;
-      this.now = options.now ?? Date.now;
-      this.keyset = ServerKeysetSchema.parse(options.keyset);
-    }
-    async verify(input) {
-      const pkg = RulePackageSchema.parse(input);
-      const now = this.now();
-      if (pkg.issuedAt > now) throw new RuleVerificationError("package_from_future", "rule package is issued in the future");
-      if (pkg.expiresAt != null && pkg.expiresAt <= now) throw new RuleVerificationError("package_expired", "rule package is expired");
-      this.verifyEngineRange(pkg);
-      this.verifyCapabilitiesAndLimits(pkg);
-      this.verifyPrimitives(pkg);
-      const contentHash = await computeVerifiedRulePackageContentHash(pkg);
-      if (contentHash !== pkg.contentHash) throw new RuleVerificationError("content_hash_mismatch", "rule package content hash mismatch");
-      const signingKey = this.keyset.keys.find(key => key.kid === pkg.signingKid && key.use === "rule-signing" && key.notBefore <= now && key.expiresAt > now && this.keyset.issuedAt <= now && this.keyset.expiresAt > now);
-      if (!signingKey) throw new RuleVerificationError("invalid_signing_key", "active rule-signing key not found");
-      const publicKey = await importEcdsaPublicJwk(signingKey.publicJwk);
-      if (!(await verifyEcdsaP1363(publicKey, utf8Bytes(canonicalRulePackageSignatureInput(pkg)), pkg.signature))) throw new RuleVerificationError("invalid_signature", "rule package signature rejected");
-      await this.verifySequenceAndRollback(pkg);
-      return pkg;
-    }
-    verifyEngineRange(pkg) {
-      if (compareRuleVersions(this.options.engineVersion, pkg.engineRange.min) < 0 || pkg.engineRange.maxExclusive != null && compareRuleVersions(this.options.engineVersion, pkg.engineRange.maxExclusive) >= 0) throw new RuleVerificationError("engine_incompatible", "rule package engine range is incompatible");
-    }
-    verifyCapabilitiesAndLimits(pkg) {
-      var _a2;
-      for (const capability of pkg.capabilities) {
-        if (!this.options.policy.capabilities.has(capability)) throw new RuleVerificationError("capability_denied", `rule capability is not allowed: ${capability}`);
-      }
-      for (const variant of pkg.variants) {
-        for (const key of LIMIT_KEYS) {
-          const value = (_a2 = variant.limits) == null ? void 0 : _a2[key];
-          if (value != null && value > this.options.policy.limits[key]) throw new RuleVerificationError("limit_denied", `rule limit exceeds runtime policy: ${key}`);
-        }
-      }
-    }
-    verifyPrimitives(pkg) {
-      const capabilities = new Set(pkg.capabilities);
-      const verifyFlow = (flow, phase) => this.verifyStepList(flow.steps, phase, capabilities);
-      for (const variant of pkg.variants) {
-        verifyFlow(variant.match, "match");
-        verifyFlow(variant.capture, "capture");
-        verifyFlow(variant.fill, "fill");
-        if (variant.diagnostics) verifyFlow(variant.diagnostics, "diagnostic");
-        if (variant.lifecycle) {
-          for (const steps of lifecycleSteps(variant.lifecycle)) this.verifyStepList(steps, "lifecycle", capabilities);
-          for (const state of Object.values(variant.lifecycle.states)) for (const transition of state.transitions) {
-            if (!RULE_DISPATCHED_EVENTS.has(transition.event)) throw new RuleVerificationError("event_denied", `engine never dispatches lifecycle event: ${transition.event}`);
-            if (transition.when) this.verifyExpression(transition.when);
-          }
-        }
-      }
-    }
-    verifyStepList(steps, phase, capabilities) {
-      visitSteps(steps, step => {
-        for (const expression of stepExpressions(step)) this.verifyExpression(expression);
-        if (step.type !== "primitive") return;
-        const definition = this.options.registry.get(step.id);
-        if (!definition) throw new RuleVerificationError("unknown_primitive", `unknown primitive: ${step.id}`);
-        if (!this.options.policy.primitives.has(step.id)) throw new RuleVerificationError("primitive_denied", `primitive is not allowed by runtime policy: ${step.id}`);
-        if (!definition.phases.includes(phase)) throw new RuleVerificationError("primitive_phase_denied", `primitive is not allowed in ${phase}: ${step.id}`);
-        if (definition.capability && (!this.options.policy.capabilities.has(definition.capability) || !capabilities.has(definition.capability))) throw new RuleVerificationError("capability_denied", `primitive capability is not declared: ${definition.capability}`);
-      });
-    }
-    verifyExpression(expr) {
-      visitExpressions(expr, node => {
-        var _a2, _b;
-        if (node.op === "regex" && !((_a2 = this.options.services) == null ? void 0 : _a2.regex)) throw new RuleVerificationError("expression_denied", "regex executor is not installed");
-        if (node.op === "jsonPath" && !((_b = this.options.services) == null ? void 0 : _b.jsonPath)) throw new RuleVerificationError("expression_denied", "JSONPath executor is not installed");
-      });
-    }
-    async verifySequenceAndRollback(pkg) {
-      const current = this.options.current;
-      if (!current) return;
-      if (pkg.releaseSequence < current.releaseSequence) throw new RuleVerificationError("sequence_downgrade", "rule release sequence cannot decrease");
-      if (pkg.releaseSequence === current.releaseSequence && pkg.contentHash !== current.contentHash) throw new RuleVerificationError("sequence_reuse", "rule release sequence cannot be reused for different content");
-      const isVersionRollback = compareRuleVersions(pkg.version, current.version) < 0;
-      if (!isVersionRollback && !pkg.rollbackAuthorization) return;
-      const authorization = pkg.rollbackAuthorization;
-      if (!authorization || authorization.toVersion !== pkg.version || !this.options.authorizeRollback || !(await this.options.authorizeRollback(authorization, pkg))) throw new RuleVerificationError("rollback_unauthorized", "rule rollback is not authorized");
-    }
-  }
-
-  class RuleStoreError extends Error {
-    constructor(code, message) {
-      super(message);
-      this.code = code;
-      this.name = "RuleStoreError";
-    }
-  }
-
-  function freezeJson(value) {
-    if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
-    for (const child of Object.values(value)) freezeJson(child);
-    return Object.freeze(value);
-  }
-
-  const emptyState = () => ({
-    candidate: null,
-    active: null,
-    lastKnownGood: null,
-    highestSequence: -1,
-    highestHash: null,
-    disabled: false,
-    quarantined: []
-  });
-
-  class RuleStore {
-    constructor() {
-      __publicField(this, "states", new Map);
-    }
-    install(input) {
-      const pkg = freezeJson(RulePackageSchema.parse(input));
-      this.state(pkg.packageId).active = pkg;
-      return pkg;
-    }
-    async stageRemote(input, verifier) {
-      const pkg = freezeJson(await verifier.verify(input));
-      const state = this.state(pkg.packageId);
-      if (pkg.releaseSequence < state.highestSequence) throw new RuleStoreError("sequence_downgrade", "rule release sequence cannot decrease");
-      if (pkg.releaseSequence === state.highestSequence && state.highestHash !== pkg.contentHash) throw new RuleStoreError("sequence_reuse", "rule release sequence cannot be reused for different content");
-      if (pkg.releaseSequence === state.highestSequence && state.highestHash === pkg.contentHash) {
-        return state.candidate ?? state.active ?? state.lastKnownGood ?? pkg;
-      }
-      state.candidate = pkg;
-      state.highestSequence = pkg.releaseSequence;
-      state.highestHash = pkg.contentHash;
-      return pkg;
-    }
-    activateCandidate(packageId) {
-      const state = this.state(packageId);
-      if (!state.candidate) throw new RuleStoreError("candidate_missing", `rule candidate is missing: ${packageId}`);
-      if (state.active) state.lastKnownGood = state.active;
-      state.active = state.candidate;
-      state.candidate = null;
-      return state.active;
-    }
-    quarantineActive(packageId, reason) {
-      const state = this.state(packageId);
-      if (!state.active) return;
-      state.quarantined.push({
-        pkg: state.active,
-        reason: reason
-      });
-      state.active = null;
-    }
-    setDisabled(packageId, disabled) {
-      this.state(packageId).disabled = disabled;
-    }
-    resolve(packageId) {
-      const state = this.state(packageId);
-      if (state.disabled) return null;
-      if (state.active) return {
-        source: "remote-active",
-        pkg: state.active
-      };
-      if (state.lastKnownGood) return {
-        source: "remote-lkg",
-        pkg: state.lastKnownGood
-      };
-      return null;
-    }
-    diagnostics(packageId) {
-      const state = this.state(packageId);
-      return {
-        packageId: packageId,
-        disabled: state.disabled,
-        candidate: state.candidate,
-        active: state.active,
-        lastKnownGood: state.lastKnownGood,
-        highestSequence: state.highestSequence,
-        quarantined: [ ...state.quarantined ]
-      };
-    }
-    exportSnapshot() {
-      return {
-        schemaVersion: 1,
-        packages: [ ...this.states.entries() ].filter(([, state]) => state.disabled || state.candidate != null || state.active != null || state.lastKnownGood != null || state.quarantined.length > 0 || state.highestSequence >= 0).map(([packageId, state]) => ({
-          packageId: packageId,
-          disabled: state.disabled,
-          candidate: state.candidate,
-          active: state.active,
-          lastKnownGood: state.lastKnownGood,
-          highestSequence: state.highestSequence,
-          highestHash: state.highestHash,
-          quarantined: [ ...state.quarantined ]
-        }))
-      };
-    }
-    async restoreSnapshot(input, verifier) {
-      if (!input || typeof input !== "object") throw this.snapshotError("rule snapshot must be an object");
-      const snapshot2 = input;
-      if (snapshot2.schemaVersion !== 1 || !Array.isArray(snapshot2.packages)) throw this.snapshotError("unsupported rule snapshot");
-      if (snapshot2.packages.length > 128) throw this.snapshotError("rule snapshot contains too many packages");
-      const restored = new Map;
-      for (const rawEntry of snapshot2.packages) {
-        if (!rawEntry || typeof rawEntry !== "object") throw this.snapshotError("invalid rule snapshot entry");
-        const entry = rawEntry;
-        if (typeof entry.packageId !== "string" || entry.packageId.length === 0 || typeof entry.disabled !== "boolean" || !Number.isInteger(entry.highestSequence) || entry.highestHash !== null && typeof entry.highestHash !== "string" || !Array.isArray(entry.quarantined)) throw this.snapshotError("invalid rule snapshot metadata");
-        if (restored.has(entry.packageId)) throw this.snapshotError("duplicate rule snapshot package");
-        const verifyPackage = async value => {
-          if (value == null) return null;
-          const pkg = freezeJson(await verifier.verify(value));
-          if (pkg.packageId !== entry.packageId) throw this.snapshotError("rule snapshot packageId mismatch");
-          return pkg;
-        };
-        const packageId = entry.packageId;
-        const degraded = () => ({
-          candidate: null,
-          active: null,
-          lastKnownGood: null,
-          highestSequence: entry.highestSequence,
-          highestHash: entry.highestHash,
-          disabled: entry.disabled,
-          quarantined: []
-        });
-        let candidate;
-        let active2;
-        let lastKnownGood;
-        try {
-          [candidate, active2, lastKnownGood] = await Promise.all([ verifyPackage(entry.candidate), verifyPackage(entry.active), verifyPackage(entry.lastKnownGood) ]);
-        } catch (error) {
-          if (!(error instanceof RuleVerificationError)) throw error;
-          restored.set(packageId, degraded());
-          continue;
-        }
-        const quarantined = [];
-        for (const rawQuarantine of entry.quarantined) {
-          if (!rawQuarantine || typeof rawQuarantine !== "object") throw this.snapshotError("invalid quarantined rule");
-          const quarantine = rawQuarantine;
-          if (typeof quarantine.reason !== "string" || quarantine.reason.length > 512) throw this.snapshotError("invalid quarantine reason");
-          const quarantinedPackage = await verifyPackage(quarantine.pkg);
-          if (!quarantinedPackage) throw this.snapshotError("missing quarantined package");
-          quarantined.push({
-            pkg: quarantinedPackage,
-            reason: quarantine.reason
-          });
-        }
-        const remotePackages = [ candidate, active2, lastKnownGood, ...quarantined.map(item => item.pkg) ].filter(pkg => pkg != null);
-        const highestSequence = entry.highestSequence;
-        const highestHash = entry.highestHash;
-        if (remotePackages.length === 0) {
-          if (highestSequence < -1) throw this.snapshotError("empty snapshot has invalid sequence");
-        } else if (!remotePackages.some(pkg => pkg.releaseSequence === highestSequence && pkg.contentHash === highestHash) || remotePackages.some(pkg => pkg.releaseSequence > highestSequence)) throw this.snapshotError("rule snapshot highest sequence mismatch");
-        restored.set(entry.packageId, {
-          candidate: candidate,
-          active: active2,
-          lastKnownGood: lastKnownGood,
-          highestSequence: highestSequence,
-          highestHash: highestHash,
-          disabled: entry.disabled,
-          quarantined: quarantined
-        });
-      }
-      for (const [packageId, state] of restored) this.states.set(packageId, state);
-    }
-    snapshotError(message) {
-      return new RuleStoreError("snapshot_invalid", message);
-    }
-    state(packageId) {
-      let state = this.states.get(packageId);
-      if (!state) {
-        state = emptyState();
-        this.states.set(packageId, state);
-      }
-      return state;
-    }
-  }
-
-  class JsonRuleResolver {
-    constructor(options) {
-      this.options = options;
-    }
-    async resolve(packageId, options = {}) {
-      var _a2, _b, _c, _d, _e, _f;
-      const resolved = this.options.store.resolve(packageId);
-      if (!resolved) return null;
-      const variants = resolved.pkg.variants.map((variant, index) => ({
-        variant: variant,
-        index: index
-      })).sort((left, right) => right.variant.priority - left.variant.priority || left.index - right.index);
-      for (const {variant: variant} of variants) {
-        try {
-          const result = await this.options.interpreter.run(variant.match, {
-            phase: "match",
-            variables: options.variables,
-            reserved: options.reserved,
-            signal: options.signal,
-            capabilities: new Set(resolved.pkg.capabilities),
-            limits: variant.limits,
-            flows: [ variant.capture, variant.fill, ...variant.diagnostics ? [ variant.diagnostics ] : [] ]
-          });
-          if (typeof result.value !== "boolean") {
-            (_b = (_a2 = this.options).onAttempt) == null ? void 0 : _b.call(_a2, {
-              variantId: variant.id,
-              matched: false,
-              reason: "invalid_match_result",
-              steps: result.steps
-            });
-            continue;
-          }
-          (_d = (_c = this.options).onAttempt) == null ? void 0 : _d.call(_c, {
-            variantId: variant.id,
-            matched: result.value,
-            steps: result.steps
-          });
-          if (result.value) return {
-            source: resolved.source,
-            pkg: resolved.pkg,
-            variant: variant
-          };
-        } catch (error) {
-          if (!(error instanceof RuleDomainError)) throw error;
-          (_f = (_e = this.options).onAttempt) == null ? void 0 : _f.call(_e, {
-            variantId: variant.id,
-            matched: false,
-            reason: error.code
-          });
-        }
-      }
-      return null;
-    }
-  }
-
-  function registerLocalHook(registry, hook) {
-    registry.register({
-      id: hook.id,
-      phases: hook.phases,
-      capability: hook.capability,
-      requiresSafetyCapability: hook.requiresSafetyCapability,
-      safetyArgument: hook.safetyArgument,
-      execute: async ({args: args, ...context}) => {
-        let parsed;
-        try {
-          parsed = hook.parseArgs(args);
-        } catch (error) {
-          throw new RuleDomainError("invalid_hook_args", error instanceof Error ? error.message : "invalid hook arguments");
-        }
-        const result = await hook.execute(parsed, context);
-        if (!hook.validateResult(result)) throw new RuleDomainError("invalid_hook_result", `local hook returned an invalid result: ${hook.id}`);
-        return result;
-      }
-    });
-  }
-
-  const FORBIDDEN_KEYS = new Set([ "__proto__", "prototype", "constructor" ]);
-
-  const MAX_FIELDS = 64;
-
-  const MAX_PATH_DEPTH = 32;
-
-  const MAX_SNAPSHOT_NODES = 1e4;
-
-  const MAX_SNAPSHOT_BYTES = 512 * 1024;
-
-  const utf8Length$1 = value => (new TextEncoder).encode(value).length;
-
-  function createSnapshotState(signal, label) {
-    return {
-      signal: signal,
-      nodes: 0,
-      bytes: 0,
-      ancestors: new WeakSet,
-      label: label
-    };
-  }
-
-  function safeKey(value) {
-    return typeof value === "string" && value.length > 0 && value.length <= 256 && !FORBIDDEN_KEYS.has(value);
-  }
-
-  function parseSnapshotFields(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("fields must be an object");
-    const entries = Object.entries(value);
-    if (entries.length === 0 || entries.length > MAX_FIELDS) throw new Error("fields must contain between 1 and 64 entries");
-    const fields = Object.create(null);
-    for (const [name, rawPath] of entries) {
-      if (!safeKey(name)) throw new Error(`invalid field name: ${name}`);
-      if (!Array.isArray(rawPath) || rawPath.length === 0 || rawPath.length > MAX_PATH_DEPTH) throw new Error(`invalid snapshot path: ${name}`);
-      fields[name] = rawPath.map(segment => {
-        if (typeof segment === "number") {
-          if (!Number.isInteger(segment) || segment < 0) throw new Error(`invalid snapshot path index: ${name}`);
-          return segment;
-        }
-        if (!safeKey(segment)) throw new Error(`invalid snapshot path property: ${name}`);
-        return segment;
-      });
-    }
-    return fields;
-  }
-
-  function consumeSnapshotValue(state, value) {
-    if (state.signal.aborted) throw new RuleExecutionError("cancelled", `${state.label} snapshot cancelled`);
-    state.nodes += 1;
-    if (value) state.bytes += utf8Length$1(value);
-    if (state.nodes > MAX_SNAPSHOT_NODES || state.bytes > MAX_SNAPSHOT_BYTES) throw new RuleExecutionError("budget_exceeded", `${state.label} snapshot budget exceeded`);
-  }
-
-  function cloneJsonValue(value, state) {
-    if (value === null || typeof value === "boolean") {
-      consumeSnapshotValue(state);
-      return value;
-    }
-    if (typeof value === "number") {
-      consumeSnapshotValue(state);
-      if (!Number.isFinite(value)) throw new RuleDomainError("scope_value_unsafe", `${state.label} contains a non-finite number`);
-      return value;
-    }
-    if (typeof value === "string") {
-      consumeSnapshotValue(state, value);
-      return value;
-    }
-    if (!value || typeof value !== "object") throw new RuleDomainError("scope_value_unsafe", `${state.label} field is not JSON data`);
-    consumeSnapshotValue(state);
-    if (state.ancestors.has(value)) throw new RuleDomainError("scope_value_unsafe", `${state.label} field contains a cycle`);
-    state.ancestors.add(value);
-    try {
-      if (Array.isArray(value)) {
-        if (value.length > MAX_SNAPSHOT_NODES) throw new RuleExecutionError("budget_exceeded", `${state.label} array exceeds snapshot budget`);
-        return Array.from({
-          length: value.length
-        }, (_, index) => {
-          const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-          if (!descriptor) {
-            consumeSnapshotValue(state);
-            return null;
-          }
-          if (!("value" in descriptor)) throw new RuleDomainError("scope_value_unsafe", `${state.label} array contains an accessor`);
-          return cloneJsonValue(descriptor.value, state);
-        });
-      }
-      const prototype = Object.getPrototypeOf(value);
-      if (prototype !== Object.prototype && prototype !== null) throw new RuleDomainError("scope_value_unsafe", `${state.label} field must be plain JSON data`);
-      const result = Object.create(null);
-      for (const key of Object.keys(value)) {
-        if (!safeKey(key)) throw new RuleDomainError("scope_value_unsafe", `${state.label} contains an unsafe key: ${key}`);
-        consumeSnapshotValue(state, key);
-        const descriptor = Object.getOwnPropertyDescriptor(value, key);
-        if (!descriptor || !("value" in descriptor)) throw new RuleDomainError("scope_value_unsafe", `${state.label} contains an accessor: ${key}`);
-        result[key] = cloneJsonValue(descriptor.value, state);
-      }
-      return result;
-    } finally {
-      state.ancestors.delete(value);
-    }
-  }
-
-  const MAX_UEDITOR_TARGETS = 64;
-
-  const utf8Length = value => (new TextEncoder).encode(value).length;
-
-  function registerChaoxingRuleHooks(registry, dependencies) {
-    registerLocalHook(registry, {
-      id: "chaoxing.normalizeTitle",
-      phases: [ "capture", "diagnostic" ],
-      parseArgs: args => {
-        if (typeof args.text !== "string") throw new Error("text is required");
-        if (utf8Length(args.text) > 128 * 1024) throw new Error("title hook input exceeds byte limit");
-        return {
-          text: args.text
-        };
-      },
-      validateResult: value => typeof value === "string",
-      execute: ({text: text}) => stripTitle(text)
-    });
-    registerLocalHook(registry, {
-      id: "chaoxing.decodeFont",
-      phases: [ "capture", "diagnostic" ],
-      capability: "runtime-read",
-      parseArgs: args => {
-        if (typeof args.text !== "string" || typeof args.styleText !== "string") throw new Error("text and styleText are required");
-        if (utf8Length(args.text) > 128 * 1024 || utf8Length(args.styleText) > 2 * 1024 * 1024) throw new Error("font hook input exceeds byte limit");
-        return {
-          text: args.text,
-          styleText: args.styleText
-        };
-      },
-      validateResult: value => typeof value === "string",
-      execute: ({text: text, styleText: styleText}) => {
-        const base64 = extractCxFontBase64(styleText);
-        if (!base64) throw new RuleDomainError("font_data_missing", "Chaoxing font data is missing");
-        if (Object.keys(dependencies.table).length === 0) throw new RuleDomainError("font_table_unavailable", "Chaoxing font table is unavailable");
-        let fontData;
-        try {
-          fontData = base64ToUint8Array(base64);
-        } catch {
-          throw new RuleDomainError("font_data_invalid", "Chaoxing font data is invalid");
-        }
-        return applyCharMap(text, buildCharMap(fontData, dependencies.table, dependencies.typr));
-      }
-    });
-    registerLocalHook(registry, {
-      id: "chaoxing.harvestAnswerValues",
-      phases: [ "capture", "diagnostic" ],
-      parseArgs: args => {
-        if (typeof args.text !== "string") throw new Error("text is required");
-        if (utf8Length(args.text) > 64 * 1024) throw new Error("harvest hook input exceeds byte limit");
-        const options = args.options ?? [];
-        if (!Array.isArray(options) || options.length > 64) throw new Error("options must be a bounded option array");
-        const contents = options.map(option => {
-          const content = option == null ? void 0 : option.content;
-          if (typeof content !== "string") throw new Error("option content must be a string");
-          return content;
-        });
-        const slotValues = args.slotValues ?? [];
-        if (!Array.isArray(slotValues) || slotValues.length > 64) throw new Error("slotValues must be a bounded string array");
-        return {
-          text: args.text,
-          options: contents,
-          slotValues: slotValues.map(value => String(value))
-        };
-      },
-      validateResult: value => Array.isArray(value),
-      execute: ({text: text, options: options, slotValues: slotValues}) => mapChaoxingHarvestedAnswer(text, options, slotValues)
-    });
-    if (dependencies.refs && dependencies.resolveUeditorBodies) {
-      const {refs: refs, resolveUeditorBodies: resolveUeditorBodies2} = dependencies;
-      registerLocalHook(registry, {
-        id: "chaoxing.ueditorBodies",
-        phases: [ "capture", "diagnostic" ],
-        capability: "runtime-read",
-        parseArgs: args => {
-          if (!Array.isArray(args.targets) || args.targets.length === 0 || args.targets.length > MAX_UEDITOR_TARGETS) throw new Error("targets must contain between 1 and 64 DOM references");
-          return {
-            targets: args.targets
-          };
-        },
-        validateResult: value => Array.isArray(value),
-        execute: ({targets: targets}) => {
-          const textareas = targets.map(target => {
-            const element = refs.getDom(target);
-            if (element.tagName.toLowerCase() !== "textarea") throw new RuleDomainError("ueditor_target_invalid", "Chaoxing UEditor source target must be a textarea");
-            return element;
-          });
-          let bodies;
-          try {
-            bodies = resolveUeditorBodies2(textareas);
-          } catch (error) {
-            throw new RuleDomainError("ueditor_body_unavailable", error instanceof Error ? error.message : "Chaoxing UEditor body is unavailable");
-          }
-          if (!Array.isArray(bodies) || bodies.length !== textareas.length) throw new RuleDomainError("ueditor_body_unavailable", "Chaoxing UEditor body count does not match source targets");
-          return bodies.map(body => {
-            var _a2;
-            if (!body || !body.isConnected || ((_a2 = body.getAttribute("contenteditable")) == null ? void 0 : _a2.toLowerCase()) !== "true") throw new RuleDomainError("ueditor_body_unavailable", "Chaoxing UEditor body must be a connected contenteditable target");
-            return refs.createDomRef(body);
-          });
-        }
-      });
-    }
-    if (dependencies.refs && dependencies.registerExamQuestion) {
-      const {refs: refs, registerExamQuestion: registerExamQuestion} = dependencies;
-      registerLocalHook(registry, {
-        id: "chaoxing.examRegisterQuestion",
-        phases: [ "capture", "diagnostic" ],
-        capability: "runtime-read",
-        parseArgs: args => {
-          if (typeof args.path !== "string" || !args.path.startsWith("/") || args.path.length > 1024) throw new Error("path must be a valid question path");
-          const mode = args.mode;
-          if (mode !== "paged" && mode !== "preview") throw new Error("mode must be paged or preview");
-          return {
-            path: args.path,
-            target: args.target,
-            mode: mode
-          };
-        },
-        validateResult: value => typeof value === "string",
-        execute: ({path: path, target: target, mode: mode}) => {
-          const element = refs.getDom(target);
-          if (!element.isConnected || !element.classList.contains("questionLi")) throw new RuleDomainError("exam_question_invalid", "Chaoxing exam question target must be a connected questionLi");
-          registerExamQuestion({
-            path: path,
-            target: element,
-            mode: mode
-          });
-          return path;
-        }
-      });
-    }
-    const registerPlanHook = (id, execute) => registerLocalHook(registry, {
-      id: id,
-      phases: [ "fill" ],
-      capability: "answer-write",
-      requiresSafetyCapability: true,
-      parseArgs: args => ({
-        safety: args.safety
-      }),
-      validateResult: value => typeof value === "boolean",
-      execute: ({safety: safety}, {signal: signal}) => execute(safetyPlanForCapability(safety), signal)
-    });
-    if (dependencies.prepareExamPlan) registerPlanHook("chaoxing.examPreparePlan", dependencies.prepareExamPlan);
-    if (dependencies.commitExamPlan) registerPlanHook("chaoxing.examCommitPlan", dependencies.commitExamPlan);
-    if (dependencies.commitDoworkPlan) registerPlanHook("chaoxing.doworkCommitPlan", dependencies.commitDoworkPlan);
-    if (dependencies.commitStudentstudyPlan) registerPlanHook("chaoxing.studentstudyCommitPlan", dependencies.commitStudentstudyPlan);
-    if (dependencies.commitOldHomeworkPlan) registerPlanHook("chaoxing.oldHomeworkCommitPlan", dependencies.commitOldHomeworkPlan);
-    if (dependencies.commitOldChapterPlan) registerPlanHook("chaoxing.oldChapterCommitPlan", dependencies.commitOldChapterPlan);
-    if (dependencies.commitNewChapterPlan) registerPlanHook("chaoxing.newChapterCommitPlan", dependencies.commitNewChapterPlan);
-  }
-
-  const LABEL = "aopeng paper data";
-
-  const AOPENG_PAPER_SLOTS = Object.freeze([ "exam-view-paper", "exam-pull-paper" ]);
-
-  const SLOT_SET = new Set(AOPENG_PAPER_SLOTS);
-
-  const MAX_EMBEDDED_JSON_DEPTH = 3;
-
-  function decodeEmbeddedJson(value) {
-    let current = value;
-    for (let depth = 0; depth < MAX_EMBEDDED_JSON_DEPTH; depth += 1) {
-      if (typeof current !== "string") return current;
-      const trimmed = current.trim();
-      if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return current;
-      try {
-        current = JSON.parse(trimmed);
-      } catch {
-        return current;
-      }
-    }
-    return current;
-  }
-
-  function pathValueThroughEmbeddedJson(source, path) {
-    let current = decodeEmbeddedJson(source);
-    for (const segment of path) {
-      if (!current || typeof current !== "object") return null;
-      const descriptor = Object.getOwnPropertyDescriptor(current, String(segment));
-      if (!descriptor) return null;
-      if (!("value" in descriptor)) throw new RuleDomainError("scope_value_unsafe", `${LABEL} path contains an accessor: ${String(segment)}`);
-      current = decodeEmbeddedJson(descriptor.value);
-    }
-    return current;
-  }
-
-  function registerAopengRuleHooks(registry, environment) {
-    registerLocalHook(registry, {
-      id: "aopeng.paperData",
-      phases: [ "capture", "diagnostic" ],
-      capability: "network-read",
-      parseArgs: args => {
-        if (typeof args.slot !== "string" || !SLOT_SET.has(args.slot)) throw new Error(`unknown aopeng paper slot: ${String(args.slot)}`);
-        return {
-          slot: args.slot,
-          fields: parseSnapshotFields(args.fields)
-        };
-      },
-      validateResult: value => value === null || JsonRuleValueSchema.safeParse(value).success,
-      execute: ({slot: slot, fields: fields}, {signal: signal}) => {
-        let payload;
-        try {
-          payload = environment.readCapturedResponse(slot);
-        } catch (error) {
-          throw new RuleDomainError("aopeng_paper_unavailable", error instanceof Error ? error.message : "paper data is unavailable");
-        }
-        if (payload == null || typeof payload !== "object") return null;
-        const state = createSnapshotState(signal, LABEL);
-        const result = Object.create(null);
-        for (const [name, path] of Object.entries(fields)) {
-          const selected2 = pathValueThroughEmbeddedJson(payload, path);
-          result[name] = selected2 == null ? null : cloneJsonValue(selected2, state);
-        }
-        return result;
-      }
-    });
-  }
-
-  const DEFAULT_MAX_TREES = 1e3;
-
-  function normalizeHosts(hosts) {
-    const normalized = new Set(hosts.map(host => host.trim().toLowerCase()).filter(Boolean));
-    if (normalized.size === 0) throw new Error("JsonRulePlatformAdapter requires at least one host");
-    for (const host of normalized) {
-      if (host.includes("/") || host.includes(":") || host.startsWith(".") || host.endsWith(".") || host.includes("..")) throw new Error(`invalid JsonRulePlatformAdapter host: ${host}`);
-    }
-    return normalized;
-  }
-
-  function matchesHost(hostname, hosts) {
-    const current = hostname.toLowerCase();
-    for (const host of hosts) {
-      if (current === host || current.endsWith(`.${host}`)) return true;
-    }
-    return false;
-  }
-
-  function variantFlows(resolved) {
-    const {variant: variant} = resolved;
-    return [ variant.match, variant.capture, variant.fill, ...variant.diagnostics ? [ variant.diagnostics ] : [] ];
-  }
-
-  function publicFillPlan(plan) {
-    return Object.freeze({
-      path: plan.path,
-      atomic: plan.atomic,
-      fingerprint: plan.fingerprint,
-      operations: plan.operations
-    });
-  }
-
-  function isRuleFailure(error) {
-    return error instanceof RuleDomainError || error instanceof RuleExecutionError;
-  }
-
-  class JsonRulePlatformAdapter {
-    constructor(options) {
-      __publicField(this, "platform");
-      __publicField(this, "packageId");
-      __publicField(this, "hosts");
-      __publicField(this, "maxTrees");
-      __publicField(this, "treeRuntimes", new WeakMap);
-      __publicField(this, "activeRuntime", null);
-      __publicField(this, "lastResolved", null);
-      __publicField(this, "captureFailure", null);
-      __publicField(this, "lastAttempts", []);
-      __publicField(this, "captureGeneration", 0);
-      __publicField(this, "lastHarvested", []);
-      __publicField(this, "pageChangeListeners", new Set);
-      this.options = options;
-      if (!options.platform.trim() || !options.packageId.trim()) throw new Error("JsonRulePlatformAdapter identifiers cannot be empty");
-      this.platform = options.platform;
-      this.packageId = options.packageId;
-      this.hosts = normalizeHosts(options.hosts);
-      this.maxTrees = options.maxTrees ?? DEFAULT_MAX_TREES;
-      new RuleCaptureRegistry({
-        maxTrees: this.maxTrees
-      }).dispose();
-    }
-    match(ctx) {
-      return !ctx.signal.aborted && matchesHost(ctx.location.hostname, this.hosts) && this.options.store.resolve(this.packageId) !== null;
-    }
-    takeHarvested() {
-      return this.lastHarvested.splice(0);
-    }
-    subscribePageChanges(listener) {
-      this.pageChangeListeners.add(listener);
-      let active2 = true;
-      return () => {
-        if (!active2) return;
-        active2 = false;
-        this.pageChangeListeners.delete(listener);
-      };
-    }
-    ruleDiagnostics() {
-      var _a2, _b, _c;
-      return {
-        resolved: this.options.store.resolve(this.packageId),
-        variantId: ((_b = (_a2 = this.activeRuntime) == null ? void 0 : _a2.resolved) == null ? void 0 : _b.variant.id) ?? ((_c = this.lastResolved) == null ? void 0 : _c.variant.id) ?? null,
-        attempts: this.lastAttempts,
-        captureFailure: this.captureFailure,
-        store: this.options.store.diagnostics(this.packageId)
-      };
-    }
-    async captureTrees(ctx) {
-      var _a2;
-      const generation = ++this.captureGeneration;
-      const previous = this.activeRuntime;
-      this.activeRuntime = null;
-      this.lastResolved = null;
-      this.captureFailure = null;
-      if (previous) await this.disposeRuntime(previous);
-      if (!this.match(ctx) || generation !== this.captureGeneration) return [];
-      const runtime = this.createRuntime(ctx);
-      try {
-        const resolved = await runtime.resolver.resolve(this.packageId, {
-          signal: ctx.signal
-        });
-        if (!resolved || resolved.pkg.platform !== this.platform) {
-          await this.disposeRuntime(runtime);
-          return [];
-        }
-        this.lastResolved = resolved;
-        runtime.resolved = resolved;
-        runtime.refs.tightenDomRefCap((_a2 = resolved.variant.limits) == null ? void 0 : _a2.maxDomRefs);
-        const result = await runtime.interpreter.run(resolved.variant.capture, {
-          phase: "capture",
-          signal: ctx.signal,
-          capabilities: new Set(resolved.pkg.capabilities),
-          limits: resolved.variant.limits,
-          flows: variantFlows(resolved),
-          resources: runtime.resources
-        });
-        this.lastHarvested.push(...runtime.capture.takeHarvested());
-        if (!runtime.capture.ownsFinishedResult(result.value)) throw new RuleDomainError("invalid_capture_result", "capture flow must return capture.finish from its current registry");
-        if (generation !== this.captureGeneration) {
-          await this.disposeRuntime(runtime);
-          return [];
-        }
-        const trees = result.value;
-        if (trees.length === 0) {
-          if (!resolved.variant.lifecycle) {
-            await this.disposeRuntime(runtime);
-            return [];
-          }
-          this.activeRuntime = runtime;
-          await this.startLifecycle(runtime, resolved);
-          if (generation !== this.captureGeneration) {
-            if (this.activeRuntime === runtime) this.activeRuntime = null;
-            await this.disposeRuntime(runtime);
-          }
-          return [];
-        }
-        this.activeRuntime = runtime;
-        for (const tree of trees) this.treeRuntimes.set(tree, runtime);
-        return trees;
-      } catch (error) {
-        if (this.activeRuntime === runtime) this.activeRuntime = null;
-        await this.disposeRuntime(runtime);
-        if (isRuleFailure(error)) {
-          this.captureFailure = error.code;
-          return [];
-        }
-        throw error;
-      }
-    }
-    async applyTreeFillPlan(captured, plan, ctx) {
-      const runtime = this.treeRuntimes.get(captured);
-      if (!runtime || runtime.disposed || runtime !== this.activeRuntime || runtime.ctx.document !== ctx.document || runtime.ctx.location !== ctx.location || !this.match(ctx) || !runtime.resolved) return false;
-      try {
-        assertSafetyCapability(plan.safetyCapability);
-      } catch {
-        return false;
-      }
-      if (safetyPlanForCapability(plan.safetyCapability) !== plan) return false;
-      try {
-        const result = await runtime.interpreter.run(runtime.resolved.variant.fill, {
-          phase: "fill",
-          signal: ctx.signal,
-          reserved: {
-            $safety: plan.safetyCapability,
-            $plan: publicFillPlan(plan)
-          },
-          capabilities: new Set(runtime.resolved.pkg.capabilities),
-          limits: runtime.resolved.variant.limits,
-          flows: variantFlows(runtime.resolved)
-        });
-        if (result.value !== true) return false;
-        return runtime.writer.verifyPlan(plan, ctx.signal);
-      } catch (error) {
-        if (isRuleFailure(error)) return false;
-        throw error;
-      }
-    }
-    async dispose() {
-      this.captureGeneration += 1;
-      const runtime = this.activeRuntime;
-      this.activeRuntime = null;
-      this.lastResolved = null;
-      this.pageChangeListeners.clear();
-      if (runtime) await this.disposeRuntime(runtime);
-    }
-    createRuntime(ctx) {
-      var _a2, _b;
-      const refs = new RuntimeReferenceRegistry({
-        maxDomRefs: this.options.policy.limits.maxDomRefs
-      });
-      const capture2 = new RuleCaptureRegistry({
-        maxTrees: this.maxTrees
-      });
-      const resources = new RuleResourceScope;
-      resources.add(() => capture2.dispose());
-      resources.bind(ctx.signal);
-      const registry = new PrimitiveRegistry;
-      const writer = new BindingRegistryAnswerWriter(capture2.bindings);
-      const environment = {
-        ctx: ctx,
-        refs: refs,
-        capture: capture2,
-        resources: resources,
-        writer: writer
-      };
-      const interpreter = new RuleInterpreter({
-        registry: registry,
-        policy: this.options.policy,
-        services: this.options.services
-      });
-      this.lastAttempts = [];
-      const runtime = {
-        ...environment,
-        interpreter: interpreter,
-        resolver: new JsonRuleResolver({
-          store: this.options.store,
-          interpreter: interpreter,
-          onAttempt: attempt => {
-            this.lastAttempts = [ ...this.lastAttempts, attempt ];
-          }
-        }),
-        resolved: null,
-        lifecycle: null,
-        disposed: false
-      };
-      registerCoreRulePrimitives(registry, {
-        document: ctx.document,
-        location: ctx.location,
-        refs: refs,
-        capture: capture2,
-        writer: writer,
-        resources: resources,
-        emit: event => {
-          void this.dispatchLifecycleEvent(runtime, event);
-        }
-      });
-      (_b = (_a2 = this.options).configureRegistry) == null ? void 0 : _b.call(_a2, registry, environment);
-      return runtime;
-    }
-    async startLifecycle(runtime, resolved) {
-      const definition = resolved.variant.lifecycle;
-      if (!definition) return;
-      const machine = new RuleStateMachine({
-        interpreter: runtime.interpreter,
-        definition: definition,
-        flows: variantFlows(resolved),
-        capabilities: new Set(resolved.pkg.capabilities),
-        signal: runtime.ctx.signal,
-        resources: runtime.resources,
-        limits: resolved.variant.limits
-      });
-      runtime.lifecycle = machine;
-      await machine.start();
-    }
-    async dispatchLifecycleEvent(runtime, event) {
-      const lifecycle = runtime.lifecycle;
-      if (!lifecycle || runtime.disposed || runtime !== this.activeRuntime) return;
-      try {
-        const result = await lifecycle.dispatch(event.event, event.payload);
-        if (!result.transitioned || runtime.disposed || runtime !== this.activeRuntime) return;
-        for (const listener of [ ...this.pageChangeListeners ]) listener();
-      } catch {}
-    }
-    async disposeRuntime(runtime) {
-      if (runtime.disposed) return;
-      runtime.disposed = true;
-      runtime.capture.dispose();
-      await runtime.resources.dispose();
-    }
-  }
-
   const CHA0XING_FONT_TABLE_MD5 = "87594bb90a8153dd8fbe69683c451b1c";
 
   function parseChaoxingFontTable(raw) {
-    if (!raw || cxFontMd5(raw) !== CHA0XING_FONT_TABLE_MD5) return null;
+    if (!raw || core.cxFontMd5(raw) !== CHA0XING_FONT_TABLE_MD5) return null;
     try {
       const parsed = JSON.parse(raw);
       if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") return null;
@@ -12695,7 +165,7 @@
 
   const CACHE_WARN_ENTRIES = 5e3;
 
-  const HASH_PATTERN = /^[0-9a-f]{64}$/;
+  const HASH_PATTERN$1 = /^[0-9a-f]{64}$/;
 
   const MAX_VALUES = 64;
 
@@ -12755,22 +225,22 @@
       tombstones: tombstones,
       clearedAt: 0
     };
-    const snapshot2 = input;
-    if (Array.isArray(snapshot2.entries)) for (const item of snapshot2.entries) {
+    const snapshot = input;
+    if (Array.isArray(snapshot.entries)) for (const item of snapshot.entries) {
       if (!Array.isArray(item) || item.length !== 2) continue;
       const [key, value] = item;
-      if (typeof key !== "string" || !HASH_PATTERN.test(key)) continue;
+      if (typeof key !== "string" || !HASH_PATTERN$1.test(key)) continue;
       const parsed = parseEntry(value);
       if (parsed) entries.set(key, parsed);
     }
-    if (Array.isArray(snapshot2.tombstones)) for (const item of snapshot2.tombstones) {
+    if (Array.isArray(snapshot.tombstones)) for (const item of snapshot.tombstones) {
       if (!Array.isArray(item) || item.length !== 2) continue;
       const [key, at] = item;
-      if (typeof key !== "string" || !HASH_PATTERN.test(key)) continue;
+      if (typeof key !== "string" || !HASH_PATTERN$1.test(key)) continue;
       if (typeof at !== "number" || !(at > 0)) continue;
       tombstones.set(key, at);
     }
-    const clearedAt = snapshot2.clearedAt;
+    const clearedAt = snapshot.clearedAt;
     return {
       entries: entries,
       tombstones: tombstones,
@@ -12825,7 +295,7 @@
       };
     }
     write(unitHash, hit, meta) {
-      if (!HASH_PATTERN.test(unitHash)) return false;
+      if (!HASH_PATTERN$1.test(unitHash)) return false;
       const prev = this.entries.get(unitHash);
       const parsed = parseEntry({
         ...hit,
@@ -12910,11 +380,11 @@
       };
     }
     parseImport(text) {
-      var _a2;
+      var _a;
       const parsedRaw = JSON.parse(text);
       return {
         incoming: parseSnapshot$1(parsedRaw).entries,
-        rawCount: ((_a2 = parsedRaw.entries) == null ? void 0 : _a2.length) ?? 0
+        rawCount: ((_a = parsedRaw.entries) == null ? void 0 : _a.length) ?? 0
       };
     }
     importJson(text) {
@@ -13062,11 +532,11 @@
     };
   }
 
-  function createPanelPositionSnapshot(position2) {
+  function createPanelPositionSnapshot(position) {
     return {
       schemaVersion: 1,
-      x: Math.round(position2.x),
-      y: Math.round(position2.y)
+      x: Math.round(position.x),
+      y: Math.round(position.y)
     };
   }
 
@@ -13080,8 +550,8 @@
     return parsed;
   }
 
-  function savePanelPosition(storage, position2) {
-    storage.set(PANEL_POSITION_KEY, createPanelPositionSnapshot(position2));
+  function savePanelPosition(storage, position) {
+    storage.set(PANEL_POSITION_KEY, createPanelPositionSnapshot(position));
   }
 
   function axisRange(free, margin) {
@@ -13101,12 +571,12 @@
     return rounded;
   }
 
-  function clampPanelPosition(position2, panel, viewport, margin = PANEL_VIEWPORT_MARGIN) {
+  function clampPanelPosition(position, panel, viewport, margin = PANEL_VIEWPORT_MARGIN) {
     const freeX = Math.max(0, viewport.width - panel.width);
     const freeY = Math.max(0, viewport.height - panel.height);
     return {
-      x: clampAxis(position2.x, freeX, margin),
-      y: clampAxis(position2.y, freeY, margin)
+      x: clampAxis(position.x, freeX, margin),
+      y: clampAxis(position.y, freeY, margin)
     };
   }
 
@@ -13118,16 +588,16 @@
     return Math.round(to.min + ratio * (to.max - to.min));
   }
 
-  function remapPanelPosition(position2, fromPanel, toPanel, viewport, margin = PANEL_VIEWPORT_MARGIN) {
+  function remapPanelPosition(position, fromPanel, toPanel, viewport, margin = PANEL_VIEWPORT_MARGIN) {
     return {
-      x: remapAxis(position2.x, Math.max(0, viewport.width - fromPanel.width), Math.max(0, viewport.width - toPanel.width), margin),
-      y: remapAxis(position2.y, Math.max(0, viewport.height - fromPanel.height), Math.max(0, viewport.height - toPanel.height), margin)
+      x: remapAxis(position.x, Math.max(0, viewport.width - fromPanel.width), Math.max(0, viewport.width - toPanel.width), margin),
+      y: remapAxis(position.y, Math.max(0, viewport.height - fromPanel.height), Math.max(0, viewport.height - toPanel.height), margin)
     };
   }
 
   function createBackendSecurityClient(options) {
-    const deviceKeys = new DeviceKeyManager(options.storage);
-    const sessions = new SecureSessionClient({
+    const deviceKeys = new core.DeviceKeyManager(options.storage);
+    const sessions = new core.SecureSessionClient({
       transport: options.transport,
       baseUrl: options.baseUrl,
       deviceKeys: deviceKeys,
@@ -13139,7 +609,7 @@
     });
     return {
       sessions: sessions,
-      transport: new SecureTransport({
+      transport: new core.SecureTransport({
         transport: options.transport,
         sessions: sessions,
         client: {
@@ -13212,6 +682,12 @@
 
   const setUsername = u => _GM_setValue(USERNAME_KEY, u);
 
+  const CARD_SESSION_KEY = "aiask_card_session";
+
+  const getCardSession = () => _GM_getValue(CARD_SESSION_KEY, false);
+
+  const setCardSession = v => _GM_setValue(CARD_SESSION_KEY, v);
+
   const COLLAPSED_KEY = "aiask_panel_collapsed";
 
   const getCollapsed = () => _GM_getValue(COLLAPSED_KEY, true);
@@ -13231,7 +707,7 @@
 
   const getPanelPosition = () => loadPanelPosition(panelPositionStorage);
 
-  const setPanelPosition = position2 => savePanelPosition(panelPositionStorage, position2);
+  const setPanelPosition = position => savePanelPosition(panelPositionStorage, position);
 
   const localAnswerCache = new LocalAnswerCache({
     get: key => _GM_getValue(key, null),
@@ -13333,19 +809,19 @@
     if (!raw || typeof raw !== "object") return 0;
     const blob = raw;
     if (blob.day !== day) return 0;
-    const count2 = blob.count;
-    if (typeof count2 !== "number" || !Number.isSafeInteger(count2) || count2 < 0) return 0;
-    return Math.min(count2, EVIDENCE_DAILY_LIMIT);
+    const count = blob.count;
+    if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) return 0;
+    return Math.min(count, EVIDENCE_DAILY_LIMIT);
   };
 
   const evidenceQuota = {
     today: () => readEvidenceQuotaCount(localDayKey()),
     bump: () => {
       const day = localDayKey();
-      const count2 = Math.min(readEvidenceQuotaCount(day) + 1, EVIDENCE_DAILY_LIMIT);
+      const count = Math.min(readEvidenceQuotaCount(day) + 1, EVIDENCE_DAILY_LIMIT);
       _GM_setValue(EVIDENCE_QUOTA_KEY, {
         day: day,
-        count: count2
+        count: count
       });
     }
   };
@@ -13408,7 +884,7 @@
   const VERSION_PROBE_PATHNAME = "/feedback.html";
 
   function isAllowedOrigin(origin) {
-    if (origin === IMPORT_BRIDGE_ORIGIN) return true;
+    if (origin === protocol.IMPORT_BRIDGE_ORIGIN) return true;
     return false;
   }
 
@@ -13422,11 +898,11 @@
     return null;
   }
 
-  function errorReply(requestId2, reason) {
+  function errorReply(requestId, reason) {
     return {
-      channel: IMPORT_BRIDGE_REPLY_CHANNEL,
-      v: IMPORT_BRIDGE_VERSION,
-      requestId: requestId2,
+      channel: protocol.IMPORT_BRIDGE_REPLY_CHANNEL,
+      v: protocol.IMPORT_BRIDGE_VERSION,
+      requestId: requestId,
       kind: "error",
       reason: reason
     };
@@ -13435,28 +911,28 @@
   function importBridgeReplyFor(event, cache, selfWindows) {
     if (!isAllowedOrigin(event.origin)) return null;
     if (!selfWindows.includes(event.source)) return null;
-    const request = parseImportBridgeRequest(event.data);
+    const request = protocol.parseImportBridgeRequest(event.data);
     if (!request) return null;
     if (request.kind === "ping") return {
-      channel: IMPORT_BRIDGE_REPLY_CHANNEL,
-      v: IMPORT_BRIDGE_VERSION,
+      channel: protocol.IMPORT_BRIDGE_REPLY_CHANNEL,
+      v: protocol.IMPORT_BRIDGE_VERSION,
       requestId: request.requestId,
       kind: "pong",
       scriptVersion: SCRIPT_VERSION
     };
     if (!cache) return null;
     try {
-      if (request.kind === "preview") return importBridgePreviewReply(request.requestId, cache.previewImport(request.snapshot));
+      if (request.kind === "preview") return protocol.importBridgePreviewReply(request.requestId, cache.previewImport(request.snapshot));
       const counts = cache.importJson(request.snapshot);
       if (cache.hasPersistFailure()) return errorReply(request.requestId, "import-failed");
-      return importBridgeCommitReply(request.requestId, counts);
+      return protocol.importBridgeCommitReply(request.requestId, counts);
     } catch {
       return errorReply(request.requestId, "invalid-snapshot");
     }
   }
 
   function looksLikeBridgeMessage(data) {
-    return typeof data === "object" && data !== null && data.channel === IMPORT_BRIDGE_CHANNEL;
+    return typeof data === "object" && data !== null && data.channel === protocol.IMPORT_BRIDGE_CHANNEL;
   }
 
   function note(text, warn = false) {
@@ -13513,11 +989,11 @@
   function subscribeDomChanges(document2, callback, options = {}) {
     const view = document2.defaultView;
     if (!view) throw new Error("dom-change document has no window");
-    const {debounceMs: debounceMs = 300, maxWaitMs: maxWaitMs = 1e3, maxTriggers: maxTriggers2 = 200} = options;
+    const {debounceMs: debounceMs = 300, maxWaitMs: maxWaitMs = 1e3, maxTriggers: maxTriggers = 200} = options;
     let triggers = 0;
     const scheduler = createPageChangeScheduler(view, () => {
       triggers += 1;
-      if (triggers >= maxTriggers2) observer.disconnect();
+      if (triggers >= maxTriggers) observer.disconnect();
       return callback();
     }, debounceMs, maxWaitMs);
     const observer = new view.MutationObserver(records => {
@@ -13608,6 +1084,10 @@
       while (host.parent !== host && host.parent.location.href) host = host.parent;
     } catch {}
     return host;
+  }
+
+  function getDefaultExportFromCjs(x) {
+    return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
   }
 
   var Typr = {};
@@ -13787,9 +1267,9 @@
     var bin = Typr._bin;
     var offset0 = offset;
     var obj = [];
-    var count2 = bin.readUshort(data, offset);
+    var count = bin.readUshort(data, offset);
     offset += 2;
-    for (var i = 0; i < count2; i++) {
+    for (var i = 0; i < count; i++) {
       var noff = bin.readUshort(data, offset);
       offset += 2;
       var lut = Typr._lctf.readLookupTable(data, offset0 + noff, subt);
@@ -13843,9 +1323,9 @@
       }
     }
     if (format == 2) {
-      var count2 = bin.readUshort(data, offset);
+      var count = bin.readUshort(data, offset);
       offset += 2;
-      for (var i = 0; i < count2; i++) {
+      for (var i = 0; i < count; i++) {
         obj.push(bin.readUshort(data, offset));
         offset += 2;
         obj.push(bin.readUshort(data, offset));
@@ -13885,10 +1365,10 @@
     var cvg = {};
     cvg.fmt = bin.readUshort(data, offset);
     offset += 2;
-    var count2 = bin.readUshort(data, offset);
+    var count = bin.readUshort(data, offset);
     offset += 2;
-    if (cvg.fmt == 1) cvg.tab = bin.readUshorts(data, offset, count2);
-    if (cvg.fmt == 2) cvg.tab = bin.readUshorts(data, offset, count2 * 3);
+    if (cvg.fmt == 1) cvg.tab = bin.readUshorts(data, offset, count);
+    if (cvg.fmt == 2) cvg.tab = bin.readUshorts(data, offset, count * 3);
     return cvg;
   };
 
@@ -13906,9 +1386,9 @@
     var bin = Typr._bin;
     var offset0 = offset;
     var obj = [];
-    var count2 = bin.readUshort(data, offset);
+    var count = bin.readUshort(data, offset);
     offset += 2;
-    for (var i = 0; i < count2; i++) {
+    for (var i = 0; i < count; i++) {
       var tag = bin.readASCII(data, offset, 4);
       offset += 4;
       var noff = bin.readUshort(data, offset);
@@ -13936,9 +1416,9 @@
     var bin = Typr._bin;
     var offset0 = offset;
     var obj = {};
-    var count2 = bin.readUshort(data, offset);
+    var count = bin.readUshort(data, offset);
     offset += 2;
-    for (var i = 0; i < count2; i++) {
+    for (var i = 0; i < count; i++) {
       var tag = bin.readASCII(data, offset, 4);
       offset += 4;
       var noff = bin.readUshort(data, offset);
@@ -14103,12 +1583,12 @@
 
   Typr.CFF.readIndex = function(data, offset, inds) {
     var bin = Typr._bin;
-    var count2 = bin.readUshort(data, offset);
+    var count = bin.readUshort(data, offset);
     offset += 2;
     var offsize = data[offset];
     offset++;
-    if (offsize == 1) for (var i = 0; i < count2 + 1; i++) inds.push(data[offset + i]); else if (offsize == 2) for (var i = 0; i < count2 + 1; i++) inds.push(bin.readUshort(data, offset + i * 2)); else if (offsize == 3) for (var i = 0; i < count2 + 1; i++) inds.push(bin.readUint(data, offset + i * 3 - 1) & 16777215); else if (count2 != 0) throw "unsupported offset size: " + offsize + ", count: " + count2;
-    offset += (count2 + 1) * offsize;
+    if (offsize == 1) for (var i = 0; i < count + 1; i++) inds.push(data[offset + i]); else if (offsize == 2) for (var i = 0; i < count + 1; i++) inds.push(bin.readUshort(data, offset + i * 2)); else if (offsize == 3) for (var i = 0; i < count + 1; i++) inds.push(bin.readUint(data, offset + i * 3 - 1) & 16777215); else if (count != 0) throw "unsupported offset size: " + offsize + ", count: " + count;
+    offset += (count + 1) * offsize;
     return offset - 1;
   };
 
@@ -14605,9 +2085,9 @@
     var ones2 = Typr._lctf.numOfOnes(tab.valFmt2);
     if (tab.format == 1) {
       tab.pairsets = [];
-      var count2 = bin.readUshort(data, offset);
+      var count = bin.readUshort(data, offset);
       offset += 2;
-      for (var i = 0; i < count2; i++) {
+      for (var i = 0; i < count; i++) {
         var psoff = bin.readUshort(data, offset);
         offset += 2;
         psoff += offset0;
@@ -15054,12 +2534,12 @@
     var obj = {};
     bin.readUshort(data, offset);
     offset += 2;
-    var count2 = bin.readUshort(data, offset);
+    var count = bin.readUshort(data, offset);
     offset += 2;
     bin.readUshort(data, offset);
     offset += 2;
     var offset0 = offset;
-    for (var i = 0; i < count2; i++) {
+    for (var i = 0; i < count; i++) {
       var platformID = bin.readUshort(data, offset);
       offset += 2;
       var encodingID = bin.readUshort(data, offset);
@@ -15076,7 +2556,7 @@
       if (obj[plat] == null) obj[plat] = {};
       var names = [ "copyright", "fontFamily", "fontSubfamily", "ID", "fullName", "version", "postScriptName", "trademark", "manufacturer", "designer", "description", "urlVendor", "urlDesigner", "licence", "licenceURL", "---", "typoFamilyName", "typoSubfamilyName", "compatibleFull", "sampleText", "postScriptCID", "wwsFamilyName", "wwsSubfamilyName", "lightPalette", "darkPalette" ];
       var cname = names[nameID];
-      var soff = offset0 + count2 * 12 + noffset;
+      var soff = offset0 + count * 12 + noffset;
       var str;
       if (platformID == 0) str = bin.readUnicode(data, soff, length / 2); else if (platformID == 3 && encodingID == 0) str = bin.readUnicode(data, soff, length / 2); else if (encodingID == 0) str = bin.readASCII(data, soff, length); else if (encodingID == 1) str = bin.readUnicode(data, soff, length / 2); else if (encodingID == 3) str = bin.readUnicode(data, soff, length / 2); else if (platformID == 1) {
         str = bin.readASCII(data, soff, length);
@@ -15803,18 +3283,18 @@
           Typr.U.P.lineTo(p, x, y);
         }
       } else if (v == "o6" || v == "o7") {
-        var count2 = stack.length;
+        var count = stack.length;
         var isX = v == "o6";
-        for (var j = 0; j < count2; j++) {
+        for (var j = 0; j < count; j++) {
           var sval = stack.shift();
           if (isX) x += sval; else y += sval;
           isX = !isX;
           Typr.U.P.lineTo(p, x, y);
         }
       } else if (v == "o8" || v == "o24") {
-        var count2 = stack.length;
+        var count = stack.length;
         var index = 0;
-        while (index + 6 <= count2) {
+        while (index + 6 <= count) {
           c1x = x + stack.shift();
           c1y = y + stack.shift();
           c2x = c1x + stack.shift();
@@ -16007,19 +3487,19 @@
           open = state.open;
         }
       } else if (v == "o30" || v == "o31") {
-        var count2, count1 = stack.length;
+        var count, count1 = stack.length;
         var index = 0;
         var alternate = v == "o31";
-        count2 = count1 & -3;
-        index += count1 - count2;
-        while (index < count2) {
+        count = count1 & -3;
+        index += count1 - count;
+        while (index < count) {
           if (alternate) {
             c1x = x + stack.shift();
             c1y = y;
             c2x = c1x + stack.shift();
             c2y = c1y + stack.shift();
             y = c2y + stack.shift();
-            if (count2 - index == 5) {
+            if (count - index == 5) {
               x = c2x + stack.shift();
               index++;
             } else x = c2x;
@@ -16030,7 +3510,7 @@
             c2x = c1x + stack.shift();
             c2y = c1y + stack.shift();
             x = c2x + stack.shift();
-            if (count2 - index == 5) {
+            if (count - index == 5) {
               y = c2y + stack.shift();
               index++;
             } else y = c2y;
@@ -16070,7 +3550,7 @@
       let body;
       try {
         const response = await transport.send({
-          url: baseUrl + ANNOUNCEMENT_PATH,
+          url: baseUrl + protocol.ANNOUNCEMENT_PATH,
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -16084,12 +3564,12 @@
       }
       let parsed;
       try {
-        parsed = AnnouncementResponseSchema.safeParse(JSON.parse(body));
+        parsed = protocol.AnnouncementResponseSchema.safeParse(JSON.parse(body));
       } catch {
         return FAILED(false);
       }
       if (!parsed.success) return FAILED(false);
-      if (parsed.data.code !== AiAskCode.Ok) return FAILED(parsed.data.code === AiAskCode.Busy);
+      if (parsed.data.code !== protocol.AiAskCode.Ok) return FAILED(parsed.data.code === protocol.AiAskCode.Busy);
       const {seq: seq, updatedAt: updatedAt, announcement: announcement} = parsed.data;
       return {
         result: {
@@ -16110,11 +3590,47 @@
   }
 
   const MESSAGE$1 = {
-    [AiAskCode.Invalid]: "\u7528\u6237\u540d\u3001\u5bc6\u7801\u6216\u4eba\u673a\u9a8c\u8bc1\u65e0\u6548",
-    [AiAskCode.Unauthorized]: "\u7528\u6237\u540d\u6216\u5bc6\u7801\u9519\u8bef",
-    [AiAskCode.RateLimited]: "\u64cd\u4f5c\u592a\u9891\u7e41\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5",
-    [AiAskCode.Busy]: "\u670d\u52a1\u7e41\u5fd9\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"
+    [protocol.AiAskCode.Invalid]: "\u7528\u6237\u540d\u3001\u5bc6\u7801\u6216\u4eba\u673a\u9a8c\u8bc1\u65e0\u6548",
+    [protocol.AiAskCode.Unauthorized]: "\u7528\u6237\u540d\u6216\u5bc6\u7801\u9519\u8bef",
+    [protocol.AiAskCode.RateLimited]: "\u64cd\u4f5c\u592a\u9891\u7e41\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5",
+    [protocol.AiAskCode.Busy]: "\u670d\u52a1\u7e41\u5fd9\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"
   };
+
+  async function authenticateCard(transport, code, baseUrl) {
+    const trimmedCode = code.trim();
+    if (!trimmedCode) return {
+      message: "\u8bf7\u8f93\u5165\u5361\u5bc6"
+    };
+    try {
+      const res = await transport.send({
+        url: baseUrl + protocol.AUTH_CARD_PATH,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID()
+        },
+        body: JSON.stringify({
+          code: trimmedCode
+        }),
+        timeoutMs: 8e3
+      });
+      const parsed = protocol.AuthResponseSchema.safeParse(JSON.parse(res.body));
+      if (!parsed.success) return {
+        message: MESSAGE$1[protocol.AiAskCode.Busy]
+      };
+      if (parsed.data.code === protocol.AiAskCode.Ok && parsed.data.token) return {
+        token: parsed.data.token,
+        message: "ok"
+      };
+      return {
+        message: MESSAGE$1[parsed.data.code] ?? MESSAGE$1[protocol.AiAskCode.Busy]
+      };
+    } catch {
+      return {
+        message: MESSAGE$1[protocol.AiAskCode.Busy]
+      };
+    }
+  }
 
   function registerPrecheck(username, password, email) {
     if (username.length < 3 || username.length > 32) return `\u7528\u6237\u540d\u8981 3-32 \u4f4d\uff0c\u73b0\u5728\u662f ${username.length} \u4f4d`;
@@ -16143,7 +3659,7 @@
     };
     try {
       const res = await transport.send({
-        url: baseUrl + (mode === "register" ? AUTH_REGISTER_PATH : AUTH_LOGIN_PATH),
+        url: baseUrl + (mode === "register" ? protocol.AUTH_REGISTER_PATH : protocol.AUTH_LOGIN_PATH),
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -16162,12 +3678,12 @@
         }),
         timeoutMs: 8e3
       });
-      const parsed = AuthResponseSchema.safeParse(JSON.parse(res.body));
+      const parsed = protocol.AuthResponseSchema.safeParse(JSON.parse(res.body));
       if (!parsed.success) return {
-        message: MESSAGE$1[AiAskCode.Busy]
+        message: MESSAGE$1[protocol.AiAskCode.Busy]
       };
       const {code: code, token: token, reason: reason} = parsed.data;
-      if (code === AiAskCode.Ok && token) return {
+      if (code === protocol.AiAskCode.Ok && token) return {
         token: token,
         message: "ok"
       };
@@ -16178,11 +3694,11 @@
         message: "\u8be5\u8d26\u53f7\u5df2\u88ab\u7981\u7528\uff0c\u5bc6\u7801\u662f\u5bf9\u7684\u3002\u8bf7\u8054\u7cfb\u5ba2\u670d\u5904\u7406"
       };
       return {
-        message: MESSAGE$1[code] ?? MESSAGE$1[AiAskCode.Busy]
+        message: MESSAGE$1[code] ?? MESSAGE$1[protocol.AiAskCode.Busy]
       };
     } catch {
       return {
-        message: MESSAGE$1[AiAskCode.Busy]
+        message: MESSAGE$1[protocol.AiAskCode.Busy]
       };
     }
   }
@@ -16312,9 +3828,9 @@
 
   const ERROR_TEXTS_KEY = "course.gate.playerErrorTexts";
 
-  const usableSelector = (value, probe) => {
+  const usableSelector = (value, probe2) => {
     try {
-      probe.createDocumentFragment().querySelector(value);
+      probe2.createDocumentFragment().querySelector(value);
       return true;
     } catch {
       return false;
@@ -16323,8 +3839,8 @@
 
   const firstString = value => typeof value === "string" && value.trim() ? value : null;
 
-  function resolveCourseConfig(remote, probe = globalThis.document) {
-    if (!remote || typeof remote !== "object" || !probe) return DEFAULT_COURSE_CONFIG;
+  function resolveCourseConfig(remote, probe2 = globalThis.document) {
+    if (!remote || typeof remote !== "object" || !probe2) return DEFAULT_COURSE_CONFIG;
     const table = remote;
     const next = {
       ...DEFAULT_COURSE_CONFIG
@@ -16333,7 +3849,7 @@
       const value = firstString(table[key]);
       if (value === null) continue;
       const isSelector = field !== "taskDoneText" && field !== "bigPlayLabel" && field !== "activePagerZIndex" && field !== "chapterTestDoneClass" && field !== "chapterTestDoneText";
-      if (isSelector && !usableSelector(value, probe)) continue;
+      if (isSelector && !usableSelector(value, probe2)) continue;
       next[field] = value;
     }
     const errorTexts = table[ERROR_TEXTS_KEY];
@@ -16348,7 +3864,7 @@
     }
     next.probes = Object.freeze(DEFAULT_COURSE_CONFIG.probes.map(([kind, selector], index) => {
       const override = firstString(table[`${PROBE_PREFIX}${kind}.${index}`]);
-      return Object.freeze([ kind, override && usableSelector(override, probe) ? override : selector ]);
+      return Object.freeze([ kind, override && usableSelector(override, probe2) ? override : selector ]);
     }));
     const moduleKind = {
       ...DEFAULT_COURSE_CONFIG.moduleKind
@@ -16368,8 +3884,8 @@
 
   const courseConfig = () => active;
 
-  function applyCourseConfig(remote, probe) {
-    active = resolveCourseConfig(remote, probe);
+  function applyCourseConfig(remote, probe2) {
+    active = resolveCourseConfig(remote, probe2);
     return active;
   }
 
@@ -16571,8 +4087,8 @@
       }
     });
     timer = view.setInterval(() => {
-      var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
-      const memoryPressure = (_a2 = options.memoryGuard) == null ? void 0 : _a2.check();
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
+      const memoryPressure = (_a = options.memoryGuard) == null ? void 0 : _a.check();
       if (memoryPressure != null) {
         stop();
         (_b = options.onMemoryPressure) == null ? void 0 : _b.call(options, memoryPressure);
@@ -16790,284 +4306,6 @@
     };
   }
 
-  const MAX_DEPTH = 12;
-
-  const MAX_KEYS = 40;
-
-  const MAX_TEXT = 8e3;
-
-  function looksLikeJson(value) {
-    const trimmed = value.trim();
-    return trimmed.startsWith("{") || trimmed.startsWith("[");
-  }
-
-  function describe(value, depth) {
-    if (value === null) return "null";
-    if (typeof value === "boolean") return "boolean";
-    if (typeof value === "number") return "number";
-    if (typeof value === "string") {
-      if (looksLikeJson(value) && depth < MAX_DEPTH) {
-        try {
-          return `string(json:${describe(JSON.parse(value), depth + 1)})`;
-        } catch {
-          return "string";
-        }
-      }
-      return "string";
-    }
-    if (typeof value !== "object") return typeof value;
-    if (depth >= MAX_DEPTH) return "\u2026";
-    if (Array.isArray(value)) return value.length === 0 ? "array[0]" : `array[${value.length}] of ${describe(value[0], depth + 1)}`;
-    const keys = Object.keys(value);
-    const shown = keys.slice(0, MAX_KEYS).map(key => {
-      const child = value[key];
-      return `${key}:${describe(child, depth + 1)}`;
-    });
-    if (keys.length > MAX_KEYS) shown.push(`\u2026+${keys.length - MAX_KEYS}`);
-    return `{${shown.join(",")}}`;
-  }
-
-  function describeJsonShape(value) {
-    const text = describe(value, 0);
-    return text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}\u2026\uff08\u5df2\u622a\u65ad\uff09` : text;
-  }
-
-  const MAX_CAPTURE_CHARS = 2 * 1024 * 1024;
-
-  const HOOKED_SEND_FLAG = "__aiaskHookedXhrSend";
-
-  function isHookedSend(send) {
-    return typeof send === "function" && send[HOOKED_SEND_FLAG] === true;
-  }
-
-  function readPayload(xhr) {
-    if (xhr.responseType === "json") return xhr.response ?? null;
-    if (xhr.responseType && xhr.responseType !== "text") return null;
-    const raw = typeof xhr.response === "string" ? xhr.response : xhr.responseText ?? "";
-    if (!raw || raw.length > MAX_CAPTURE_CHARS) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-
-  function createXhrResponseCapture(rules) {
-    const store = new Map;
-    const slotFor = responseURL => {
-      let url;
-      try {
-        url = new URL(responseURL);
-      } catch {
-        return null;
-      }
-      const host = url.hostname.toLowerCase();
-      const match = rules.find(rule => rule.host === host && url.pathname.includes(rule.pathIncludes));
-      return (match == null ? void 0 : match.slot) ?? null;
-    };
-    const consume = xhr => {
-      try {
-        if (xhr.readyState !== 4 || xhr.status !== 200) return;
-        const slot = slotFor(xhr.responseURL || "");
-        if (!slot) return;
-        const payload = readPayload(xhr);
-        if (payload == null) return;
-        store.set(slot, payload);
-      } catch {}
-    };
-    return {
-      read: slot => store.get(slot) ?? null,
-      clear: () => store.clear(),
-      consume: consume,
-      install(target) {
-        const descriptor = Object.getOwnPropertyDescriptor(target.prototype, "send");
-        const currentSend = (descriptor == null ? void 0 : descriptor.value) ?? target.prototype.send;
-        if (isHookedSend(currentSend)) return false;
-        if (typeof currentSend !== "function") return false;
-        const originalSend = currentSend;
-        const hookedSend = function(body) {
-          try {
-            this.addEventListener("readystatechange", () => consume(this));
-          } catch {}
-          return originalSend.call(this, body);
-        };
-        Object.defineProperty(hookedSend, HOOKED_SEND_FLAG, {
-          value: true
-        });
-        try {
-          target.prototype.send = hookedSend;
-        } catch {
-          return false;
-        }
-        return isHookedSend(target.prototype.send);
-      }
-    };
-  }
-
-  const AOPENG_CAPTURE_HOST = "os.open.com.cn";
-
-  const [EXAM_VIEW_PAPER, EXAM_PULL_PAPER] = AOPENG_PAPER_SLOTS;
-
-  const AOPENG_CAPTURE_RULES = Object.freeze([ Object.freeze({
-    slot: EXAM_VIEW_PAPER,
-    host: AOPENG_CAPTURE_HOST,
-    pathIncludes: "/StudentViewPaper"
-  }), Object.freeze({
-    slot: EXAM_PULL_PAPER,
-    host: AOPENG_CAPTURE_HOST,
-    pathIncludes: "/StudentPullPaper_V2"
-  }) ]);
-
-  const aopengResponseCapture = createXhrResponseCapture(AOPENG_CAPTURE_RULES);
-
-  const capture = aopengResponseCapture;
-
-  function readAopengCapturedResponse(slot) {
-    return capture.read(slot);
-  }
-
-  let applicable = false;
-
-  let installTarget = "none";
-
-  let installed = false;
-
-  function dig(value, path) {
-    let current = value;
-    for (const key of path) {
-      if (typeof current === "string") {
-        try {
-          current = JSON.parse(current);
-        } catch {
-          return null;
-        }
-      }
-      if (!current || typeof current !== "object") return null;
-      current = current[key];
-    }
-    return current;
-  }
-
-  function firstId(value) {
-    if (!Array.isArray(value) || value.length === 0) return null;
-    const head = value[0];
-    return head && typeof head.I1 === "string" ? head.I1 : null;
-  }
-
-  function firstDomQuestionId(doc) {
-    const el = doc == null ? void 0 : doc.querySelector("#paperPreview .topic-cont[identifier]");
-    return (el == null ? void 0 : el.getAttribute("identifier")) ?? null;
-  }
-
-  function domQuestionCount(doc) {
-    if (!doc) return null;
-    return doc.querySelectorAll("#paperPreview .question-item").length;
-  }
-
-  const HOOK_FIELD_PATHS = {
-    items: [ "Data", "Answer", "TestPaperData", "Data", "Items" ],
-    itemsNested: [ "Data", "Answer", "TestPaperData", "Data", "Data", "Items" ],
-    sheet: [ "Data", "Answer", "AnswerSheet", "ResultList" ],
-    result: [ "Data", "Answer", "AnswerResult", "Data", "Items" ]
-  };
-
-  function hookFieldLengths(payload) {
-    const out = {};
-    for (const [name, path] of Object.entries(HOOK_FIELD_PATHS)) {
-      try {
-        const value = pathValueThroughEmbeddedJson(payload, [ ...path ]);
-        out[name] = Array.isArray(value) ? value.length : value === null || value === void 0 ? "null" : typeof value;
-      } catch (error) {
-        out[name] = `throw:${error.code ?? "unknown"}`;
-      }
-    }
-    return out;
-  }
-
-  function domShape(doc) {
-    const first = {};
-    if (!doc) return {
-      types: [],
-      first: first
-    };
-    const types = [ ...new Set([ ...doc.querySelectorAll("#paperPreview .topic-cont[itemtype]") ].map(el => el.getAttribute("itemtype") ?? "").filter(Boolean)) ].slice(0, 8);
-    const q = doc.querySelector("#paperPreview .question-item");
-    if (q) {
-      first.hasTopicCont = q.querySelector(".topic-cont") !== null;
-      first.hasIdentifier = q.querySelector(".topic-cont[identifier]") !== null;
-      first.hasStem = q.querySelector(".topic-cont > p.text") !== null;
-      first.optionCount = q.querySelectorAll("ul.options > li").length;
-      first.hasTopicAnswer = q.querySelector(".topic-answer") !== null;
-    }
-    return {
-      types: types,
-      first: first
-    };
-  }
-
-  function probeJoin(payload, doc) {
-    const items = dig(payload, [ "Data", "Answer", "TestPaperData", "Data", "Items" ]);
-    const sheet = dig(payload, [ "Data", "Answer", "AnswerSheet", "ResultList" ]);
-    const result = dig(payload, [ "Data", "Answer", "AnswerResult", "Data", "Items" ]);
-    const itemId = firstId(items);
-    const sheetId = firstId(sheet);
-    const domId = firstDomQuestionId(doc);
-    const dom = domShape(doc);
-    const sheetIds = new Set((Array.isArray(sheet) ? sheet : []).map(row => row == null ? void 0 : row.I1).filter(id => typeof id === "string"));
-    const count2 = v => Array.isArray(v) ? v.length : 0;
-    return {
-      items: count2(items),
-      sheet: count2(sheet),
-      result: count2(result),
-      sheetIdMatchesItem: itemId !== null && firstId(sheet) === itemId,
-      resultIdMatchesItem: itemId !== null && firstId(result) === itemId,
-      sheetIdMatchesResult: sheetId !== null && firstId(result) === sheetId,
-      domIdFoundInSheet: domId === null ? null : sheetIds.has(domId),
-      markStatusValues: [ ...new Set((Array.isArray(result) ? result : []).map(row => row == null ? void 0 : row.MarkStatus).filter(v => typeof v === "number")) ].sort((a, b) => a - b).slice(0, 8),
-      domQuestionCount: domQuestionCount(doc),
-      hookFieldLengths: hookFieldLengths(payload),
-      domItemTypes: dom.types,
-      domFirstQuestion: dom.first
-    };
-  }
-
-  function aopengCaptureStatus(doc) {
-    if (!applicable) return null;
-    const filledSlots = AOPENG_PAPER_SLOTS.filter(slot => capture.read(slot) != null);
-    const slotShapes = {};
-    const slotJoinProbe = {};
-    for (const slot of filledSlots) {
-      const payload = capture.read(slot);
-      slotShapes[slot] = describeJsonShape(payload);
-      slotJoinProbe[slot] = probeJoin(payload, doc);
-    }
-    return {
-      target: installTarget,
-      installed: installed,
-      filledSlots: filledSlots,
-      slotShapes: slotShapes,
-      slotJoinProbe: slotJoinProbe
-    };
-  }
-
-  function installAopengResponseCapture(hostname) {
-    if (hostname.trim().toLowerCase() !== AOPENG_CAPTURE_HOST) return false;
-    applicable = true;
-    let target;
-    try {
-      if (typeof unsafeWindow !== "undefined") target = unsafeWindow == null ? void 0 : unsafeWindow.XMLHttpRequest;
-    } catch {
-      target = void 0;
-    }
-    if (target) installTarget = "page"; else if (typeof XMLHttpRequest !== "undefined") {
-      target = XMLHttpRequest;
-      installTarget = "sandbox";
-    }
-    if (!target) return false;
-    installed = capture.install(target);
-    return installed;
-  }
-
   const PAGED_PATH = "/exam-ans/exam/test/reVersionTestStartNew";
 
   const CHA0XING_EXAM_PREVIEW_PATH = "/exam-ans/mooc2/exam/preview";
@@ -17196,8 +4434,8 @@
         return false;
       }
       if (bodies.length !== textareas.length || bodies.some(body => {
-        var _a2;
-        return !(body == null ? void 0 : body.isConnected) || ((_a2 = body.getAttribute("contenteditable")) == null ? void 0 : _a2.toLowerCase()) !== "true";
+        var _a;
+        return !(body == null ? void 0 : body.isConnected) || ((_a = body.getAttribute("contenteditable")) == null ? void 0 : _a.toLowerCase()) !== "true";
       })) return false;
     }
     return true;
@@ -17228,11 +4466,11 @@
       this.questions.set(registration.path, registration);
     }
     async prepareStart(ctx) {
-      var _a2, _b, _c;
+      var _a, _b, _c;
       if (ctx.signal.aborted || !isChaoxingHost(ctx.location.hostname) || ctx.location.pathname !== PAGED_PATH) return "ready";
       const previewLinks = Array.from(ctx.document.querySelectorAll("a.completeBtn")).filter(element => element.isConnected && normalizedText$1(element) === "\u6574\u5377\u9884\u89c8" && /^\s*topreview\s*\(\s*\)\s*;?\s*$/.test(element.getAttribute("onclick") ?? ""));
       if (previewLinks.length !== 1) return "ready";
-      const storage = (_a2 = ctx.document.defaultView) == null ? void 0 : _a2.sessionStorage;
+      const storage = (_a = ctx.document.defaultView) == null ? void 0 : _a.sessionStorage;
       if (!storage) return "ready";
       const now = ((_c = (_b = this.options).now) == null ? void 0 : _c.call(_b)) ?? Date.now();
       const marker = {
@@ -17311,93 +4549,9 @@
 
   const CHA0XING_ANSWERABLE_PATH = /work\/(doHomeWork|dowork|view)|studentstudy|exam|test\//iu;
 
-  const CHA0XING_UNROUTED_PACKAGE_ID = SENTINEL_PACKAGE_IDS[0];
+  const CHA0XING_UNROUTED_PACKAGE_ID = protocol.SENTINEL_PACKAGE_IDS[0];
 
   const CHA0XING_STUDENTSTUDY_PATHS = [ "/mycourse/studentstudy", "/mooc-ans/mycourse/studentstudy" ];
-
-  const REGEX_WORKER_SOURCE = [ "'use strict';", "self.addEventListener('message', function (event) {", "  var request = event.data;", "  try {", "    var regex = new RegExp(request.pattern, request.flags || '');", "    var value;", "    if (request.kind === 'test') value = regex.test(request.value);", "    else if (request.kind === 'replace') value = request.value.replace(regex, request.replacement || '');", "    else {", "      var match = regex.exec(request.value);", "      value = match ? Array.from(match, function (part) { return part == null ? null : part; }) : null;", "    }", "    self.postMessage({ ok: true, value: value });", "  } catch (error) {", "    self.postMessage({ ok: false, code: 'regex_error', error: error instanceof Error ? error.message : 'regex failed' });", "  }", "});" ].join("\n");
-
-  function createBrowserRegexWorker() {
-    const url = URL.createObjectURL(new Blob([ REGEX_WORKER_SOURCE ], {
-      type: "text/javascript"
-    }));
-    try {
-      return new Worker(url);
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  }
-
-  function createRuleExpressionServices(createWorker = createBrowserRegexWorker) {
-    const regex = new IsolatedRegexExecutor(createWorker);
-    const services = {
-      regex: request => regex.execute(request),
-      jsonPath: ({value: value, query: query, signal: signal}) => executeJsonPath(value, query, {
-        signal: signal
-      })
-    };
-    return Object.freeze(services);
-  }
-
-  const RULE_EXPRESSION_SERVICES = createRuleExpressionServices();
-
-  const RULE_ENGINE_VERSION = "1.6.0";
-
-  const RULE_LIMITS = Object.freeze({
-    maxSteps: 5e4,
-    maxWallMs: 6e3,
-    maxAsyncMs: 1e3,
-    maxLoopIterations: 256,
-    maxCallDepth: 8,
-    maxDomRefs: 4e3
-  });
-
-  const CORE_RULE_PRIMITIVES = Object.freeze([ "page.location", "page.queryParam", "dom.queryCss", "dom.queryCssAll", "dom.queryXPath", "dom.queryXPathAll", "dom.text", "dom.content", "dom.attr", "dom.property", "dom.closest", "dom.parent", "dom.children", "dom.index", "wait.selector", "frame.list", "frame.enter", "frame.findSameOrigin", "frame.findAllSameOrigin", "content.sanitize", "text.includes", "text.stripOptionPrefix", "text.normalizeTruth", "question.normalizeLeafType", "array.append", "capture.registerLeafDom", "capture.registerLeafBindingDom", "capture.registerTree", "capture.harvestLeaf", "capture.finish", "answer.applyPlan", "dom.clickAnswer", "dom.setChecked", "dom.setValue", "dom.setSelected", "matching.pair", "observe.mutation", "observe.urlChange" ]);
-
-  const CORE_CAPABILITIES = Object.freeze([ "dom-read", "frame-read", "runtime-read", "answer-write" ]);
-
-  const GENERIC_DOM_RULE_POLICY = {
-    primitives: new Set(CORE_RULE_PRIMITIVES),
-    capabilities: new Set(CORE_CAPABILITIES),
-    limits: RULE_LIMITS
-  };
-
-  const AOPENG_RULE_POLICY = {
-    primitives: new Set([ ...CORE_RULE_PRIMITIVES, "aopeng.paperData" ]),
-    capabilities: new Set([ ...CORE_CAPABILITIES, "network-read" ]),
-    limits: RULE_LIMITS
-  };
-
-  const CHA0XING_RULE_POLICY = {
-    primitives: new Set([ ...CORE_RULE_PRIMITIVES, "chaoxing.normalizeTitle", "chaoxing.decodeFont", "chaoxing.harvestAnswerValues", "chaoxing.ueditorBodies", "chaoxing.examRegisterQuestion", "chaoxing.examPreparePlan", "chaoxing.examCommitPlan", "chaoxing.doworkCommitPlan", "chaoxing.studentstudyCommitPlan", "chaoxing.oldHomeworkCommitPlan", "chaoxing.oldChapterCommitPlan", "chaoxing.newChapterCommitPlan" ]),
-    capabilities: new Set(CORE_CAPABILITIES),
-    limits: RULE_LIMITS
-  };
-
-  const TRUSTED_REMOTE_RULE_PLATFORMS = Object.freeze([ Object.freeze({
-    platform: "wangxiao",
-    packageId: "wangxiao-xatu-chapter-assessment",
-    hosts: Object.freeze([ "xatu.168wangxiao.com" ]),
-    policy: GENERIC_DOM_RULE_POLICY
-  }), Object.freeze({
-    platform: "aopeng",
-    packageId: "aopeng-os-homework-online",
-    hosts: Object.freeze([ "os.open.com.cn" ]),
-    policy: AOPENG_RULE_POLICY
-  }) ]);
-
-  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|xatu\.168wangxiao\.com|os\.open\.com\.cn)$/u;
-
-  const normalizedHost = hostname => hostname.trim().toLowerCase();
-
-  function trustedRemoteRulePlatformFor(hostname) {
-    const host = normalizedHost(hostname);
-    return TRUSTED_REMOTE_RULE_PLATFORMS.find(entry => entry.hosts.some(candidate => candidate === host)) ?? null;
-  }
-
-  function trustedRemoteRulePlatformByPackageId(packageId) {
-    return TRUSTED_REMOTE_RULE_PLATFORMS.find(entry => entry.packageId === packageId) ?? null;
-  }
 
   function objectValue(value) {
     return value !== null && typeof value === "object";
@@ -17409,10 +4563,10 @@
   }
 
   function ueditorApi(document2) {
-    var _a2, _b;
+    var _a, _b;
     let candidate;
     try {
-      candidate = (_a2 = pageWindowForDocument(document2)) == null ? void 0 : _a2.UE;
+      candidate = (_a = pageWindowForDocument(document2)) == null ? void 0 : _a.UE;
     } catch {
       candidate = null;
     }
@@ -17439,8 +4593,8 @@
   }
 
   function validEditorBody(body, expectedFrame) {
-    var _a2, _b;
-    if (!body || !body.isConnected || ((_a2 = body.getAttribute("contenteditable")) == null ? void 0 : _a2.toLowerCase()) !== "true") return false;
+    var _a, _b;
+    if (!body || !body.isConnected || ((_a = body.getAttribute("contenteditable")) == null ? void 0 : _a.toLowerCase()) !== "true") return false;
     try {
       const frame = (_b = body.ownerDocument.defaultView) == null ? void 0 : _b.frameElement;
       return frame === expectedFrame;
@@ -17455,7 +4609,7 @@
   }
 
   function resolveUeditorEditor(textarea, api) {
-    var _a2;
+    var _a;
     if (!textarea.id) return null;
     const expectedFrame = expectedEditorFrame(textarea);
     if (!(expectedFrame == null ? void 0 : expectedFrame.isConnected)) return null;
@@ -17465,7 +4619,7 @@
         if (!validEditorBody(body, expectedFrame)) continue;
         const candidate = editor;
         const container = elementValue(candidate.container);
-        if (candidate.id === textarea.id || (container == null ? void 0 : container.contains(textarea)) || ((_a2 = body.ownerDocument.defaultView) == null ? void 0 : _a2.frameElement) === expectedFrame) return candidate;
+        if (candidate.id === textarea.id || (container == null ? void 0 : container.contains(textarea)) || ((_a = body.ownerDocument.defaultView) == null ? void 0 : _a.frameElement) === expectedFrame) return candidate;
       }
     }
     if (typeof api.getEditor !== "function") return null;
@@ -17489,35 +4643,6 @@
     });
   }
 
-  function validatedRulePackageIdFor(location2) {
-    const page = new URL(location2.href);
-    if (page.hostname !== "chaoxing.com" && !page.hostname.endsWith(".chaoxing.com")) return null;
-    if (CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page.pathname) && page.searchParams.get("mooc2") === "1") return CHA0XING_PACKAGE_IDS.studentstudy;
-    if (page.pathname === "/mooc-ans/work/selectWorkQuestionYiPiYue" || page.pathname === "/work/selectWorkQuestionYiPiYue") return CHA0XING_PACKAGE_IDS.studentstudy;
-    if (page.pathname === "/exam-ans/exam/test/reVersionTestStartNew" || page.pathname === CHA0XING_EXAM_PREVIEW_PATH) return CHA0XING_PACKAGE_IDS.examStudent;
-    if (page.pathname === "/mooc-ans/work/doHomeWorkNew" && page.searchParams.get("mooc2") === "1") return CHA0XING_PACKAGE_IDS.newChapter;
-    if (page.pathname === "/mooc-ans/work/doHomeWorkNew" && page.searchParams.get("mooc2") === "0") return CHA0XING_PACKAGE_IDS.oldChapter;
-    if (page.pathname === "/mooc-ans/work/doHomeWorkNew" && page.searchParams.get("mooc") === "1") return CHA0XING_PACKAGE_IDS.oldHomework;
-    if (page.pathname === "/mooc-ans/mooc2/work/dowork") return CHA0XING_PACKAGE_IDS.dowork;
-    return null;
-  }
-
-  function isNewCourseStudyUrl(location2) {
-    const page = new URL(location2.href);
-    if (page.hostname !== "chaoxing.com" && !page.hostname.endsWith(".chaoxing.com")) return false;
-    return CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page.pathname) && page.searchParams.get("mooc2") === "1";
-  }
-
-  function legacyStudentstudyUpgradeUrl(location2) {
-    const page = new URL(location2.href);
-    if (page.hostname !== "chaoxing.com" && !page.hostname.endsWith(".chaoxing.com")) return null;
-    if (!CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page.pathname)) return null;
-    if (page.searchParams.get("mooc2") === "1") return null;
-    page.pathname = "/mycourse/studentstudy";
-    page.searchParams.set("mooc2", "1");
-    return page.toString();
-  }
-
   const DOWORK_SAVE_TEXT = "\u6682\u65f6\u4fdd\u5b58";
 
   const DOWORK_SAVE_HANDLERS = new Set([ "saveWork()", "saveWork();" ]);
@@ -17538,6 +4663,10 @@
 
   const NO_SUBMIT_SUCCESS_TEXT = "\u4fdd\u5b58\u6210\u529f";
 
+  const NO_SUBMIT_SUCCESS_BOX_SELECTOR = "#saveSuccessContent";
+
+  const SAVE_TOAST_SELECTOR = "#dialogToast";
+
   const NO_SUBMIT_CONFIRM_TIMEOUT_MS = 1e4;
 
   const STUDENTSTUDY_READY_TIMEOUT_MS = 5e3;
@@ -17555,14 +4684,14 @@
   }
 
   function safeDoworkSaveTarget(document2) {
-    var _a2;
+    var _a;
     const candidates = [ ...document2.querySelectorAll("a") ].filter(element => {
       const onclick = element.getAttribute("onclick") ?? "";
       return normalizedElementText(element) === DOWORK_SAVE_TEXT || onclick.includes("saveWork");
     });
     if (candidates.length !== 1) return null;
     const target = candidates[0];
-    if (!target || !target.isConnected || target.tagName.toLowerCase() !== "a" || normalizedElementText(target) !== DOWORK_SAVE_TEXT || !DOWORK_SAVE_HANDLERS.has(((_a2 = target.getAttribute("onclick")) == null ? void 0 : _a2.trim()) ?? "") || target.classList.contains("completeBtn") || target.closest(".completeBtn")) return null;
+    if (!target || !target.isConnected || target.tagName.toLowerCase() !== "a" || normalizedElementText(target) !== DOWORK_SAVE_TEXT || !DOWORK_SAVE_HANDLERS.has(((_a = target.getAttribute("onclick")) == null ? void 0 : _a.trim()) ?? "") || target.classList.contains("completeBtn") || target.closest(".completeBtn")) return null;
     return target;
   }
 
@@ -17623,16 +4752,16 @@
         return false;
       }
       if (bodies.length !== textareas.length || bodies.some(body => {
-        var _a2;
-        return !(body == null ? void 0 : body.isConnected) || ((_a2 = body.getAttribute("contenteditable")) == null ? void 0 : _a2.toLowerCase()) !== "true";
+        var _a;
+        return !(body == null ? void 0 : body.isConnected) || ((_a = body.getAttribute("contenteditable")) == null ? void 0 : _a.toLowerCase()) !== "true";
       })) return false;
     }
     return true;
   }
 
   function validNoSubmitTarget(target) {
-    var _a2;
-    return !(!target || !target.isConnected || target.tagName.toLowerCase() !== "a" || normalizedElementText(target) !== NO_SUBMIT_SAVE_TEXT || !hasAnyClass(target, NO_SUBMIT_SAVE_CLASSES) || !target.classList.contains("workBtnIndex") || !NO_SUBMIT_SAVE_HANDLERS.has(((_a2 = target.getAttribute("onclick")) == null ? void 0 : _a2.trim()) ?? "") || hasAnyClass(target, NO_SUBMIT_BLOCKED_CLASSES) || target.closest(".btnSubmit, .Btn_blue_1, .completeBtn"));
+    var _a;
+    return !(!target || !target.isConnected || target.tagName.toLowerCase() !== "a" || normalizedElementText(target) !== NO_SUBMIT_SAVE_TEXT || !hasAnyClass(target, NO_SUBMIT_SAVE_CLASSES) || !target.classList.contains("workBtnIndex") || !NO_SUBMIT_SAVE_HANDLERS.has(((_a = target.getAttribute("onclick")) == null ? void 0 : _a.trim()) ?? "") || hasAnyClass(target, NO_SUBMIT_BLOCKED_CLASSES) || target.closest(".btnSubmit, .Btn_blue_1, .completeBtn"));
   }
 
   const noSubmitCandidatesIn = current => {
@@ -17670,11 +4799,6 @@
 
   const ANSWERABLE_QUESTION_SELECTOR = '.TiMu input[name^="answertype"]';
 
-  const doworkSaveTargets = document2 => {
-    const target = safeDoworkSaveTarget(document2);
-    return target ? [ target ] : null;
-  };
-
   function unsafePageWindow() {
     try {
       return typeof unsafeWindow === "undefined" ? null : unsafeWindow ?? null;
@@ -17684,14 +4808,14 @@
   }
 
   function pageWindowForDocument(document2) {
-    var _a2;
+    var _a;
     const root = unsafePageWindow();
     if (!root) return document2.defaultView;
     const documentElement = document2.documentElement;
     if (!documentElement) return null;
     const previousProbe = documentElement.getAttribute(PAGE_WINDOW_PROBE_ATTRIBUTE);
-    const probe = `aiask-${++pageWindowProbeSequence}`;
-    documentElement.setAttribute(PAGE_WINDOW_PROBE_ATTRIBUTE, probe);
+    const probe2 = `aiask-${++pageWindowProbeSequence}`;
+    documentElement.setAttribute(PAGE_WINDOW_PROBE_ATTRIBUTE, probe2);
     const queue = [ {
       window: root,
       depth: 0
@@ -17704,7 +4828,7 @@
         if (!current || seen.has(current.window)) continue;
         seen.add(current.window);
         try {
-          if (((_a2 = current.window.document.documentElement) == null ? void 0 : _a2.getAttribute(PAGE_WINDOW_PROBE_ATTRIBUTE)) === probe) return current.window;
+          if (((_a = current.window.document.documentElement) == null ? void 0 : _a.getAttribute(PAGE_WINDOW_PROBE_ATTRIBUTE)) === probe2) return current.window;
         } catch {
           continue;
         }
@@ -17775,71 +4899,155 @@
     return out;
   }
 
-  function runNoSubmitSave(target, signal, requiresTextSync) {
+  function observeSaveReceipt(pageWindow, document2, signal, timeoutMs) {
+    var _a;
+    const originalAlert = pageWindow.alert;
+    let resolveOutcome = () => void 0;
+    const promise = new Promise(resolve => {
+      resolveOutcome = resolve;
+    });
+    let settled = false;
+    let started = false;
+    let unloadVerdict = false;
+    let successSeen = false;
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      globalThis.clearTimeout(timeout);
+      boxObserver == null ? void 0 : boxObserver.disconnect();
+      toastObserver == null ? void 0 : toastObserver.disconnect();
+      signal.removeEventListener("abort", onAbort);
+      pageWindow.removeEventListener("pagehide", onPageHide);
+      pageWindow.removeEventListener("beforeunload", onPageHide);
+      try {
+        pageWindow.alert = originalAlert;
+      } catch {}
+      resolveOutcome(value);
+    };
+    const onAbort = () => finish(false);
+    const onPageHide = () => finish(unloadVerdict);
+    const isSuccessText = raw => String(raw ?? "").replace(/\s+/g, "").trim().startsWith(NO_SUBMIT_SUCCESS_TEXT);
+    const onSuccessObserved = () => {
+      successSeen = true;
+      if (started) finish(true);
+    };
+    const interceptedAlert = message => {
+      if (isSuccessText(message)) {
+        onSuccessObserved();
+        return;
+      }
+      finish(false);
+      originalAlert.call(pageWindow, String(message ?? ""));
+    };
+    const boxContent = document2.querySelector(NO_SUBMIT_SUCCESS_BOX_SELECTOR);
+    const ObserverCtor = (_a = document2.defaultView) == null ? void 0 : _a.MutationObserver;
+    const boxObserver = boxContent && ObserverCtor ? new ObserverCtor(() => {
+      if (isSuccessText(boxContent.textContent)) onSuccessObserved();
+    }) : null;
+    boxObserver == null ? void 0 : boxObserver.observe(boxContent, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+    const toastHost = document2.body ?? document2.documentElement;
+    const toastOf = node => {
+      if (!node) return null;
+      const element = node.nodeType === 1 ? node : node.parentElement ?? null;
+      if (!element) return null;
+      if (typeof element.closest === "function") {
+        const own = element.closest(SAVE_TOAST_SELECTOR);
+        if (own) return own;
+      }
+      return typeof element.querySelector === "function" ? element.querySelector(SAVE_TOAST_SELECTOR) : null;
+    };
+    const toastObserver = toastHost && ObserverCtor ? new ObserverCtor(records => {
+      for (const record of records) {
+        for (const added of record.addedNodes) {
+          const toast = toastOf(added);
+          if (toast && isSuccessText(toast.textContent)) {
+            onSuccessObserved();
+            return;
+          }
+        }
+        const changed = toastOf(record.target);
+        if (changed && isSuccessText(changed.textContent)) {
+          onSuccessObserved();
+          return;
+        }
+      }
+    }) : null;
+    toastObserver == null ? void 0 : toastObserver.observe(toastHost, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+    const timeout = globalThis.setTimeout(() => finish(false), timeoutMs);
+    signal.addEventListener("abort", onAbort, {
+      once: true
+    });
+    pageWindow.addEventListener("pagehide", onPageHide, {
+      once: true
+    });
+    pageWindow.addEventListener("beforeunload", onPageHide, {
+      once: true
+    });
+    try {
+      pageWindow.alert = interceptedAlert;
+    } catch {
+      finish(false);
+    }
+    return {
+      promise: promise,
+      armed: !settled,
+      markStarted: (value, unloadCounts = value) => {
+        started = value;
+        unloadVerdict = unloadCounts;
+        if (!value) finish(false); else if (successSeen) finish(true);
+      }
+    };
+  }
+
+  function runNoSubmitSave(target, signal, requiresTextSync, timeoutMs = NO_SUBMIT_CONFIRM_TIMEOUT_MS) {
     if (signal.aborted || !target.isConnected) return Promise.resolve(false);
     const pageWindow = pageWindowForDocument(target.ownerDocument);
     const handler = pageWindow == null ? void 0 : pageWindow.noSubmit;
     if (!pageWindow || typeof handler !== "function") return Promise.resolve(false);
     if (requiresTextSync && !syncUeditorAnswers(target.ownerDocument, pageWindow)) return Promise.resolve(false);
-    return new Promise(resolve => {
-      const originalAlert = pageWindow.alert;
-      let settled = false;
-      let started = false;
-      let successSeen = false;
-      const finish = value => {
-        if (settled) return;
-        settled = true;
-        globalThis.clearTimeout(timeout);
-        signal.removeEventListener("abort", onAbort);
-        pageWindow.removeEventListener("pagehide", onPageHide);
-        pageWindow.removeEventListener("beforeunload", onPageHide);
-        try {
-          pageWindow.alert = originalAlert;
-        } catch {}
-        resolve(value);
-      };
-      const onAbort = () => finish(false);
-      const onPageHide = () => finish(started);
-      const interceptedAlert = message => {
-        const text = String(message ?? "").replace(/\s+/g, "").trim();
-        if (text === NO_SUBMIT_SUCCESS_TEXT) {
-          successSeen = true;
-          if (started) finish(true);
-          return;
-        }
-        finish(false);
-        originalAlert.call(pageWindow, String(message ?? ""));
-      };
-      const timeout = globalThis.setTimeout(() => finish(false), NO_SUBMIT_CONFIRM_TIMEOUT_MS);
-      signal.addEventListener("abort", onAbort, {
-        once: true
-      });
-      pageWindow.addEventListener("pagehide", onPageHide, {
-        once: true
-      });
-      pageWindow.addEventListener("beforeunload", onPageHide, {
-        once: true
-      });
-      try {
-        pageWindow.alert = interceptedAlert;
-        handler.call(pageWindow);
-        started = normalizedElementText(target) === NO_SUBMIT_PENDING_TEXT;
-        if (!started) finish(false); else if (successSeen) finish(true);
-      } catch {
-        finish(false);
-      }
-    });
+    const watch2 = observeSaveReceipt(pageWindow, target.ownerDocument, signal, timeoutMs);
+    if (!watch2.armed) return watch2.promise;
+    try {
+      handler.call(pageWindow);
+      watch2.markStarted(normalizedElementText(target) === NO_SUBMIT_PENDING_TEXT);
+    } catch {
+      watch2.markStarted(false);
+    }
+    return watch2.promise;
+  }
+
+  function runSaveWork(target, signal, timeoutMs = NO_SUBMIT_CONFIRM_TIMEOUT_MS) {
+    if (signal.aborted || !target.isConnected) return Promise.resolve(false);
+    const pageWindow = pageWindowForDocument(target.ownerDocument);
+    if (!pageWindow) return Promise.resolve(false);
+    const watch2 = observeSaveReceipt(pageWindow, target.ownerDocument, signal, timeoutMs);
+    if (!watch2.armed) return watch2.promise;
+    try {
+      target.click();
+      watch2.markStarted(true, false);
+    } catch {
+      watch2.markStarted(false);
+    }
+    return watch2.promise;
   }
 
   function syncUeditorAnswers(document2, pageWindow) {
-    var _a2;
+    var _a;
     const targets = [ ...document2.querySelectorAll('textarea[name^="answerEditor"], textarea[name^="answer"]:not([name^="answerEditor"])') ];
     if (targets.length === 0) return true;
     const api = objectValue(pageWindow.UE) ? pageWindow.UE : ueditorApi(document2);
     for (const textarea of targets) {
       const editor = api ? resolveUeditorEditor(textarea, api) : null;
       const body = editor ? bodyFromEditor(editor) : null;
-      const text = ((_a2 = body == null ? void 0 : body.textContent) == null ? void 0 : _a2.trim()) ?? "";
+      const text = ((_a = body == null ? void 0 : body.textContent) == null ? void 0 : _a.trim()) ?? "";
       if (!text) continue;
       if (!api || !editor || typeof editor.sync !== "function") return false;
       try {
@@ -17852,47 +5060,420 @@
     return true;
   }
 
-  class ChaoxingDeferredSaveRuntime {
-    constructor(safeTargets, execute = target => {
-      target.click();
-      return true;
-    }) {
-      __publicField(this, "document", null);
-      __publicField(this, "pending", false);
-      __publicField(this, "requiresTextSync", false);
-      this.safeTargets = safeTargets;
-      this.execute = execute;
-    }
-    stagePlan(plan, document2, signal) {
-      if (signal.aborted || plan.operations.length === 0 || !this.safeTargets(document2)) return false;
-      this.document = document2;
-      this.pending = true;
-      if (plan.operations.some(operation => operation.kind === "write")) this.requiresTextSync = true;
-      return true;
-    }
-    async persist(ctx) {
-      if (!this.pending) return true;
-      if (ctx.signal.aborted || ctx.document !== this.document) return false;
-      const targets = this.safeTargets(ctx.document);
-      if (!targets) return false;
-      try {
-        for (const target of targets) if (!(await this.execute(target, ctx.signal, this.requiresTextSync))) return false;
-        this.pending = false;
-        this.document = null;
-        this.requiresTextSync = false;
+  const CHA0XING_PAGE_SAVE_HOOK_IDS = {
+    noSubmit: "chaoxing.noSubmit",
+    saveWork: "chaoxing.saveWork"
+  };
+
+  function registerChaoxingPageSaveHooks(registry, {document: document2, which: which}) {
+    core.registerLocalHook(registry, {
+      id: CHA0XING_PAGE_SAVE_HOOK_IDS[which],
+      phases: [ "fill" ],
+      capability: "commit",
+      commitOnly: true,
+      parseArgs: args => {
+        const keys = Object.keys(args);
+        if (keys.length !== 1 || typeof args.textWrites !== "boolean") throw new Error("expected { textWrites: boolean }");
+        return {
+          textWrites: args.textWrites
+        };
+      },
+      validateResult: value => typeof value === "boolean",
+      execute: async ({textWrites: textWrites}, {signal: signal}) => {
+        if (which === "saveWork") {
+          const target = safeDoworkSaveTarget(document2);
+          return target ? runSaveWork(target, signal) : false;
+        }
+        const targets = safeNoSubmitSaveTargets(document2);
+        if (!targets) return false;
+        const budget = Math.max(1, Math.floor(NO_SUBMIT_CONFIRM_TIMEOUT_MS / targets.length));
+        for (const target of targets) if (!(await runNoSubmitSave(target, signal, textWrites, budget))) return false;
         return true;
-      } catch {
-        return false;
       }
+    });
+  }
+
+  const normalizedHost = hostname => hostname.trim().toLowerCase();
+
+  const MAX_DEPTH = 12;
+
+  const MAX_KEYS = 40;
+
+  const MAX_TEXT = 8e3;
+
+  function looksLikeJson(value) {
+    const trimmed = value.trim();
+    return trimmed.startsWith("{") || trimmed.startsWith("[");
+  }
+
+  function describe(value, depth) {
+    if (value === null) return "null";
+    if (typeof value === "boolean") return "boolean";
+    if (typeof value === "number") return "number";
+    if (typeof value === "string") {
+      if (looksLikeJson(value) && depth < MAX_DEPTH) {
+        try {
+          return `string(json:${describe(JSON.parse(value), depth + 1)})`;
+        } catch {
+          return "string";
+        }
+      }
+      return "string";
     }
-    dispose() {
-      this.document = null;
-      this.pending = false;
-      this.requiresTextSync = false;
+    if (typeof value !== "object") return typeof value;
+    if (depth >= MAX_DEPTH) return "\u2026";
+    if (Array.isArray(value)) return value.length === 0 ? "array[0]" : `array[${value.length}] of ${describe(value[0], depth + 1)}`;
+    const keys = Object.keys(value);
+    const shown = keys.slice(0, MAX_KEYS).map(key => {
+      const child = value[key];
+      return `${key}:${describe(child, depth + 1)}`;
+    });
+    if (keys.length > MAX_KEYS) shown.push(`\u2026+${keys.length - MAX_KEYS}`);
+    return `{${shown.join(",")}}`;
+  }
+
+  function describeJsonShape(value) {
+    const text = describe(value, 0);
+    return text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}\u2026\uff08\u5df2\u622a\u65ad\uff09` : text;
+  }
+
+  const XHR_CAPTURE_TABLE = Object.freeze([ Object.freeze({
+    host: "os.open.com.cn",
+    pathIncludes: "/StudentViewPaper",
+    slot: "exam-view-paper"
+  }), Object.freeze({
+    host: "os.open.com.cn",
+    pathIncludes: "/StudentPullPaper_V2",
+    slot: "exam-pull-paper"
+  }), Object.freeze({
+    host: "ctapp.hubuzkw.com",
+    pathIncludes: "/exam.index/get_knows_question_ids",
+    slot: "question-bank"
+  }) ]);
+
+  function slotsForHosts(hosts) {
+    const wanted = new Set(hosts.map(normalizedHost));
+    return new Set(XHR_CAPTURE_TABLE.filter(entry => wanted.has(entry.host)).map(entry => entry.slot));
+  }
+
+  function captureRulesForHost(host) {
+    const target = normalizedHost(host);
+    return XHR_CAPTURE_TABLE.filter(entry => entry.host === target).map(entry => Object.freeze({
+      slot: entry.slot,
+      host: entry.host,
+      pathIncludes: entry.pathIncludes
+    }));
+  }
+
+  const MAX_CAPTURE_CHARS = 2 * 1024 * 1024;
+
+  const HOOKED_SEND_FLAG = "__aiaskHookedXhrSend";
+
+  function isHookedSend(send) {
+    return typeof send === "function" && send[HOOKED_SEND_FLAG] === true;
+  }
+
+  function readPayload(xhr) {
+    if (xhr.responseType === "json") return xhr.response ?? null;
+    if (xhr.responseType && xhr.responseType !== "text") return null;
+    const raw = typeof xhr.response === "string" ? xhr.response : xhr.responseText ?? "";
+    if (!raw || raw.length > MAX_CAPTURE_CHARS) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
     }
   }
 
-  function chaoxingRuleOptions(packageId, store, services, configureRegistry) {
+  function createXhrResponseCapture(rules) {
+    const store = new Map;
+    const listeners2 = new Set;
+    const slotFor = responseURL => {
+      let url;
+      try {
+        url = new URL(responseURL);
+      } catch {
+        return null;
+      }
+      const host = url.hostname.toLowerCase();
+      const match = rules.find(rule => rule.host === host && url.pathname.includes(rule.pathIncludes));
+      return (match == null ? void 0 : match.slot) ?? null;
+    };
+    const consume = xhr => {
+      try {
+        if (xhr.readyState !== 4 || xhr.status !== 200) return;
+        const slot = slotFor(xhr.responseURL || "");
+        if (!slot) return;
+        const payload = readPayload(xhr);
+        if (payload == null) return;
+        store.set(slot, payload);
+        for (const listener of [ ...listeners2 ]) {
+          try {
+            listener(slot);
+          } catch {}
+        }
+      } catch {}
+    };
+    return {
+      read: slot => store.get(slot) ?? null,
+      clear: () => store.clear(),
+      consume: consume,
+      subscribe(listener) {
+        listeners2.add(listener);
+        return () => {
+          listeners2.delete(listener);
+        };
+      },
+      install(target) {
+        const descriptor = Object.getOwnPropertyDescriptor(target.prototype, "send");
+        const currentSend = (descriptor == null ? void 0 : descriptor.value) ?? target.prototype.send;
+        if (isHookedSend(currentSend)) return false;
+        if (typeof currentSend !== "function") return false;
+        const originalSend = currentSend;
+        const hookedSend = function(body) {
+          try {
+            this.addEventListener("readystatechange", () => consume(this));
+          } catch {}
+          return originalSend.call(this, body);
+        };
+        Object.defineProperty(hookedSend, HOOKED_SEND_FLAG, {
+          value: true
+        });
+        try {
+          target.prototype.send = hookedSend;
+        } catch {
+          return false;
+        }
+        return isHookedSend(target.prototype.send);
+      }
+    };
+  }
+
+  const responseListener = createXhrResponseCapture(XHR_CAPTURE_TABLE);
+
+  function readCapturedSlot(slot) {
+    return responseListener.read(slot);
+  }
+
+  function subscribeCapturedSlots(listener) {
+    return responseListener.subscribe(listener);
+  }
+
+  let applicable = false;
+
+  let installTarget = "none";
+
+  let installed = false;
+
+  let expected = [];
+
+  function installResponseListener(hostname) {
+    const rules = captureRulesForHost(normalizedHost(hostname));
+    if (rules.length === 0) return false;
+    applicable = true;
+    expected = rules.map(rule => rule.slot);
+    let target;
+    try {
+      if (typeof unsafeWindow !== "undefined") target = unsafeWindow == null ? void 0 : unsafeWindow.XMLHttpRequest;
+    } catch {
+      target = void 0;
+    }
+    if (target) installTarget = "page"; else if (typeof XMLHttpRequest !== "undefined") {
+      target = XMLHttpRequest;
+      installTarget = "sandbox";
+    }
+    if (!target) return false;
+    installed = responseListener.install(target);
+    return installed;
+  }
+
+  function listenerStatus() {
+    if (!applicable) return null;
+    const filled = expected.filter(slot => responseListener.read(slot) != null);
+    const shapes = {};
+    for (const slot of filled) shapes[slot] = describeJsonShape(responseListener.read(slot));
+    return {
+      target: installTarget,
+      installed: installed,
+      expected: expected,
+      filled: filled,
+      shapes: shapes
+    };
+  }
+
+  const CHA0XING_PACKAGE_HOOKS = Object.freeze({
+    [CHA0XING_PACKAGE_IDS.examStudent]: Object.freeze([ "registerExamQuestion", "prepareExamPlan", "commitExamPlan" ]),
+    [CHA0XING_PACKAGE_IDS.dowork]: Object.freeze([ "saveWork" ]),
+    [CHA0XING_PACKAGE_IDS.studentstudy]: Object.freeze([ "noSubmit" ]),
+    [CHA0XING_PACKAGE_IDS.oldHomework]: Object.freeze([ "noSubmit" ]),
+    [CHA0XING_PACKAGE_IDS.oldChapter]: Object.freeze([ "noSubmit" ]),
+    [CHA0XING_PACKAGE_IDS.newChapter]: Object.freeze([ "noSubmit" ])
+  });
+
+  const CHA0XING_PRIMITIVE_IDS = Object.freeze([ "chaoxing.normalizeTitle", "chaoxing.decodeFont", "chaoxing.harvestAnswerValues", "chaoxing.ueditorBodies", "chaoxing.examRegisterQuestion", "chaoxing.examPreparePlan", "chaoxing.examCommitPlan", CHA0XING_PAGE_SAVE_HOOK_IDS.noSubmit, CHA0XING_PAGE_SAVE_HOOK_IDS.saveWork ]);
+
+  function registerPageSaveVerificationStub(registry, id) {
+    core.registerLocalHook(registry, {
+      id: id,
+      phases: [ "fill" ],
+      capability: "commit",
+      commitOnly: true,
+      parseArgs: args => {
+        const keys = Object.keys(args);
+        if (keys.length !== 1 || typeof args.textWrites !== "boolean") throw new Error("expected { textWrites: boolean }");
+        return {
+          textWrites: args.textWrites
+        };
+      },
+      validateResult: value => typeof value === "boolean",
+      execute: () => false
+    });
+  }
+
+  const PLATFORM_PRIVATE_HOOKS = Object.freeze({
+    chaoxing: Object.freeze({
+      primitiveIds: CHA0XING_PRIMITIVE_IDS,
+      registerForVerification(registry, {refs: refs, typr: typr, fontTable: fontTable, packageId: packageId}) {
+        const hooks = CHA0XING_PACKAGE_HOOKS[packageId] ?? [];
+        const on = name => hooks.includes(name);
+        core.registerChaoxingRuleHooks(registry, {
+          typr: typr,
+          table: fontTable,
+          refs: refs,
+          resolveUeditorBodies: targets => targets,
+          ...on("registerExamQuestion") ? {
+            registerExamQuestion: () => void 0
+          } : {},
+          ...on("prepareExamPlan") ? {
+            prepareExamPlan: () => false
+          } : {},
+          ...on("commitExamPlan") ? {
+            commitExamPlan: () => false
+          } : {}
+        });
+        if (on("noSubmit")) registerPageSaveVerificationStub(registry, CHA0XING_PAGE_SAVE_HOOK_IDS.noSubmit);
+        if (on("saveWork")) registerPageSaveVerificationStub(registry, CHA0XING_PAGE_SAVE_HOOK_IDS.saveWork);
+      }
+    })
+  });
+
+  const REGEX_WORKER_SOURCE = [ "'use strict';", "self.addEventListener('message', function (event) {", "  var request = event.data;", "  try {", "    var regex = new RegExp(request.pattern, request.flags || '');", "    var value;", "    if (request.kind === 'test') value = regex.test(request.value);", "    else if (request.kind === 'replace') value = request.value.replace(regex, request.replacement || '');", "    else {", "      var match = regex.exec(request.value);", "      value = match ? Array.from(match, function (part) { return part == null ? null : part; }) : null;", "    }", "    self.postMessage({ ok: true, value: value });", "  } catch (error) {", "    self.postMessage({ ok: false, code: 'regex_error', error: error instanceof Error ? error.message : 'regex failed' });", "  }", "});" ].join("\n");
+
+  function createBrowserRegexWorker() {
+    const url = URL.createObjectURL(new Blob([ REGEX_WORKER_SOURCE ], {
+      type: "text/javascript"
+    }));
+    try {
+      return new Worker(url);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function createRuleExpressionServices(createWorker = createBrowserRegexWorker) {
+    const regex = new core.IsolatedRegexExecutor(createWorker);
+    const services = {
+      regex: request => regex.execute(request),
+      jsonPath: ({value: value, query: query, signal: signal}) => core.executeJsonPath(value, query, {
+        signal: signal
+      })
+    };
+    return Object.freeze(services);
+  }
+
+  const RULE_EXPRESSION_SERVICES = createRuleExpressionServices();
+
+  const RULE_ENGINE_VERSION = "1.7.0";
+
+  const RULE_LIMITS = Object.freeze({
+    maxSteps: 5e4,
+    maxWallMs: 6e3,
+    maxAsyncMs: 1e3,
+    maxLoopIterations: 256,
+    maxCallDepth: 8,
+    maxDomRefs: 4e3,
+    maxNavClicks: 8
+  });
+
+  const CORE_RULE_PRIMITIVES = Object.freeze([ "page.location", "page.queryParam", "dom.queryCss", "dom.queryCssAll", "dom.queryXPath", "dom.queryXPathAll", "dom.text", "dom.content", "dom.attr", "dom.property", "dom.closest", "dom.parent", "dom.children", "dom.index", "wait.selector", "wait.absent", "frame.list", "frame.enter", "frame.findSameOrigin", "frame.findAllSameOrigin", "content.sanitize", "text.includes", "text.stripOptionPrefix", "text.normalizeTruth", "question.normalizeLeafType", "array.append", "capture.registerLeafDom", "capture.registerLeafBindingDom", "capture.registerTree", "capture.harvestLeaf", "capture.finish", "capture.slot", "aopeng.paperData", "hubu.questionBank", "answer.applyPlan", "dom.clickAnswer", "dom.setChecked", "dom.setValue", "dom.setSelected", "matching.pair", "observe.mutation", "observe.urlChange", "schedule.once", "nav.click" ]);
+
+  const CORE_CAPABILITIES = Object.freeze([ "dom-read", "frame-read", "runtime-read", "network-read", "answer-write", "navigate", "commit", "course" ]);
+
+  function platformRulePolicy(platform) {
+    var _a;
+    return {
+      primitives: new Set([ ...CORE_RULE_PRIMITIVES, ...((_a = PLATFORM_PRIVATE_HOOKS[platform]) == null ? void 0 : _a.primitiveIds) ?? [] ]),
+      capabilities: new Set(CORE_CAPABILITIES),
+      limits: RULE_LIMITS
+    };
+  }
+
+  const GENERIC_DOM_RULE_POLICY = platformRulePolicy("generic");
+
+  const CHA0XING_RULE_POLICY = platformRulePolicy("chaoxing");
+
+  const TRUSTED_REMOTE_RULE_PLATFORMS = Object.freeze([ Object.freeze({
+    platform: "wangxiao",
+    packageId: "wangxiao-xatu-chapter-assessment",
+    hosts: Object.freeze([ "xatu.168wangxiao.com" ]),
+    policy: GENERIC_DOM_RULE_POLICY
+  }), Object.freeze({
+    platform: "aopeng",
+    packageId: "aopeng-os-homework-online",
+    hosts: Object.freeze([ "os.open.com.cn" ]),
+    policy: GENERIC_DOM_RULE_POLICY
+  }), Object.freeze({
+    platform: "hubu",
+    packageId: "hubu-zkw-question-bank",
+    hosts: Object.freeze([ "ctapp.hubuzkw.com" ]),
+    policy: GENERIC_DOM_RULE_POLICY
+  }) ]);
+
+  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com)$/u;
+
+  function trustedRemoteRulePlatformFor(hostname) {
+    const host = normalizedHost(hostname);
+    return TRUSTED_REMOTE_RULE_PLATFORMS.find(entry => entry.hosts.some(candidate => candidate === host)) ?? null;
+  }
+
+  function trustedRemoteRulePlatformByPackageId(packageId) {
+    return TRUSTED_REMOTE_RULE_PLATFORMS.find(entry => entry.packageId === packageId) ?? null;
+  }
+
+  function validatedRulePackageIdFor(location2) {
+    const page = new URL(location2.href);
+    if (page.hostname !== "chaoxing.com" && !page.hostname.endsWith(".chaoxing.com")) return null;
+    if (CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page.pathname) && page.searchParams.get("mooc2") === "1") return CHA0XING_PACKAGE_IDS.studentstudy;
+    if (page.pathname === "/mooc-ans/work/selectWorkQuestionYiPiYue" || page.pathname === "/work/selectWorkQuestionYiPiYue") return CHA0XING_PACKAGE_IDS.studentstudy;
+    if (page.pathname === "/exam-ans/exam/test/reVersionTestStartNew" || page.pathname === CHA0XING_EXAM_PREVIEW_PATH) return CHA0XING_PACKAGE_IDS.examStudent;
+    if (page.pathname === "/mooc-ans/work/doHomeWorkNew" && page.searchParams.get("mooc2") === "1") return CHA0XING_PACKAGE_IDS.newChapter;
+    if (page.pathname === "/mooc-ans/work/doHomeWorkNew" && page.searchParams.get("mooc2") === "0") return CHA0XING_PACKAGE_IDS.oldChapter;
+    if (page.pathname === "/mooc-ans/work/doHomeWorkNew" && page.searchParams.get("mooc") === "1") return CHA0XING_PACKAGE_IDS.oldHomework;
+    if (page.pathname === "/mooc-ans/mooc2/work/dowork") return CHA0XING_PACKAGE_IDS.dowork;
+    return null;
+  }
+
+  function isNewCourseStudyUrl(location2) {
+    const page = new URL(location2.href);
+    if (page.hostname !== "chaoxing.com" && !page.hostname.endsWith(".chaoxing.com")) return false;
+    return CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page.pathname) && page.searchParams.get("mooc2") === "1";
+  }
+
+  function legacyStudentstudyUpgradeUrl(location2) {
+    const page = new URL(location2.href);
+    if (page.hostname !== "chaoxing.com" && !page.hostname.endsWith(".chaoxing.com")) return null;
+    if (!CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page.pathname)) return null;
+    if (page.searchParams.get("mooc2") === "1") return null;
+    page.pathname = "/mycourse/studentstudy";
+    page.searchParams.set("mooc2", "1");
+    return page.toString();
+  }
+
+  const ENGINE_RECHECK_BUDGET = new core.EngineRecheckBudget;
+
+  const WALK_SESSIONS = new core.WalkSessionStore;
+
+  function chaoxingRuleOptions(packageId, store, services, configureRegistry, walkGate) {
     return {
       platform: "chaoxing",
       packageId: packageId,
@@ -17900,78 +5481,34 @@
       store: store,
       policy: CHA0XING_RULE_POLICY,
       services: services,
-      configureRegistry: configureRegistry
+      configureRegistry: configureRegistry,
+      recheckBudget: ENGINE_RECHECK_BUDGET,
+      walk: {
+        sessions: WALK_SESSIONS,
+        gate: walkGate
+      }
     };
   }
 
-  const CHA0XING_SAVE_VARIANTS = Object.freeze({
-    [CHA0XING_PACKAGE_IDS.dowork]: {
-      commitKey: "commitDoworkPlan",
-      safeTargets: doworkSaveTargets
-    },
+  const CHA0XING_PAGE_SAVE_HOOK = Object.freeze({
+    [CHA0XING_PACKAGE_IDS.dowork]: "saveWork",
+    [CHA0XING_PACKAGE_IDS.studentstudy]: "noSubmit",
+    [CHA0XING_PACKAGE_IDS.oldHomework]: "noSubmit",
+    [CHA0XING_PACKAGE_IDS.oldChapter]: "noSubmit",
+    [CHA0XING_PACKAGE_IDS.newChapter]: "noSubmit"
+  });
+
+  const CHA0XING_CAPTURE_READY = Object.freeze({
     [CHA0XING_PACKAGE_IDS.studentstudy]: {
-      commitKey: "commitStudentstudyPlan",
-      safeTargets: safeNoSubmitSaveTargets,
-      execute: runNoSubmitSave,
-      ready: isStudentstudyTextReady
-    },
-    [CHA0XING_PACKAGE_IDS.oldHomework]: {
-      commitKey: "commitOldHomeworkPlan",
-      safeTargets: safeNoSubmitSaveTargets,
-      execute: runNoSubmitSave
-    },
-    [CHA0XING_PACKAGE_IDS.newChapter]: {
-      commitKey: "commitNewChapterPlan",
-      safeTargets: safeNoSubmitSaveTargets,
-      execute: runNoSubmitSave
-    },
-    [CHA0XING_PACKAGE_IDS.oldChapter]: {
-      commitKey: "commitOldChapterPlan",
-      safeTargets: safeNoSubmitSaveTargets,
-      execute: runNoSubmitSave
+      predicate: isStudentstudyTextReady,
+      timeoutMs: STUDENTSTUDY_READY_TIMEOUT_MS
     }
   });
 
-  class ChaoxingSaveRuleAdapter extends JsonRulePlatformAdapter {
-    constructor(variant, packageId, store, typr, table, services) {
-      const saveRuntime = new ChaoxingDeferredSaveRuntime(variant.safeTargets, variant.execute);
-      super(chaoxingRuleOptions(packageId, store, services, (registry, environment) => registerChaoxingRuleHooks(registry, {
-        typr: typr,
-        table: table,
-        refs: environment.refs,
-        resolveUeditorBodies: targets => resolveUeditorBodies(targets, environment.ctx.document),
-        [variant.commitKey]: (plan, signal) => saveRuntime.stagePlan(plan, environment.ctx.document, signal)
-      })));
-      __publicField(this, "saveRuntime");
-      __publicField(this, "ready");
-      this.saveRuntime = saveRuntime;
-      this.ready = variant.ready;
-    }
-    async captureTrees(ctx) {
-      const ready = this.ready;
-      if (ready) {
-        await waitUntil(() => ready(ctx.document), {
-          timeout: STUDENTSTUDY_READY_TIMEOUT_MS,
-          interval: 50,
-          signal: ctx.signal
-        });
-        if (ctx.signal.aborted) return [];
-      }
-      return super.captureTrees(ctx);
-    }
-    persistAnswers(ctx) {
-      return this.saveRuntime.persist(ctx);
-    }
-    async dispose() {
-      this.saveRuntime.dispose();
-      await super.dispose();
-    }
-  }
-
-  class ChaoxingExamRuleAdapter extends JsonRulePlatformAdapter {
-    constructor(packageId, store, typr, table, services) {
+  class ChaoxingExamRuleAdapter extends core.JsonRulePlatformAdapter {
+    constructor(packageId, store, typr, table, services, walkGate) {
       const examRuntime = new ChaoxingExamRuntime;
-      super(chaoxingRuleOptions(packageId, store, services, (registry, environment) => registerChaoxingRuleHooks(registry, {
+      super(chaoxingRuleOptions(packageId, store, services, (registry, environment) => core.registerChaoxingRuleHooks(registry, {
         typr: typr,
         table: table,
         refs: environment.refs,
@@ -17979,13 +5516,13 @@
         registerExamQuestion: registration => examRuntime.registerQuestion(registration),
         prepareExamPlan: (plan, signal) => examRuntime.preparePlan(plan, signal),
         commitExamPlan: (plan, signal) => examRuntime.commitPlan(plan, signal)
-      })));
+      }), walkGate));
       __publicField(this, "examRuntime");
       this.examRuntime = examRuntime;
     }
     async captureTrees(ctx) {
       this.examRuntime.beginCapture();
-      if (ctx.location.pathname === CHA0XING_EXAM_PREVIEW_PATH && !(await waitUntil(() => isChaoxingExamPreviewReady(ctx.document, targets => resolveUeditorBodies(targets, ctx.document)), {
+      if (ctx.location.pathname === CHA0XING_EXAM_PREVIEW_PATH && !(await core.waitUntil(() => isChaoxingExamPreviewReady(ctx.document, targets => resolveUeditorBodies(targets, ctx.document)), {
         timeout: 5e3,
         interval: 50,
         signal: ctx.signal
@@ -18001,36 +5538,57 @@
     }
   }
 
-  function createChaoxingRuleAdapter(packageId, store, typr, table, services) {
-    const args = [ packageId, store, typr, table, services ];
-    if (packageId === CHA0XING_PACKAGE_IDS.examStudent) return new ChaoxingExamRuleAdapter(...args);
-    const saveVariant = CHA0XING_SAVE_VARIANTS[packageId];
-    if (saveVariant) return new ChaoxingSaveRuleAdapter(saveVariant, ...args);
-    return new JsonRulePlatformAdapter(chaoxingRuleOptions(packageId, store, services, (registry, environment) => registerChaoxingRuleHooks(registry, {
-      typr: typr,
-      table: table,
-      refs: environment.refs,
-      resolveUeditorBodies: targets => resolveUeditorBodies(targets, environment.ctx.document)
-    })));
+  function createChaoxingRuleAdapter(packageId, store, typr, table, services, walkGate) {
+    if (packageId === CHA0XING_PACKAGE_IDS.examStudent) return new ChaoxingExamRuleAdapter(packageId, store, typr, table, services, walkGate);
+    return new core.JsonRulePlatformAdapter({
+      ...chaoxingRuleOptions(packageId, store, services, (registry, environment) => {
+        core.registerChaoxingRuleHooks(registry, {
+          typr: typr,
+          table: table,
+          refs: environment.refs,
+          resolveUeditorBodies: targets => resolveUeditorBodies(targets, environment.ctx.document)
+        });
+        const which = CHA0XING_PAGE_SAVE_HOOK[packageId];
+        if (which) registerChaoxingPageSaveHooks(registry, {
+          document: environment.ctx.document,
+          which: which
+        });
+      }, walkGate),
+      captureReady: CHA0XING_CAPTURE_READY[packageId]
+    });
   }
 
-  function createDefaultAdapterFactories(location2, typr, store, table = {}, services = RULE_EXPRESSION_SERVICES) {
+  function createDefaultAdapterFactories(location2, typr, store, table = {}, services = RULE_EXPRESSION_SERVICES, walkGate = () => true) {
     const trustedRemote = trustedRemoteRulePlatformFor(location2.hostname || new URL(location2.href).hostname);
-    if (trustedRemote) return [ () => new JsonRulePlatformAdapter({
-      platform: trustedRemote.platform,
-      packageId: trustedRemote.packageId,
-      hosts: trustedRemote.hosts,
-      store: store,
-      policy: trustedRemote.policy,
-      services: services,
-      ...trustedRemote.platform === "aopeng" ? {
-        configureRegistry: registry => registerAopengRuleHooks(registry, {
-          readCapturedResponse: readAopengCapturedResponse
-        })
-      } : {}
-    }) ];
+    if (trustedRemote) {
+      const privateHooks = PLATFORM_PRIVATE_HOOKS[trustedRemote.platform];
+      return [ () => new core.JsonRulePlatformAdapter({
+        platform: trustedRemote.platform,
+        packageId: trustedRemote.packageId,
+        hosts: trustedRemote.hosts,
+        store: store,
+        policy: trustedRemote.policy,
+        services: services,
+        listener: {
+          read: readCapturedSlot,
+          allowedSlots: slotsForHosts(trustedRemote.hosts),
+          subscribe: subscribeCapturedSlots
+        },
+        recheckBudget: ENGINE_RECHECK_BUDGET,
+        walk: {
+          sessions: WALK_SESSIONS,
+          gate: walkGate
+        },
+        ...(privateHooks == null ? void 0 : privateHooks.registerForRuntime) ? {
+          configureRegistry: registry => {
+            var _a;
+            return (_a = privateHooks.registerForRuntime) == null ? void 0 : _a.call(privateHooks, registry);
+          }
+        } : {}
+      }) ];
+    }
     const packageId = validatedRulePackageIdFor(location2);
-    return packageId ? [ () => createChaoxingRuleAdapter(packageId, store, typr, table, services) ] : [];
+    return packageId ? [ () => createChaoxingRuleAdapter(packageId, store, typr, table, services, walkGate) ] : [];
   }
 
   const TIMED_READ_ROUNDS = 3;
@@ -18052,17 +5610,17 @@
   };
 
   function courseAttachments(documents) {
-    var _a2;
+    var _a;
     for (const document2 of documents) {
-      const list = (_a2 = courseWindow(document2)) == null ? void 0 : _a2.attachments;
+      const list = (_a = courseWindow(document2)) == null ? void 0 : _a.attachments;
       if (Array.isArray(list)) return list;
     }
     return null;
   }
 
   const attachmentJobId = attachment => {
-    var _a2;
-    const raw = attachment.jobid || ((_a2 = attachment.property) == null ? void 0 : _a2._jobid);
+    var _a;
+    const raw = attachment.jobid || ((_a = attachment.property) == null ? void 0 : _a._jobid);
     return raw === void 0 || raw === null ? "" : String(raw);
   };
 
@@ -18077,8 +5635,8 @@
   };
 
   const frameJobId = document2 => {
-    var _a2, _b, _c;
-    let frame = ((_a2 = document2.defaultView) == null ? void 0 : _a2.frameElement) ?? null;
+    var _a, _b, _c;
+    let frame = ((_a = document2.defaultView) == null ? void 0 : _a.frameElement) ?? null;
     for (let hop = 0; frame && hop < MAX_DATA_HOPS; hop += 1) {
       const raw = frame.getAttribute("data");
       if (raw) {
@@ -18109,9 +5667,9 @@
   };
 
   const frameElementOf = document2 => {
-    var _a2;
+    var _a;
     try {
-      return ((_a2 = document2 == null ? void 0 : document2.defaultView) == null ? void 0 : _a2.frameElement) ?? null;
+      return ((_a = document2 == null ? void 0 : document2.defaultView) == null ? void 0 : _a.frameElement) ?? null;
     } catch {
       return null;
     }
@@ -18146,18 +5704,18 @@
   }
 
   const dwellSecondsOf = document2 => {
-    var _a2;
+    var _a;
     const frame = document2.querySelector(courseConfig().timedReadFrame);
     const src = (frame == null ? void 0 : frame.getAttribute("src")) ?? "";
-    const raw = (_a2 = /[?&]timing=(\d+)/u.exec(src)) == null ? void 0 : _a2[1];
+    const raw = (_a = /[?&]timing=(\d+)/u.exec(src)) == null ? void 0 : _a[1];
     const timing = raw ? Number.parseInt(raw, 10) : TIMED_READ_FALLBACK_SECONDS;
     const seconds = Number.isFinite(timing) ? timing : TIMED_READ_FALLBACK_SECONDS;
     return (seconds + TIMED_READ_SLACK_SECONDS) * TIMED_READ_ROUNDS;
   };
 
   const moduleOf = attachment => {
-    var _a2;
-    return typeof ((_a2 = attachment.property) == null ? void 0 : _a2.module) === "string" ? attachment.property.module : "";
+    var _a;
+    return typeof ((_a = attachment.property) == null ? void 0 : _a.module) === "string" ? attachment.property.module : "";
   };
 
   const chapterTestDone = root => {
@@ -18282,14 +5840,14 @@
       const elements = [ ...document2.querySelectorAll(courseConfig().chapter) ];
       if (elements.length === 0) continue;
       return elements.map(element => {
-        var _a2;
+        var _a;
         const parent = element.parentElement;
         const counter = parent == null ? void 0 : parent.querySelector(courseConfig().jobUnfinishCount);
         const view = counter == null ? void 0 : counter.ownerDocument.defaultView;
         const raw = view && counter instanceof view.HTMLInputElement ? counter.value : (counter == null ? void 0 : counter.getAttribute("value")) ?? "0";
         return {
           element: element,
-          chapterId: ((_a2 = CHAPTER_ID_PATTERN.exec(element.getAttribute("onclick") ?? "")) == null ? void 0 : _a2[3]) ?? null,
+          chapterId: ((_a = CHAPTER_ID_PATTERN.exec(element.getAttribute("onclick") ?? "")) == null ? void 0 : _a[3]) ?? null,
           unfinishedCount: Number.parseInt(raw, 10) || 0,
           active: (parent == null ? void 0 : parent.classList.contains("posCatalog_active")) ?? false
         };
@@ -18306,8 +5864,8 @@
   }
 
   function jumpToChapter(documents, chapter) {
-    var _a2;
-    const entry = (_a2 = chapter.element.parentElement) == null ? void 0 : _a2.querySelector(courseConfig().chapterName);
+    var _a;
+    const entry = (_a = chapter.element.parentElement) == null ? void 0 : _a.querySelector(courseConfig().chapterName);
     if (entry) {
       try {
         entry.click();
@@ -18389,8 +5947,8 @@
   const flattened = value => (value ?? "").replace(/\s+/gu, "");
 
   const taskAlreadyDone = doc => {
-    var _a2;
-    if (flattened((_a2 = doc.body) == null ? void 0 : _a2.textContent).includes(courseConfig().taskDoneText)) return true;
+    var _a;
+    if (flattened((_a = doc.body) == null ? void 0 : _a.textContent).includes(courseConfig().taskDoneText)) return true;
     for (const el of doc.querySelectorAll("[aria-label], [title], [alt]")) {
       for (const attr of [ "aria-label", "title", "alt" ]) if (flattened(el.getAttribute(attr)).includes(courseConfig().taskDoneText)) return true;
     }
@@ -18412,11 +5970,11 @@
   const hasLoadingMedia = documents => documents.some(doc => [ ...doc.querySelectorAll("video, audio") ].some(el => isLoadingMedia(el)));
 
   function playMedia(pending, options) {
-    var _a2;
+    var _a;
     const rate = Math.min(Math.max(options.playbackRate ?? 1, 1), MAX_PLAYBACK_RATE);
     pending.volume = options.volume ?? 0;
     pending.playbackRate = rate;
-    void ((_a2 = pending.play()) == null ? void 0 : _a2.catch(() => {}));
+    void ((_a = pending.play()) == null ? void 0 : _a.catch(() => {}));
     if (pending.paused) return {
       kind: "blocked",
       reason: "not-playing"
@@ -18554,12 +6112,12 @@
   }
 
   function advanceTaskTab(documents) {
-    var _a2;
+    var _a;
     const found = taskTabs(documents);
     if (!found || found.activeIndex < 0) return false;
     const next = found.activeIndex + 1;
     if (next >= found.count) return false;
-    (_a2 = found.tabs[next]) == null ? void 0 : _a2.click();
+    (_a = found.tabs[next]) == null ? void 0 : _a.click();
     return true;
   }
 
@@ -18584,8 +6142,8 @@
   }
 
   function sectionSignature(documents) {
-    var _a2, _b;
-    const href = ((_b = (_a2 = documents[0]) == null ? void 0 : _a2.location) == null ? void 0 : _b.href) ?? "";
+    var _a, _b;
+    const href = ((_b = (_a = documents[0]) == null ? void 0 : _a.location) == null ? void 0 : _b.href) ?? "";
     const tabs = taskTabs(documents);
     const labels = (tabs == null ? void 0 : tabs.tabs.map(tab => tab.textContent ?? "").join(",")) ?? "";
     return `${href}|${labels}`;
@@ -18596,7 +6154,7 @@
   const MAX_SCROLL_TARGETS = 2e3;
 
   function simulateReading(documents) {
-    var _a2, _b, _c;
+    var _a, _b, _c;
     const summary = {
       frames: documents.length,
       scrolled: 0,
@@ -18604,8 +6162,8 @@
     };
     for (const doc of documents) {
       const pager = [ ...doc.querySelectorAll(courseConfig().readerPager) ].find(el => {
-        var _a3;
-        return ((_a3 = el.style) == null ? void 0 : _a3.zIndex) === courseConfig().activePagerZIndex;
+        var _a2;
+        return ((_a2 = el.style) == null ? void 0 : _a2.zIndex) === courseConfig().activePagerZIndex;
       });
       if (pager) {
         try {
@@ -18614,7 +6172,7 @@
         } catch {}
       }
       try {
-        (_c = (_a2 = doc.defaultView) == null ? void 0 : _a2.scrollTo) == null ? void 0 : _c.call(_a2, 0, ((_b = doc.documentElement) == null ? void 0 : _b.scrollHeight) ?? 0);
+        (_c = (_a = doc.defaultView) == null ? void 0 : _a.scrollTo) == null ? void 0 : _c.call(_a, 0, ((_b = doc.documentElement) == null ? void 0 : _b.scrollHeight) ?? 0);
       } catch {}
       let touched = 0;
       for (const el of doc.querySelectorAll("div, section, main")) {
@@ -18630,8 +6188,8 @@
   }
 
   const chapterLabel = chapter => {
-    var _a2, _b;
-    const name = ((_b = (_a2 = chapter.element.parentElement) == null ? void 0 : _a2.querySelector(courseConfig().chapterName)) == null ? void 0 : _b.textContent) ?? chapter.element.textContent;
+    var _a, _b;
+    const name = ((_b = (_a = chapter.element.parentElement) == null ? void 0 : _a.querySelector(courseConfig().chapterName)) == null ? void 0 : _b.textContent) ?? chapter.element.textContent;
     return (name ?? "").trim() || "\u4e0b\u4e00\u4e2a\u672a\u5b8c\u6210\u7ae0\u8282";
   };
 
@@ -18685,8 +6243,8 @@
   const SUBMIT_TEXTS = [ "\u63d0\u4ea4", "\u4ea4\u5377", "\u786e\u5b9a\u63d0\u4ea4" ];
 
   const isExamPage = document2 => {
-    var _a2;
-    return (((_a2 = document2.location) == null ? void 0 : _a2.pathname) ?? "").includes("/exam");
+    var _a;
+    return (((_a = document2.location) == null ? void 0 : _a.pathname) ?? "").includes("/exam");
   };
 
   const normalizedText = element => (element.textContent ?? "").replace(/\s+/gu, "");
@@ -18856,8 +6414,8 @@
     try {
       const jquery = view.$;
       if (jquery) patch(jquery, "toast", args => {
-        var _a2;
-        return String(((_a2 = args[0]) == null ? void 0 : _a2.content) ?? "");
+        var _a;
+        return String(((_a = args[0]) == null ? void 0 : _a.content) ?? "");
       });
     } catch {}
     return {
@@ -18869,10 +6427,10 @@
   }
 
   function answeredFieldSummary(view) {
-    var _a2;
+    var _a;
     try {
       const doc = view.document;
-      const form = (_a2 = doc == null ? void 0 : doc.forms) == null ? void 0 : _a2.namedItem("form1");
+      const form = (_a = doc == null ? void 0 : doc.forms) == null ? void 0 : _a.namedItem("form1");
       if (!form) return "form=\u8bfb\u4e0d\u5230";
       const answers = [ ...form.querySelectorAll('input[name^="answer"]') ];
       const filled = answers.filter(el => (el.value ?? "").trim() !== "").length;
@@ -18901,9 +6459,9 @@
     return views;
   }
 
-  async function pollFor(probe, timeoutMs, stepMs) {
+  async function pollFor(probe2, timeoutMs, stepMs) {
     for (let waited = 0; waited <= timeoutMs; waited += stepMs) {
-      const hit = probe();
+      const hit = probe2();
       if (hit) return hit;
       if (waited + stepMs > timeoutMs) break;
       await sleep(stepMs);
@@ -18924,8 +6482,8 @@
   const CONFIRM_OK_ID = "popok";
 
   function visible(element) {
-    var _a2;
-    const view = (_a2 = element.ownerDocument) == null ? void 0 : _a2.defaultView;
+    var _a;
+    const view = (_a = element.ownerDocument) == null ? void 0 : _a.defaultView;
     if (!view) return false;
     try {
       let node = element;
@@ -18954,7 +6512,7 @@
   }
 
   async function autoSubmitRound(getDocuments, state) {
-    var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     if (!state.enabled) return "off";
     if (state.items.length === 0) return "no-items";
     if (!shouldAutoSubmit(state)) return hasUnrecognizedQuestions(state) ? "unrecognized-questions" : "below-threshold";
@@ -18965,7 +6523,7 @@
     if (!frame) return "no-page-window";
     if (pageSubmitQuotaExhausted(frame.win)) return "site-quota";
     if (pageSubmitLocked(frame.win)) return "site-locked";
-    (_a2 = state.onEntry) == null ? void 0 : _a2.call(state, "click", entryHandlerSource(frame.win));
+    (_a = state.onEntry) == null ? void 0 : _a.call(state, "click", entryHandlerSource(frame.win));
     const siteMessage = captureSiteMessage(frame.win);
     try {
       try {
@@ -19001,8 +6559,8 @@
       const settled = () => clicked && !confirmStuck && !siteMessage.message() ? "confirm-accepted" : "confirm-unverified";
       if (!state.isSubmitted) return settled();
       const done = await pollFor(() => {
-        var _a3;
-        return ((_a3 = state.isSubmitted) == null ? void 0 : _a3.call(state)) ? "submitted" : siteMessage.message() ? "refused" : null;
+        var _a2;
+        return ((_a2 = state.isSubmitted) == null ? void 0 : _a2.call(state)) ? "submitted" : siteMessage.message() ? "refused" : null;
       }, state.verifyTimeoutMs ?? DEFAULT_VERIFY_TIMEOUT_MS, state.pollMs ?? POLL_MS);
       const refusal = siteMessage.message();
       if (refusal) (_i = state.onConfirmProbe) == null ? void 0 : _i.call(state, `\u7ad9\u70b9\u62d2\u7edd\u63d0\u4ea4 \xb7 ${refusal}`);
@@ -19038,8 +6596,8 @@
   }
 
   const readUsedJsHeap = view => () => {
-    var _a2;
-    const used = (_a2 = view.performance.memory) == null ? void 0 : _a2.usedJSHeapSize;
+    var _a;
+    const used = (_a = view.performance.memory) == null ? void 0 : _a.usedJSHeapSize;
     return typeof used === "number" ? used : null;
   };
 
@@ -19055,11 +6613,11 @@
 
   const redactPreviewText = value => redactOrdinaryTags(value.replace(/<!--[\s\S]*?-->/g, "[\u6807\u7b7e]").replace(/<!DOCTYPE(?:\s+[^<>]*)?\s*>/gi, "[\u6807\u7b7e]")).replace(/https?:\/\/[^\s<>"']+/gi, "[\u94fe\u63a5]");
 
-  const previewOf = value => parseQuestionContent(value, {
+  const previewOf = value => protocol.parseQuestionContent(value, {
     stripUntrustedTags: false
   }).map(part => part.type === "image" ? "[\u56fe\u7247]" : redactPreviewText(part.value)).join("").slice(0, 30);
 
-  const imageCountOf = value => parseQuestionContent(value).filter(part => part.type === "image").length;
+  const imageCountOf = value => protocol.parseQuestionContent(value).filter(part => part.type === "image").length;
 
   function itemOf(input) {
     return {
@@ -19067,31 +6625,45 @@
       decodeFailed: input.decodeFailed ?? false,
       stemPreview: previewOf(input.stem),
       optionCount: input.options.length,
-      imageCount: imageCountOf(input.stem) + input.options.reduce((count2, option) => count2 + imageCountOf(option), 0),
+      imageCount: imageCountOf(input.stem) + input.options.reduce((count, option) => count + imageCountOf(option), 0),
       unsupportedReason: input.unsupportedReason
     };
   }
 
+  async function ruleDiagnosticsFlowOf(adapter, ctx) {
+    if (!("runDiagnostics" in adapter) || typeof adapter.runDiagnostics !== "function") return null;
+    try {
+      return await adapter.runDiagnostics(ctx);
+    } catch {
+      return {
+        status: "failed",
+        error: "diagnostics_threw"
+      };
+    }
+  }
+
   async function runDiagnostic(adapter, ctx) {
-    var _a2;
+    var _a;
     if (!adapter.match(ctx)) return {
       matched: false,
       count: 0,
       imageCount: 0,
       harvestedCount: 0,
-      items: []
+      items: [],
+      ruleFlow: null
     };
-    const items = (await adapter.captureTrees(ctx)).flatMap(tree => flattenQuestionTree(tree.root).map(unit => itemOf({
-      type: unit.queryType === "short_answer" ? QuestionType.Fill : unit.queryType,
+    const items = (await adapter.captureTrees(ctx)).flatMap(tree => protocol.flattenQuestionTree(tree.root).map(unit => itemOf({
+      type: core.isTextAnswerType(unit.queryType) ? protocol.QuestionType.Fill : unit.queryType,
       stem: unit.effectiveStem,
       options: unit.options.map(option => option.content)
     })));
     return {
       matched: true,
       count: items.length,
-      imageCount: items.reduce((count2, item) => count2 + item.imageCount, 0),
-      harvestedCount: ((_a2 = adapter.takeHarvested) == null ? void 0 : _a2.call(adapter).length) ?? 0,
-      items: items
+      imageCount: items.reduce((count, item) => count + item.imageCount, 0),
+      harvestedCount: ((_a = adapter.takeHarvested) == null ? void 0 : _a.call(adapter).length) ?? 0,
+      items: items,
+      ruleFlow: await ruleDiagnosticsFlowOf(adapter, ctx)
     };
   }
 
@@ -19283,7 +6855,7 @@
     try {
       const res = await __privateGet(this, _deps).transport.send({
         method: "POST",
-        url: __privateGet(this, _deps).baseUrl + EVENTS_PATH,
+        url: __privateGet(this, _deps).baseUrl + protocol.EVENTS_PATH,
         headers: {
           "Content-Type": "application/json",
           "Idempotency-Key": crypto.randomUUID()
@@ -19470,8 +7042,8 @@
   }
 
   const serialize = doc => {
-    var _a2;
-    return ((_a2 = doc.documentElement) == null ? void 0 : _a2.outerHTML) ?? "";
+    var _a;
+    return ((_a = doc.documentElement) == null ? void 0 : _a.outerHTML) ?? "";
   };
 
   function capturePageSnapshot(win, options) {
@@ -19489,7 +7061,7 @@
     };
     const MAX_FRAME_DEPTH2 = 5;
     const walk = (doc, framePath) => {
-      var _a2;
+      var _a;
       if (framePath.length >= MAX_FRAME_DEPTH2) return;
       const iframes = Array.from(doc.querySelectorAll("iframe"));
       for (let i = 0; i < iframes.length; i += 1) {
@@ -19500,7 +7072,7 @@
             unreachableFrames += 1;
             continue;
           }
-          push(childDoc, ((_a2 = childDoc.location) == null ? void 0 : _a2.href) ?? "", childPath);
+          push(childDoc, ((_a = childDoc.location) == null ? void 0 : _a.href) ?? "", childPath);
           walk(childDoc, childPath);
         } catch {
           unreachableFrames += 1;
@@ -19556,7 +7128,7 @@
   };
 
   function collectEvidenceHtml(win, options = {}) {
-    var _a2;
+    var _a;
     const now = options.now ?? Date.now;
     const startedAt = now();
     const outOfTime = () => now() - startedAt >= TIME_BUDGET_MS;
@@ -19589,7 +7161,7 @@
     };
     const markerUrl = raw => clip(commentSafe(redactEvidenceText(stripUrlQuery(raw)).text), MAX_FRAME_URL);
     const collect = (doc, url, depth) => {
-      var _a3;
+      var _a2;
       pushText(`\x3c!-- aiask-frame#${nonce}: ${markerUrl(url)} --\x3e`);
       const slot = {
         kind: "frame",
@@ -19629,13 +7201,13 @@
           capOnce("frames");
           return;
         }
-        collect(childDoc, ((_a3 = childDoc.location) == null ? void 0 : _a3.href) ?? "", depth + 1);
+        collect(childDoc, ((_a2 = childDoc.location) == null ? void 0 : _a2.href) ?? "", depth + 1);
       }
     };
-    collect(win.document, ((_a2 = win.location) == null ? void 0 : _a2.href) ?? "", 0);
+    collect(win.document, ((_a = win.location) == null ? void 0 : _a.href) ?? "", 0);
     const renderDoc = doc => {
-      var _a3, _b, _c;
-      const raw = ((_a3 = doc.documentElement) == null ? void 0 : _a3.outerHTML) ?? "";
+      var _a2, _b, _c;
+      const raw = ((_a2 = doc.documentElement) == null ? void 0 : _a2.outerHTML) ?? "";
       const oversize = raw.length > MAX_PARSE_HTML;
       const copy = (new DOMParser).parseFromString(oversize ? clip(raw, MAX_PARSE_HTML) : raw, "text/html");
       const all = copy.querySelectorAll("*");
@@ -19763,9 +7335,9 @@
     return [ ...keys ].sort().slice(0, MAX_QKEYS);
   }
 
-  function bodyNodesBucket(count2) {
-    if (!(count2 > 1)) return 0;
-    return Math.min(MAX_BODY_BUCKET, Math.floor(Math.log2(count2)));
+  function bodyNodesBucket(count) {
+    if (!(count > 1)) return 0;
+    return Math.min(MAX_BODY_BUCKET, Math.floor(Math.log2(count)));
   }
 
   const countOf = (doc, selector, cap) => Math.min(cap, doc.querySelectorAll(selector).length);
@@ -19775,7 +7347,7 @@
   const normalizeReadyState = raw => READY_STATES.has(raw) ? raw : "complete";
 
   function buildPageFingerprint(location2, document2) {
-    var _a2;
+    var _a;
     try {
       const host = normalizedHost(location2.hostname);
       if (!host || !SUPPORTED_HOST_PATTERN.test(host)) return null;
@@ -19786,7 +7358,7 @@
         textareas: countOf(document2, "textarea", DOM_COUNT_CAPS.textareas),
         selects: countOf(document2, "select", DOM_COUNT_CAPS.selects),
         forms: countOf(document2, "form", DOM_COUNT_CAPS.forms),
-        bodyNodes: bodyNodesBucket(((_a2 = document2.body) == null ? void 0 : _a2.getElementsByTagName("*").length) ?? 0),
+        bodyNodes: bodyNodesBucket(((_a = document2.body) == null ? void 0 : _a.getElementsByTagName("*").length) ?? 0),
         readyState: normalizeReadyState(document2.readyState)
       };
       return {
@@ -19798,6 +7370,149 @@
     } catch {
       return null;
     }
+  }
+
+  const MESSAGE_UNAUTHORIZED = protocol.AiAskCode.Unauthorized;
+
+  const ITEM_TYPES = new Set(protocol.HarvestRowSchema.shape.itemType.options);
+
+  const HASH_PATTERN = /^[0-9a-f]{64}$/u;
+
+  let lastContribute = null;
+
+  const MAX_CONSECUTIVE_FAILURES = 3;
+
+  let stoppedThisPage = false;
+
+  let consecutiveFailures = 0;
+
+  const isTerminal = code => code === protocol.AiAskCode.Invalid || code === MESSAGE_UNAUTHORIZED;
+
+  const sentThisPage = new Set;
+
+  function contributableRows(items) {
+    const rows = [];
+    for (const item of items) {
+      const values = item.values.filter(value => value.trim() !== "");
+      const stem = item.stem ?? "";
+      const itemType = item.itemType;
+      if (!HASH_PATTERN.test(item.unitHash) || !ITEM_TYPES.has(itemType) || stem.trim() === "" || values.length === 0 || sentThisPage.has(item.unitHash)) continue;
+      const row = {
+        unitHash: item.unitHash,
+        stem: stem,
+        itemType: itemType,
+        options: item.options ?? [],
+        values: values
+      };
+      if (!protocol.HarvestRowSchema.safeParse(row).success) continue;
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function chunkRows(platform, rows) {
+    const bytes = chunk => (new TextEncoder).encode(JSON.stringify({
+      platform: platform,
+      rows: chunk
+    })).length;
+    const chunks = [];
+    let current = [];
+    for (const row of rows) {
+      const next = [ ...current, row ];
+      if (current.length > 0 && (next.length > protocol.HARVEST_CONTRIBUTE_MAX_ROWS || bytes(next) > protocol.HARVEST_CONTRIBUTE_MAX_BYTES)) {
+        chunks.push(current);
+        current = [ row ];
+        continue;
+      }
+      current = next;
+    }
+    if (current.length > 0) chunks.push(current);
+    return chunks;
+  }
+
+  const harvestContributeStatus = () => lastContribute;
+
+  async function sendChunk(transport, baseUrl, platform, rows) {
+    const res = await transport.send({
+      url: baseUrl + protocol.HARVEST_CONTRIBUTE_PATH,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID()
+      },
+      body: JSON.stringify({
+        platform: platform,
+        rows: rows
+      }),
+      timeoutMs: 15e3
+    });
+    const parsed = protocol.HarvestContributeResponseSchema.safeParse(JSON.parse(res.body));
+    if (!parsed.success) return {
+      queued: 0,
+      code: protocol.AiAskCode.Busy
+    };
+    return {
+      queued: parsed.data.queued ?? 0,
+      code: parsed.data.code
+    };
+  }
+
+  async function contributeHarvest(transport, baseUrl, platform, items) {
+    if (stoppedThisPage) return {
+      queued: 0,
+      stopped: true
+    };
+    const rows = contributableRows(items);
+    if (rows.length === 0) return {
+      queued: 0
+    };
+    let queued = 0;
+    for (const chunk of chunkRows(platform, rows)) {
+      let outcome;
+      try {
+        outcome = await sendChunk(transport, baseUrl, platform, chunk);
+      } catch {
+        outcome = {
+          queued: 0,
+          code: protocol.AiAskCode.Busy
+        };
+      }
+      if (outcome.code !== protocol.AiAskCode.Ok) {
+        consecutiveFailures += 1;
+        if (isTerminal(outcome.code) || consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) stoppedThisPage = true;
+        lastContribute = {
+          at: Date.now(),
+          rows: rows.length,
+          queued: queued,
+          code: outcome.code,
+          stopped: stoppedThisPage,
+          failures: consecutiveFailures
+        };
+        return {
+          queued: queued,
+          ...outcome.code === MESSAGE_UNAUTHORIZED ? {
+            unauthorized: true
+          } : {},
+          ...stoppedThisPage ? {
+            stopped: true
+          } : {}
+        };
+      }
+      consecutiveFailures = 0;
+      for (const row of chunk) sentThisPage.add(row.unitHash);
+      queued += outcome.queued;
+    }
+    lastContribute = {
+      at: Date.now(),
+      rows: rows.length,
+      queued: queued,
+      code: protocol.AiAskCode.Ok,
+      stopped: false,
+      failures: 0
+    };
+    return {
+      queued: queued
+    };
   }
 
   function formatTime(d = new Date) {
@@ -19842,7 +7557,7 @@
   async function fetchMe(transport, baseUrl) {
     try {
       const response = await transport.send({
-        url: baseUrl + ME_PATH,
+        url: baseUrl + protocol.ME_PATH,
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -19851,8 +7566,8 @@
         body: JSON.stringify({}),
         timeoutMs: 8e3
       });
-      const parsed = MeResponseSchema.safeParse(JSON.parse(response.body));
-      if (!parsed.success || parsed.data.code !== AiAskCode.Ok) return null;
+      const parsed = protocol.MeResponseSchema.safeParse(JSON.parse(response.body));
+      if (!parsed.success || parsed.data.code !== protocol.AiAskCode.Ok) return null;
       const {username: username, balance: balance, emailBound: emailBound} = parsed.data;
       if (typeof username !== "string" || typeof balance !== "number" || typeof emailBound !== "boolean") return null;
       return {
@@ -19866,16 +7581,16 @@
   }
 
   const MESSAGE = {
-    [AiAskCode.Invalid]: "\u5361\u5bc6\u65e0\u6548\u3001\u5df2\u7528\u6216\u5df2\u8fc7\u671f",
-    [AiAskCode.Unauthorized]: "\u767b\u5f55\u5df2\u5931\u6548\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55",
-    [AiAskCode.RateLimited]: "\u64cd\u4f5c\u592a\u9891\u7e41\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5",
-    [AiAskCode.Busy]: "\u670d\u52a1\u7e41\u5fd9\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"
+    [protocol.AiAskCode.Invalid]: "\u5361\u5bc6\u65e0\u6548\u3001\u5df2\u7528\u6216\u5df2\u8fc7\u671f",
+    [protocol.AiAskCode.Unauthorized]: "\u767b\u5f55\u5df2\u5931\u6548\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55",
+    [protocol.AiAskCode.RateLimited]: "\u64cd\u4f5c\u592a\u9891\u7e41\uff0c\u8bf7\u7a0d\u540e\u518d\u8bd5",
+    [protocol.AiAskCode.Busy]: "\u670d\u52a1\u7e41\u5fd9\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"
   };
 
   async function redeemCard(transport, code, baseUrl) {
     try {
       const res = await transport.send({
-        url: baseUrl + REDEEM_PATH,
+        url: baseUrl + protocol.REDEEM_PATH,
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -19886,25 +7601,25 @@
         }),
         timeoutMs: 8e3
       });
-      const parsed = RedeemResponseSchema.safeParse(JSON.parse(res.body));
+      const parsed = protocol.RedeemResponseSchema.safeParse(JSON.parse(res.body));
       if (!parsed.success) return {
-        message: MESSAGE[AiAskCode.Busy]
+        message: MESSAGE[protocol.AiAskCode.Busy]
       };
       const {code: rc, balance: balance} = parsed.data;
-      if (rc === AiAskCode.Ok && typeof balance === "number") return {
+      if (rc === protocol.AiAskCode.Ok && typeof balance === "number") return {
         balance: balance,
         message: "ok"
       };
-      if (rc === AiAskCode.Unauthorized) return {
-        message: MESSAGE[AiAskCode.Unauthorized],
+      if (rc === protocol.AiAskCode.Unauthorized) return {
+        message: MESSAGE[protocol.AiAskCode.Unauthorized],
         unauthorized: true
       };
       return {
-        message: MESSAGE[rc] ?? MESSAGE[AiAskCode.Busy]
+        message: MESSAGE[rc] ?? MESSAGE[protocol.AiAskCode.Busy]
       };
     } catch {
       return {
-        message: MESSAGE[AiAskCode.Busy]
+        message: MESSAGE[protocol.AiAskCode.Busy]
       };
     }
   }
@@ -20086,7 +7801,7 @@
     try {
       const res = await transport.send({
         method: "POST",
-        url: baseUrl + REPORT_PATH,
+        url: baseUrl + protocol.REPORT_PATH,
         headers: {
           "Content-Type": "application/json",
           "Idempotency-Key": crypto.randomUUID()
@@ -20094,7 +7809,7 @@
         body: JSON.stringify(req),
         timeoutMs: 5e3
       });
-      const parsed = ReportResponseSchema.safeParse(JSON.parse(res.body));
+      const parsed = protocol.ReportResponseSchema.safeParse(JSON.parse(res.body));
       return parsed.success ? parsed.data : null;
     } catch {
       return null;
@@ -20104,7 +7819,8 @@
   const PLATFORM_LABEL = Object.freeze({
     chaoxing: "\u8d85\u661f",
     wangxiao: "168 \u7f51\u6821",
-    aopeng: "\u5965\u9e4f\u6559\u80b2"
+    aopeng: "\u5965\u9e4f\u6559\u80b2",
+    hubu: "\u6e56\u5317\u81ea\u8003"
   });
 
   const platformLabelFor = platform => PLATFORM_LABEL[platform] ?? platform;
@@ -20112,7 +7828,8 @@
   const PLATFORM_CEILING = Object.freeze({
     chaoxing: Object.freeze([ "answer", "harvest", "course-automation" ]),
     wangxiao: Object.freeze([ "answer", "harvest" ]),
-    aopeng: Object.freeze([ "harvest" ])
+    aopeng: Object.freeze([ "harvest" ]),
+    hubu: Object.freeze([ "answer", "harvest" ])
   });
 
   const FALLBACK_FEATURES = Object.freeze([ "answer", "harvest" ]);
@@ -20122,13 +7839,13 @@
     return ceiling;
   }
 
-  const MAX_RELEASE_CONTEXTS = MAX_RULE_PACKAGES * 3;
+  const MAX_RELEASE_CONTEXTS = protocol.MAX_RULE_PACKAGES * 3;
 
   function parseSnapshot(input) {
     if (!input || typeof input !== "object") throw new Error("rule release context snapshot must be an object");
-    const snapshot2 = input;
-    if (snapshot2.schemaVersion !== 1 || !Array.isArray(snapshot2.summaries) || snapshot2.summaries.length > MAX_RELEASE_CONTEXTS || Object.keys(snapshot2).some(key => key !== "schemaVersion" && key !== "summaries")) throw new Error("invalid rule release context snapshot");
-    return snapshot2.summaries.map(summary => RulePackageSummarySchema.parse(summary));
+    const snapshot = input;
+    if (snapshot.schemaVersion !== 1 || !Array.isArray(snapshot.summaries) || snapshot.summaries.length > MAX_RELEASE_CONTEXTS || Object.keys(snapshot).some(key => key !== "schemaVersion" && key !== "summaries")) throw new Error("invalid rule release context snapshot");
+    return snapshot.summaries.map(summary => protocol.RulePackageSummarySchema.parse(summary));
   }
 
   const rulePackageIdentity = value => `${value.packageId}\0${value.releaseSequence}\0${value.contentHash}`;
@@ -20178,7 +7895,7 @@
   };
 
   function ruleCaptureFailure(adapter) {
-    return adapter instanceof JsonRulePlatformAdapter ? adapter.ruleDiagnostics().captureFailure : null;
+    return adapter instanceof core.JsonRulePlatformAdapter ? adapter.ruleDiagnostics().captureFailure : null;
   }
 
   function zeroQuestionReadout(platformLabel, captureFailure) {
@@ -20192,14 +7909,14 @@
   }
 
   function resolvedRulePackage(adapter) {
-    var _a2;
-    if (!(adapter instanceof JsonRulePlatformAdapter)) return null;
-    return ((_a2 = adapter.ruleDiagnostics().resolved) == null ? void 0 : _a2.pkg) ?? null;
+    var _a;
+    if (!(adapter instanceof core.JsonRulePlatformAdapter)) return null;
+    return ((_a = adapter.ruleDiagnostics().resolved) == null ? void 0 : _a.pkg) ?? null;
   }
 
   function buildRuleSessionDiagnostic(adapter, loadStatus, releaseSummaries = []) {
-    var _a2, _b;
-    if (!(adapter instanceof JsonRulePlatformAdapter)) return null;
+    var _a, _b;
+    if (!(adapter instanceof core.JsonRulePlatformAdapter)) return null;
     const diagnostics = adapter.ruleDiagnostics();
     const resolved = diagnostics.resolved;
     if (!resolved) return null;
@@ -20222,13 +7939,19 @@
           cohortBucket: releaseSummary.cohortBucket
         }
       } : {},
-      candidateVersion: (_a2 = diagnostics.store.candidate) == null ? void 0 : _a2.version,
+      candidateVersion: (_a = diagnostics.store.candidate) == null ? void 0 : _a.version,
       lastKnownGoodVersion: (_b = diagnostics.store.lastKnownGood) == null ? void 0 : _b.version,
+      lifecycle: diagnostics.lifecycle,
+      lifecycleFailure: diagnostics.lifecycleFailure,
+      eventFailure: diagnostics.eventFailure,
+      rechecks: diagnostics.rechecks,
+      walker: diagnostics.walker,
+      commit: diagnostics.commit,
       json: JSON.stringify(resolved.pkg, null, 2)
     };
   }
 
-  const isDefinitivelyInvalid = error => error instanceof RuleVerificationError || error instanceof RuleStoreError && error.code === "snapshot_invalid" || error instanceof Error && error.name === "ZodError";
+  const isDefinitivelyInvalid = error => error instanceof core.RuleVerificationError || error instanceof core.RuleStoreError && error.code === "snapshot_invalid" || error instanceof Error && error.name === "ZodError";
 
   class GmRuleStorePersistence {
     constructor(storage) {
@@ -20239,10 +7962,10 @@
       this.storage.set(this.key, store.exportSnapshot());
     }
     async restore(store, verifier) {
-      const snapshot2 = this.storage.get(this.key);
-      if (snapshot2 == null) return "no-rules";
+      const snapshot = this.storage.get(this.key);
+      if (snapshot == null) return "no-rules";
       try {
-        await store.restoreSnapshot(snapshot2, verifier);
+        await store.restoreSnapshot(snapshot, verifier);
         return "loaded";
       } catch (error) {
         if (isDefinitivelyInvalid(error)) {
@@ -20253,7 +7976,7 @@
       }
     }
     async load(options) {
-      const store = new RuleStore;
+      const store = new core.RuleStore;
       return {
         store: store,
         status: await this.restore(store, options.verifier)
@@ -20270,11 +7993,11 @@
       this.storage = storage;
     }
     save(input) {
-      this.storage.set(this.key, ServerKeysetSchema.parse(input));
+      this.storage.set(this.key, protocol.ServerKeysetSchema.parse(input));
     }
     load() {
       const input = this.storage.get(this.key);
-      return input == null ? null : ServerKeysetSchema.parse(input);
+      return input == null ? null : protocol.ServerKeysetSchema.parse(input);
     }
     clear() {
       this.storage.delete(this.key);
@@ -20288,9 +8011,9 @@
       if (!keyset) return options.runtime.initialize({
         storage: options.storage
       });
-      if (!(await verifyServerKeysetSignature(await importEcdsaPublicJwk(options.rootPublicJwk), keyset))) throw new Error("cached keyset root signature rejected");
-      const highestAcceptedVersion = await readKeysetWatermark(options.storage, options.baseUrl, options.inheritLegacyKeysetWatermark);
-      validateServerKeyset(keyset, (options.now ?? Date.now)(), highestAcceptedVersion);
+      if (!(await protocol.verifyServerKeysetSignature(await protocol.importEcdsaPublicJwk(options.rootPublicJwk), keyset))) throw new Error("cached keyset root signature rejected");
+      const highestAcceptedVersion = await core.readKeysetWatermark(options.storage, options.baseUrl, options.inheritLegacyKeysetWatermark);
+      protocol.validateServerKeyset(keyset, (options.now ?? Date.now)(), highestAcceptedVersion);
       return options.runtime.initialize({
         storage: options.storage,
         verifier: options.createVerifier(keyset)
@@ -20329,7 +8052,7 @@
   function mergeKnown(known, rejected) {
     const merged = new Map(known.map(item => [ item.packageId, item ]));
     for (const [packageId, item] of rejected) merged.set(packageId, item);
-    return [ ...merged.values() ].slice(0, MAX_RULE_PACKAGES);
+    return [ ...merged.values() ].slice(0, protocol.MAX_RULE_PACKAGES);
   }
 
   function errorReason(error) {
@@ -20375,9 +8098,9 @@
         const updatedPackageIds = [];
         const rejected = new Map;
         let failure;
-        for (let index = 0; index < MAX_RULE_PACKAGES; index += 1) {
+        for (let index = 0; index < protocol.MAX_RULE_PACKAGES; index += 1) {
           const response = await this.options.transport.send({
-            url: `${this.baseUrl}${RULE_SYNC_PATH}`,
+            url: `${this.baseUrl}${protocol.RULE_SYNC_PATH}`,
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -20389,8 +8112,8 @@
             timeoutMs: 8e3
           });
           if (response.status < 200 || response.status >= 300) throw new Error("rule sync request failed");
-          const parsed = RuleSyncResponseSchema.parse(JSON.parse(response.body));
-          if (parsed.code !== AiAskCode.Ok) throw new Error(`rule sync rejected: ${parsed.code}`);
+          const parsed = protocol.RuleSyncResponseSchema.parse(JSON.parse(response.body));
+          if (parsed.code !== protocol.AiAskCode.Ok) throw new Error(`rule sync rejected: ${parsed.code}`);
           if (parsed.update) {
             const update = parsed.update;
             try {
@@ -20437,7 +8160,7 @@
   }
 
   function ruleStorageKeys(storage) {
-    return [ new GmRuleStorePersistence(storage).key, new GmRuleKeysetPersistence(storage).key, new GmRuleReleaseContextPersistence(storage).key, RULE_UPDATE_LAST_CHECK_KEY, KEYSET_WATERMARKS_KEY, HIGHEST_KEYSET_VERSION_KEY ];
+    return [ new GmRuleStorePersistence(storage).key, new GmRuleKeysetPersistence(storage).key, new GmRuleReleaseContextPersistence(storage).key, RULE_UPDATE_LAST_CHECK_KEY, core.KEYSET_WATERMARKS_KEY, core.HIGHEST_KEYSET_VERSION_KEY ];
   }
 
   function resetRuleStorage(storage) {
@@ -20467,7 +8190,7 @@
       __publicField(this, "pending");
       __publicField(this, "initialized", false);
       this.state = {
-        store: new RuleStore,
+        store: new core.RuleStore,
         status: "no-rules",
         releaseSummaries: []
       };
@@ -20541,7 +8264,7 @@
         };
       } catch {
         return {
-          store: new RuleStore,
+          store: new core.RuleStore,
           status: "verification-deferred",
           releaseSummaries: cachedReleaseSummaries
         };
@@ -20628,38 +8351,34 @@
     };
   }
 
-  const CHA0XING_PACKAGE_HOOKS = Object.freeze({
-    [CHA0XING_PACKAGE_IDS.examStudent]: Object.freeze([ "registerExamQuestion", "prepareExamPlan", "commitExamPlan" ]),
-    [CHA0XING_PACKAGE_IDS.dowork]: Object.freeze([ "commitDoworkPlan" ]),
-    [CHA0XING_PACKAGE_IDS.studentstudy]: Object.freeze([ "commitStudentstudyPlan" ]),
-    [CHA0XING_PACKAGE_IDS.oldHomework]: Object.freeze([ "commitOldHomeworkPlan" ]),
-    [CHA0XING_PACKAGE_IDS.oldChapter]: Object.freeze([ "commitOldChapterPlan" ]),
-    [CHA0XING_PACKAGE_IDS.newChapter]: Object.freeze([ "commitNewChapterPlan" ])
-  });
-
   function authorizesRollback(summaries, authorization, pkg) {
     return summaries.some(summary => {
-      var _a2;
-      return summary.packageId === pkg.packageId && summary.version === pkg.version && summary.releaseSequence === pkg.releaseSequence && summary.contentHash === pkg.contentHash && ((_a2 = summary.rollbackAuthorization) == null ? void 0 : _a2.toVersion) === authorization.toVersion && summary.rollbackAuthorization.authorizationId === authorization.authorizationId;
+      var _a;
+      return summary.packageId === pkg.packageId && summary.version === pkg.version && summary.releaseSequence === pkg.releaseSequence && summary.contentHash === pkg.contentHash && ((_a = summary.rollbackAuthorization) == null ? void 0 : _a.toVersion) === authorization.toVersion && summary.rollbackAuthorization.authorizationId === authorization.authorizationId;
     });
   }
 
-  function baseRegistry(options, policy) {
-    const refs = new RuntimeReferenceRegistry({
+  function baseRegistry(options, policy, allowedSlots) {
+    const refs = new core.RuntimeReferenceRegistry({
       maxDomRefs: policy.limits.maxDomRefs
     });
-    const capture2 = new RuleCaptureRegistry({
+    const capture = new core.RuleCaptureRegistry({
       maxTrees: 256,
       maxBindings: policy.limits.maxDomRefs
     });
-    const registry = new PrimitiveRegistry;
-    registerCoreRulePrimitives(registry, {
+    const registry = new core.PrimitiveRegistry;
+    core.registerCoreRulePrimitives(registry, {
       document: options.document,
       location: options.location,
       refs: refs,
-      capture: capture2,
-      writer: new BindingRegistryAnswerWriter(capture2.bindings),
-      resources: new RuleResourceScope
+      capture: capture,
+      writer: new core.BindingRegistryAnswerWriter(capture.bindings),
+      resources: new core.RuleResourceScope,
+      listener: {
+        read: () => null,
+        allowedSlots: allowedSlots,
+        declaredSlots: () => null
+      }
     });
     return {
       registry: registry,
@@ -20668,71 +8387,52 @@
   }
 
   function platformContext(pkg, options) {
-    if (pkg.platform === "chaoxing") {
-      const {registry: registry, refs: refs} = baseRegistry(options, CHA0XING_RULE_POLICY);
-      const hooks = CHA0XING_PACKAGE_HOOKS[pkg.packageId] ?? [];
-      const on = name => hooks.includes(name);
-      registerChaoxingRuleHooks(registry, {
-        typr: options.typr,
-        table: options.fontTable ?? {},
+    const register = (policy, allowedSlots) => {
+      var _a;
+      const {registry: registry, refs: refs} = baseRegistry(options, policy, allowedSlots);
+      (_a = PLATFORM_PRIVATE_HOOKS[pkg.platform]) == null ? void 0 : _a.registerForVerification(registry, {
         refs: refs,
-        resolveUeditorBodies: targets => targets,
-        ...on("registerExamQuestion") ? {
-          registerExamQuestion: () => void 0
-        } : {},
-        ...on("prepareExamPlan") ? {
-          prepareExamPlan: () => false
-        } : {},
-        ...on("commitExamPlan") ? {
-          commitExamPlan: () => false
-        } : {},
-        ...on("commitDoworkPlan") ? {
-          commitDoworkPlan: () => false
-        } : {},
-        ...on("commitStudentstudyPlan") ? {
-          commitStudentstudyPlan: () => false
-        } : {},
-        ...on("commitOldHomeworkPlan") ? {
-          commitOldHomeworkPlan: () => false
-        } : {},
-        ...on("commitOldChapterPlan") ? {
-          commitOldChapterPlan: () => false
-        } : {},
-        ...on("commitNewChapterPlan") ? {
-          commitNewChapterPlan: () => false
-        } : {}
+        typr: options.typr,
+        fontTable: options.fontTable ?? {},
+        packageId: pkg.packageId
       });
+      return registry;
+    };
+    if (pkg.platform === "chaoxing") {
+      const policy = platformRulePolicy("chaoxing");
+      const allowedSlots = slotsForHosts([ "chaoxing.com" ]);
       return {
-        registry: registry,
-        policy: CHA0XING_RULE_POLICY
+        registry: register(policy, allowedSlots),
+        policy: policy,
+        allowedSlots: allowedSlots
       };
     }
     const trustedRemote = trustedRemoteRulePlatformByPackageId(pkg.packageId);
     if ((trustedRemote == null ? void 0 : trustedRemote.platform) === pkg.platform) {
-      const {registry: registry} = baseRegistry(options, trustedRemote.policy);
-      if (pkg.platform === "aopeng") registerAopengRuleHooks(registry, {
-        readCapturedResponse: () => null
-      });
+      const policy = trustedRemote.policy;
+      const allowedSlots = slotsForHosts(trustedRemote.hosts);
       return {
-        registry: registry,
-        policy: trustedRemote.policy
+        registry: register(policy, allowedSlots),
+        policy: policy,
+        allowedSlots: allowedSlots
       };
     }
-    throw new RuleVerificationError("capability_denied", `unsupported rule platform: ${pkg.platform}`);
+    throw new core.RuleVerificationError("capability_denied", `unsupported rule platform: ${pkg.platform}`);
   }
 
   function createUserscriptRuleVerifier(options) {
     return {
       verify: async input => {
-        var _a2;
-        const pkg = RulePackageSchema.parse(input);
-        const {registry: registry, policy: policy} = platformContext(pkg, options);
-        const current = (_a2 = options.store.resolve(pkg.packageId)) == null ? void 0 : _a2.pkg;
-        return new RuleVerifier({
+        var _a;
+        const pkg = protocol.RulePackageSchema.parse(input);
+        const {registry: registry, policy: policy, allowedSlots: allowedSlots} = platformContext(pkg, options);
+        const current = (_a = options.store.resolve(pkg.packageId)) == null ? void 0 : _a.pkg;
+        return new core.RuleVerifier({
           engineVersion: RULE_ENGINE_VERSION,
           keyset: options.keyset,
           registry: registry,
           policy: policy,
+          allowedSlots: allowedSlots,
           services: options.services ?? RULE_EXPRESSION_SERVICES,
           now: options.now,
           authorizeRollback: (authorization, candidate) => authorizesRollback(options.releaseSummaries ?? [], authorization, candidate),
@@ -20848,7 +8548,7 @@
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          question: questionTextForSearch(unit.effectiveStem)
+          question: protocol.questionTextForSearch(unit.effectiveStem)
         }),
         timeoutMs: timeoutMs
       });
@@ -20865,7 +8565,7 @@
   }
 
   function createSession(o) {
-    var _a2;
+    var _a, _b;
     const ctx = {
       document: o.document,
       location: o.location,
@@ -20878,26 +8578,27 @@
     const runtimeState = ruleStoreRuntime.snapshot();
     const ruleStore = o.ruleStore ?? runtimeState.store;
     const ruleStoreStatus = o.ruleStoreStatus ?? runtimeState.status;
-    const factories = o.adapterFactories ?? createDefaultAdapterFactories(o.location, o.typr, ruleStore, o.fontTable ?? {});
+    const factories = o.adapterFactories ?? createDefaultAdapterFactories(o.location, o.typr, ruleStore, o.fontTable ?? {}, void 0, () => o.settings.autoStart === true);
     const candidates = factories.map(factory => ({
       factory: factory,
       adapter: factory()
     }));
-    const adapter = new RuleRuntime(candidates.map(candidate => candidate.adapter)).resolve(ctx);
+    const adapter = new core.RuleRuntime(candidates.map(candidate => candidate.adapter)).resolve(ctx);
     const selected2 = candidates.find(candidate => candidate.adapter === adapter);
     if (!adapter || !selected2) return {
       session: null,
       reason: "unsupported"
     };
-    const client = new RelayClient(o.backendTransport, o.baseUrl);
+    const client = new core.RelayClient(o.backendTransport, o.baseUrl);
     const freeFirst = o.settings.freeFirst !== false;
     const sessionDeps = {
       ...o.sessionDeps,
       freeSearch: req => freeBankSearch(o.transport, req),
       canPaidSearch: () => !!o.getToken(),
-      localStore: ((_a2 = o.sessionDeps) == null ? void 0 : _a2.localStore) ?? o.localStore
+      localStore: ((_a = o.sessionDeps) == null ? void 0 : _a.localStore) ?? o.localStore,
+      onHarvested: ((_b = o.sessionDeps) == null ? void 0 : _b.onHarvested) ?? o.onHarvested
     };
-    const session = new AnswerSession(adapter, client, {
+    const session = new core.AnswerSession(adapter, client, {
       autoFill: o.settings.autoFill,
       delayMs: o.settings.delayMs,
       freeFirst: freeFirst
@@ -20940,25 +8641,25 @@
       const generation = vue.ref(0);
       const parts = vue.computed(() => {
         const renderedGeneration = generation.value;
-        return parseQuestionContent(props.content).map(part => ({
+        return protocol.parseQuestionContent(props.content).map(part => ({
           ...part,
           generation: renderedGeneration
         }));
       });
-      const failed2 = vue.ref(new Set);
+      const failed = vue.ref(new Set);
       vue.watch(() => props.content, () => {
         generation.value++;
-        failed2.value = new Set;
+        failed.value = new Set;
       });
       const markFailed = (index, renderedGeneration) => {
         if (renderedGeneration !== generation.value) return;
-        failed2.value = new Set(failed2.value).add(index);
+        failed.value = new Set(failed.value).add(index);
       };
       return (_ctx, _cache) => (vue.openBlock(), vue.createElementBlock("span", _hoisted_1$1, [ (vue.openBlock(true), 
       vue.createElementBlock(vue.Fragment, null, vue.renderList(parts.value, (part, index) => (vue.openBlock(), 
       vue.createElementBlock(vue.Fragment, {
         key: `${index}:${part.value}`
-      }, [ part.type === "text" ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_2$1, vue.toDisplayString(part.value), 1)) : failed2.value.has(index) ? (vue.openBlock(), 
+      }, [ part.type === "text" ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_2$1, vue.toDisplayString(part.value), 1)) : failed.value.has(index) ? (vue.openBlock(), 
       vue.createElementBlock("span", _hoisted_3$1, "\u56fe\u7247\u52a0\u8f7d\u5931\u8d25")) : (vue.openBlock(), 
       vue.createElementBlock("img", {
         key: 2,
@@ -20984,10 +8685,10 @@
   }
 
   function coursePositionLine(progress) {
-    var _a2;
-    const position2 = (_a2 = progress == null ? void 0 : progress.task) == null ? void 0 : _a2.position;
-    if (!position2) return null;
-    return position2.totalSeconds === null ? formatClock(position2.currentSeconds) : `${formatClock(position2.currentSeconds)} / ${formatClock(position2.totalSeconds)}`;
+    var _a;
+    const position = (_a = progress == null ? void 0 : progress.task) == null ? void 0 : _a.position;
+    if (!position) return null;
+    return position.totalSeconds === null ? formatClock(position.currentSeconds) : `${formatClock(position.currentSeconds)} / ${formatClock(position.totalSeconds)}`;
   }
 
   function courseCountLine(progress) {
@@ -21080,14 +8781,14 @@
     if (state.pointerId === null || input.pointerId !== state.pointerId) {
       return null;
     }
-    const position2 = clampPanelPosition({
+    const position = clampPanelPosition({
       x: input.clientX - state.offsetX,
       y: input.clientY - state.offsetY
     }, state.panel, viewport);
-    if (position2.x !== state.origin.x || position2.y !== state.origin.y) {
+    if (position.x !== state.origin.x || position.y !== state.origin.y) {
       state.moved = true;
     }
-    return position2;
+    return position;
   }
 
   function endPanelDrag(state, pointerId) {
@@ -21120,28 +8821,31 @@
   }
 
   const TYPE_LABELS = {
-    [QuestionType.Single]: "\u5355\u9009\u9898",
-    [QuestionType.Multiple]: "\u591a\u9009\u9898",
-    [QuestionType.Judge]: "\u5224\u65ad\u9898",
-    [QuestionType.Fill]: "\u586b\u7a7a\u9898"
+    [protocol.QuestionType.Single]: "\u5355\u9009\u9898",
+    [protocol.QuestionType.Multiple]: "\u591a\u9009\u9898",
+    [protocol.QuestionType.Judge]: "\u5224\u65ad\u9898",
+    [protocol.QuestionType.Fill]: "\u586b\u7a7a\u9898"
+  };
+
+  const TEXT_TYPE_LABELS = {
+    short_answer: "\u7b80\u7b54\u9898",
+    definition: "\u540d\u8bcd\u89e3\u91ca",
+    essay: "\u8bba\u8ff0\u9898"
   };
 
   const harvestTypeLabel = itemType => {
-    const normalized = normalizeLeafQuestionType(itemType);
+    const normalized = core.normalizeLeafQuestionType(itemType);
     if (!normalized) return (itemType == null ? void 0 : itemType.trim()) || "\u9898\u76ee";
-    return normalized === "short_answer" ? "\u7b80\u7b54\u9898" : TYPE_LABELS[normalized];
+    return TEXT_TYPE_LABELS[normalized] ?? TYPE_LABELS[normalized];
   };
 
   const esc = value => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-  const contentHtml = content => parseQuestionContent(content).map(part => part.type === "image" ? `<img src="${esc(part.value)}" alt="\u9898\u76ee\u56fe\u7247" referrerpolicy="no-referrer">` : esc(part.value)).join("");
+  const contentHtml = content => protocol.parseQuestionContent(content).map(part => part.type === "image" ? `<img src="${esc(part.value)}" alt="\u9898\u76ee\u56fe\u7247" referrerpolicy="no-referrer">` : esc(part.value)).join("");
 
   const letter = index => String.fromCharCode(65 + index);
 
-  const typeLabel = it => {
-    var _a2;
-    return ((_a2 = it.unit) == null ? void 0 : _a2.queryType) === "short_answer" ? "\u7b80\u7b54\u9898" : TYPE_LABELS[it.q.type];
-  };
+  const typeLabel = it => it.unit && core.isTextAnswerType(it.unit.queryType) ? harvestTypeLabel(it.unit.queryType) : TYPE_LABELS[it.q.type];
 
   function buildPageExportHtml(items, meta) {
     const sections = items.map((it, inx) => {
@@ -21149,7 +8853,7 @@
         const reason = it.status === "decodeFail" ? "\u9898\u9762\u89e3\u6790\u5931\u8d25\uff0c\u5df2\u8df3\u8fc7" : "\u9898\u76ee\u65e0\u5408\u6cd5\u6587\u5b57\u6216\u56fe\u7247\uff0c\u5df2\u8df3\u8fc7";
         return `<section class="q"><h3>\u7b2c ${inx + 1} \u9898</h3><p class="mute">\uff08${reason}\uff09</p></section>`;
       }
-      const matched = it.unit ? new Set(answeredOptionIndexes(it.unit, it.answerPlan)) : new Set;
+      const matched = it.unit ? new Set(core.answeredOptionIndexes(it.unit, it.answerPlan)) : new Set;
       const opts = it.q.options.map((option, i) => `<li${matched.has(i) ? ' class="hit"' : ""}>${letter(i)}. ${contentHtml(option)}</li>`).join("");
       const answer = it.answer.length ? `${it.answer.map(contentHtml).join("\uff1b")}${it.aiGenerated ? ' <span class="mute">\uff08AI \u751f\u6210 \xb7 \u5f85\u6838\u5bf9\uff09</span>' : ""}` : '<span class="mute">\u672a\u547d\u4e2d</span>';
       return `<section class="q">\n<h3>\u7b2c ${inx + 1} \u9898 <small>[${typeLabel(it)}]</small></h3>\n<p class="stem">${contentHtml(it.q.stem)}</p>\n${opts ? `<ol class="opts">${opts}</ol>` : ""}\n<p class="ans">\u53c2\u8003\u7b54\u6848\uff1a${answer}</p>\n</section>`;
@@ -21158,11 +8862,11 @@
   }
 
   const harvestHitIndexes = it => {
-    const wanted = it.values.map(normalizeForMatch).filter(v => v !== "");
-    const wantedTruth = it.values.map(normalizeTruth);
+    const wanted = it.values.map(core.normalizeForMatch).filter(v => v !== "");
+    const wantedTruth = it.values.map(core.normalizeTruth);
     return new Set((it.options ?? []).flatMap((option, i) => {
-      const truth = normalizeTruth(option);
-      return wanted.includes(normalizeForMatch(option)) || truth !== null && wantedTruth.includes(truth) ? [ i ] : [];
+      const truth = core.normalizeTruth(option);
+      return wanted.includes(core.normalizeForMatch(option)) || truth !== null && wantedTruth.includes(truth) ? [ i ] : [];
     }));
   };
 
@@ -21399,7 +9103,8 @@
   };
 
   const _hoisted_54 = {
-    class: "prow"
+    key: 0,
+    class: "cap-mute"
   };
 
   const _hoisted_55 = {
@@ -21407,353 +9112,353 @@
   };
 
   const _hoisted_56 = {
-    key: 0,
     class: "prow"
   };
 
   const _hoisted_57 = {
-    key: 1,
+    key: 0,
     class: "prow"
   };
 
   const _hoisted_58 = {
-    key: 2,
+    key: 1,
     class: "prow"
   };
 
   const _hoisted_59 = {
-    key: 3,
+    key: 2,
     class: "prow"
   };
 
   const _hoisted_60 = {
-    class: "cap-mute"
+    key: 3,
+    class: "prow"
   };
 
   const _hoisted_61 = {
-    class: "grp"
+    class: "cap-mute"
   };
 
   const _hoisted_62 = {
+    class: "grp"
+  };
+
+  const _hoisted_63 = {
     key: 0,
     class: "cap-mute"
   };
 
-  const _hoisted_63 = {
+  const _hoisted_64 = {
     key: 1,
     class: "row"
   };
 
-  const _hoisted_64 = {
-    class: "tag acc"
-  };
-
   const _hoisted_65 = {
-    key: 2,
-    class: "cap-mute"
+    class: "tag acc"
   };
 
   const _hoisted_66 = {
     key: 2,
-    class: "grp"
+    class: "cap-mute"
   };
 
   const _hoisted_67 = {
+    key: 2,
+    class: "grp"
+  };
+
+  const _hoisted_68 = {
     class: "grid"
   };
 
-  const _hoisted_68 = [ "onClick" ];
+  const _hoisted_69 = [ "onClick" ];
 
-  const _hoisted_69 = {
+  const _hoisted_70 = {
     key: 3,
     class: "card"
   };
 
-  const _hoisted_70 = {
-    class: "row"
-  };
-
   const _hoisted_71 = {
-    class: "locator"
+    class: "row"
   };
 
   const _hoisted_72 = {
-    class: "row"
+    class: "locator"
   };
 
   const _hoisted_73 = {
-    class: "locator"
-  };
-
-  const _hoisted_74 = {
-    class: "row question-head"
-  };
-
-  const _hoisted_75 = {
-    class: "locator"
-  };
-
-  const _hoisted_76 = {
-    class: "toolbar"
-  };
-
-  const _hoisted_77 = {
-    key: 0,
-    class: "tag neutral"
-  };
-
-  const _hoisted_78 = [ "disabled" ];
-
-  const _hoisted_79 = {
-    class: "stem"
-  };
-
-  const _hoisted_80 = {
-    class: "stem-type"
-  };
-
-  const _hoisted_81 = {
-    class: "opts"
-  };
-
-  const _hoisted_82 = {
-    class: "answer-block"
-  };
-
-  const _hoisted_83 = {
     class: "row"
   };
 
-  const _hoisted_84 = {
+  const _hoisted_74 = {
+    class: "locator"
+  };
+
+  const _hoisted_75 = {
+    class: "row question-head"
+  };
+
+  const _hoisted_76 = {
+    class: "locator"
+  };
+
+  const _hoisted_77 = {
     class: "toolbar"
   };
 
-  const _hoisted_85 = {
+  const _hoisted_78 = {
     key: 0,
     class: "tag neutral"
   };
 
+  const _hoisted_79 = [ "disabled" ];
+
+  const _hoisted_80 = {
+    class: "stem"
+  };
+
+  const _hoisted_81 = {
+    class: "stem-type"
+  };
+
+  const _hoisted_82 = {
+    class: "opts"
+  };
+
+  const _hoisted_83 = {
+    class: "answer-block"
+  };
+
+  const _hoisted_84 = {
+    class: "row"
+  };
+
+  const _hoisted_85 = {
+    class: "toolbar"
+  };
+
   const _hoisted_86 = {
-    key: 1,
+    key: 0,
     class: "tag neutral"
   };
 
   const _hoisted_87 = {
+    key: 1,
+    class: "tag neutral"
+  };
+
+  const _hoisted_88 = {
     key: 0,
     class: "answer-list"
   };
 
-  const _hoisted_88 = {
+  const _hoisted_89 = {
     class: "answer-key"
   };
 
-  const _hoisted_89 = {
+  const _hoisted_90 = {
     class: "answer-value"
   };
 
-  const _hoisted_90 = {
+  const _hoisted_91 = {
     key: 0
   };
 
-  const _hoisted_91 = {
+  const _hoisted_92 = {
     key: 1,
     class: "answer-item"
   };
 
-  const _hoisted_92 = {
-    class: "answer-value"
-  };
-
   const _hoisted_93 = {
-    key: 2,
     class: "answer-value"
   };
 
   const _hoisted_94 = {
-    key: 0
+    key: 2,
+    class: "answer-value"
   };
 
   const _hoisted_95 = {
+    key: 0
+  };
+
+  const _hoisted_96 = {
     key: 3,
     class: "cap-mute"
   };
 
-  const _hoisted_96 = {
+  const _hoisted_97 = {
     class: "grp"
   };
 
-  const _hoisted_97 = {
+  const _hoisted_98 = {
     class: "row"
   };
 
-  const _hoisted_98 = {
+  const _hoisted_99 = {
     class: "toolbar"
   };
 
-  const _hoisted_99 = {
+  const _hoisted_100 = {
     class: "tag acc"
   };
 
-  const _hoisted_100 = {
+  const _hoisted_101 = {
     class: "ent-top"
   };
 
-  const _hoisted_101 = {
+  const _hoisted_102 = {
     class: "ent-ty"
   };
 
-  const _hoisted_102 = {
+  const _hoisted_103 = {
     class: "ent-tm mono"
   };
 
-  const _hoisted_103 = {
+  const _hoisted_104 = {
     key: 0,
     class: "cap-mute"
   };
 
-  const _hoisted_104 = {
+  const _hoisted_105 = {
     class: "ent-a"
   };
 
-  const _hoisted_105 = {
+  const _hoisted_106 = {
     key: 0,
     class: "ent-ops"
   };
 
-  const _hoisted_106 = {
-    class: "cap-mute"
-  };
-
   const _hoisted_107 = {
-    class: "standby"
+    class: "cap-mute"
   };
 
   const _hoisted_108 = {
-    class: "cap-mute"
+    class: "standby"
   };
 
   const _hoisted_109 = {
+    class: "cap-mute"
+  };
+
+  const _hoisted_110 = {
     key: 0,
     class: "grp"
   };
 
-  const _hoisted_110 = {
+  const _hoisted_111 = {
     class: "row"
   };
 
-  const _hoisted_111 = {
+  const _hoisted_112 = {
     class: "mono cap-mute"
   };
 
-  const _hoisted_112 = {
+  const _hoisted_113 = {
     class: "switch-row"
   };
 
-  const _hoisted_113 = [ "onClick", "aria-label" ];
+  const _hoisted_114 = [ "onClick", "aria-label" ];
 
-  const _hoisted_114 = {
+  const _hoisted_115 = {
     class: "lbl",
     style: {
       flex: "1"
     }
   };
 
-  const _hoisted_115 = {
-    class: "cap-mute"
-  };
-
   const _hoisted_116 = {
-    class: "row"
+    class: "cap-mute"
   };
 
   const _hoisted_117 = {
-    class: "mono cap-mute"
-  };
-
-  const _hoisted_118 = {
-    class: "grp"
-  };
-
-  const _hoisted_119 = {
-    class: "switch-row"
-  };
-
-  const _hoisted_120 = {
-    class: "grp"
-  };
-
-  const _hoisted_121 = {
     class: "row"
   };
 
+  const _hoisted_118 = {
+    class: "mono cap-mute"
+  };
+
+  const _hoisted_119 = {
+    class: "grp"
+  };
+
+  const _hoisted_120 = {
+    class: "switch-row"
+  };
+
+  const _hoisted_121 = {
+    class: "grp"
+  };
+
   const _hoisted_122 = {
-    class: "cap-mute"
+    class: "row"
   };
 
   const _hoisted_123 = {
-    key: 0,
-    class: "alert"
+    class: "cap-mute"
   };
 
   const _hoisted_124 = {
-    key: 1,
+    key: 0,
     class: "alert"
   };
 
   const _hoisted_125 = {
+    key: 1,
+    class: "alert"
+  };
+
+  const _hoisted_126 = {
     class: "row"
   };
 
-  const _hoisted_126 = [ "disabled" ];
+  const _hoisted_127 = [ "disabled" ];
 
-  const _hoisted_127 = {
+  const _hoisted_128 = {
     key: 2,
     class: "cap-mute"
   };
 
-  const _hoisted_128 = {
-    class: "grp"
-  };
-
   const _hoisted_129 = {
-    class: "switch-row"
+    class: "grp"
   };
 
   const _hoisted_130 = {
-    class: "row"
+    class: "switch-row"
   };
 
   const _hoisted_131 = {
-    class: "mono cap-mute"
-  };
-
-  const _hoisted_132 = {
     class: "row"
   };
 
+  const _hoisted_132 = {
+    class: "mono cap-mute"
+  };
+
   const _hoisted_133 = {
-    class: "cap-mute"
+    class: "row"
   };
 
   const _hoisted_134 = {
+    class: "cap-mute"
+  };
+
+  const _hoisted_135 = {
     class: "grp"
   };
 
-  const _hoisted_135 = [ "onClick", "aria-label" ];
+  const _hoisted_136 = [ "onClick", "aria-label" ];
 
-  const _hoisted_136 = {
+  const _hoisted_137 = {
     class: "lbl",
     style: {
       flex: "1"
     }
   };
 
-  const _hoisted_137 = {
-    class: "prev"
-  };
-
   const _hoisted_138 = {
-    class: "prow"
+    class: "prev"
   };
 
   const _hoisted_139 = {
@@ -21769,387 +9474,438 @@
   };
 
   const _hoisted_142 = {
-    key: 0,
-    class: "alert"
-  };
-
-  const _hoisted_143 = {
-    class: "prev"
-  };
-
-  const _hoisted_144 = {
     class: "prow"
   };
 
-  const _hoisted_145 = {
-    class: "toolbar"
-  };
-
-  const _hoisted_146 = {
-    class: "cap-mute mono"
-  };
-
-  const _hoisted_147 = {
-    class: "meter"
-  };
-
-  const _hoisted_148 = {
+  const _hoisted_143 = {
     key: 0,
     class: "alert"
   };
 
+  const _hoisted_144 = {
+    class: "prev"
+  };
+
+  const _hoisted_145 = {
+    class: "prow"
+  };
+
+  const _hoisted_146 = {
+    class: "toolbar"
+  };
+
+  const _hoisted_147 = {
+    class: "cap-mute mono"
+  };
+
+  const _hoisted_148 = {
+    class: "meter"
+  };
+
   const _hoisted_149 = {
-    key: 1,
+    key: 0,
     class: "alert"
   };
 
   const _hoisted_150 = {
+    key: 1,
+    class: "alert"
+  };
+
+  const _hoisted_151 = {
     key: 2,
     class: "cap-mute"
   };
 
-  const _hoisted_151 = {
+  const _hoisted_152 = {
     key: 0,
     class: "alert"
   };
 
-  const _hoisted_152 = {
-    key: 1,
-    class: "cap-mute"
-  };
-
   const _hoisted_153 = {
-    key: 4,
+    key: 1,
     class: "cap-mute"
   };
 
   const _hoisted_154 = {
-    key: 5,
+    key: 4,
     class: "cap-mute"
   };
 
   const _hoisted_155 = {
-    class: "ent-top"
+    key: 5,
+    class: "cap-mute"
   };
 
   const _hoisted_156 = {
-    class: "ent-ty"
+    class: "ent-top"
   };
 
   const _hoisted_157 = {
-    key: 0,
     class: "ent-ty"
   };
 
   const _hoisted_158 = {
-    key: 1,
+    key: 0,
     class: "ent-ty"
   };
 
   const _hoisted_159 = {
+    key: 1,
+    class: "ent-ty"
+  };
+
+  const _hoisted_160 = {
     class: "ent-tm"
   };
 
-  const _hoisted_160 = [ "aria-label", "onClick" ];
+  const _hoisted_161 = [ "aria-label", "onClick" ];
 
-  const _hoisted_161 = {
+  const _hoisted_162 = {
     class: "ent-a"
   };
 
-  const _hoisted_162 = {
+  const _hoisted_163 = {
     key: 0,
     class: "ent-ops"
   };
 
-  const _hoisted_163 = {
-    class: "cap-mute"
-  };
-
   const _hoisted_164 = {
-    key: 6,
     class: "cap-mute"
   };
 
   const _hoisted_165 = {
-    class: "statcard"
+    key: 6,
+    class: "cap-mute"
   };
 
   const _hoisted_166 = {
-    class: "row"
+    class: "statcard"
   };
 
   const _hoisted_167 = {
+    class: "row"
+  };
+
+  const _hoisted_168 = {
     key: 0,
     class: "statgrid"
   };
 
-  const _hoisted_168 = {
+  const _hoisted_169 = {
     key: 0
   };
 
-  const _hoisted_169 = {
+  const _hoisted_170 = {
     key: 1
   };
 
-  const _hoisted_170 = {
+  const _hoisted_171 = {
     key: 1,
     class: "cap-mute"
   };
 
-  const _hoisted_171 = {
-    key: 2,
-    class: "alert"
-  };
-
   const _hoisted_172 = {
-    class: "grp"
+    key: 2,
+    class: "cap-mute"
   };
 
   const _hoisted_173 = {
+    key: 3,
+    class: "cap-mute"
+  };
+
+  const _hoisted_174 = {
+    key: 4,
+    class: "cap-mute"
+  };
+
+  const _hoisted_175 = {
+    class: "cap-mute"
+  };
+
+  const _hoisted_176 = {
+    key: 5,
+    class: "alert"
+  };
+
+  const _hoisted_177 = {
+    class: "grp"
+  };
+
+  const _hoisted_178 = {
     class: "log-filter"
   };
 
-  const _hoisted_174 = [ "onClick" ];
+  const _hoisted_179 = [ "onClick" ];
 
-  const _hoisted_175 = {
+  const _hoisted_180 = {
     key: 0,
     class: "log-list"
   };
 
-  const _hoisted_176 = {
+  const _hoisted_181 = {
     class: "log-time mono"
   };
 
-  const _hoisted_177 = {
+  const _hoisted_182 = {
     class: "log-msg"
   };
 
-  const _hoisted_178 = {
+  const _hoisted_183 = {
     key: 0,
     class: "log-repeat mono"
   };
 
-  const _hoisted_179 = {
-    key: 1,
-    class: "cap-mute"
-  };
-
-  const _hoisted_180 = {
-    class: "grp"
-  };
-
-  const _hoisted_181 = [ "disabled" ];
-
-  const _hoisted_182 = {
-    key: 0,
-    class: "cap-mute"
-  };
-
-  const _hoisted_183 = {
-    key: 1,
-    class: "cap-mute"
-  };
-
   const _hoisted_184 = {
     key: 1,
-    class: "rule-meta"
+    class: "cap-mute"
   };
 
   const _hoisted_185 = {
-    class: "rule-row"
+    class: "grp"
   };
 
-  const _hoisted_186 = {
-    class: "rule-value"
-  };
+  const _hoisted_186 = [ "disabled" ];
 
   const _hoisted_187 = {
     key: 0,
-    class: "rule-row"
+    class: "cap-mute"
   };
 
   const _hoisted_188 = {
-    class: "rule-value"
+    key: 0,
+    class: "mono"
   };
 
   const _hoisted_189 = {
     key: 1,
-    class: "rule-row"
+    class: "mono"
   };
 
   const _hoisted_190 = {
-    class: "rule-value"
+    key: 1,
+    class: "cap-mute"
   };
 
   const _hoisted_191 = {
+    key: 1,
+    class: "rule-meta"
+  };
+
+  const _hoisted_192 = {
+    class: "rule-row"
+  };
+
+  const _hoisted_193 = {
+    class: "rule-value"
+  };
+
+  const _hoisted_194 = {
+    key: 0,
+    class: "rule-row"
+  };
+
+  const _hoisted_195 = {
+    class: "rule-value"
+  };
+
+  const _hoisted_196 = {
+    key: 1,
+    class: "rule-row"
+  };
+
+  const _hoisted_197 = {
+    class: "rule-value"
+  };
+
+  const _hoisted_198 = {
     key: 2,
     class: "rule-row"
   };
 
-  const _hoisted_192 = {
+  const _hoisted_199 = {
     class: "rule-value"
   };
 
-  const _hoisted_193 = {
+  const _hoisted_200 = {
     key: 2,
     class: "cap-mute"
   };
 
-  const _hoisted_194 = {
+  const _hoisted_201 = {
     class: "actbar"
   };
 
-  const _hoisted_195 = {
+  const _hoisted_202 = {
     key: 0,
     class: "prev"
   };
 
-  const _hoisted_196 = {
+  const _hoisted_203 = {
     class: "prow"
   };
 
-  const _hoisted_197 = {
+  const _hoisted_204 = {
     class: "prow"
   };
 
-  const _hoisted_198 = [ "disabled" ];
+  const _hoisted_205 = [ "disabled" ];
 
-  const _hoisted_199 = [ "disabled" ];
+  const _hoisted_206 = [ "disabled" ];
 
-  const _hoisted_200 = {
+  const _hoisted_207 = {
     key: 0,
     class: "prog"
   };
 
-  const _hoisted_201 = {
+  const _hoisted_208 = {
     class: "stat"
   };
 
-  const _hoisted_202 = {
+  const _hoisted_209 = {
     class: "ticks"
   };
 
-  const _hoisted_203 = {
+  const _hoisted_210 = {
     key: 1,
     class: "toolbar"
   };
 
-  const _hoisted_204 = [ "disabled" ];
+  const _hoisted_211 = [ "disabled" ];
 
-  const _hoisted_205 = {
+  const _hoisted_212 = {
     key: 0,
     class: "toolbar"
   };
 
-  const _hoisted_206 = {
+  const _hoisted_213 = {
     key: 1,
     class: "toolbar"
   };
 
-  const _hoisted_207 = {
+  const _hoisted_214 = {
     key: 2,
     class: "toolbar"
   };
 
-  const _hoisted_208 = [ "disabled" ];
+  const _hoisted_215 = [ "disabled" ];
 
-  const _hoisted_209 = {
+  const _hoisted_216 = {
     class: "actbar-foot"
   };
 
-  const _hoisted_210 = {
+  const _hoisted_217 = {
     class: "cap-mute mono"
   };
 
-  const _hoisted_211 = {
+  const _hoisted_218 = {
     key: 4,
     class: "pop"
   };
 
-  const _hoisted_212 = {
+  const _hoisted_219 = {
     class: "toolbar"
   };
 
-  const _hoisted_213 = [ "disabled" ];
-
-  const _hoisted_214 = [ "disabled" ];
-
-  const _hoisted_215 = {
-    key: 0,
-    class: "cap-mute"
-  };
-
-  const _hoisted_216 = {
-    class: "home-user"
-  };
-
-  const _hoisted_217 = {
-    class: "ava lg"
-  };
-
-  const _hoisted_218 = {
-    class: "home-meta"
-  };
-
-  const _hoisted_219 = {
-    class: "ctitle"
-  };
-
-  const _hoisted_220 = {
-    key: 0,
-    class: "cap-mute"
-  };
+  const _hoisted_220 = [ "disabled" ];
 
   const _hoisted_221 = [ "disabled" ];
 
-  const _hoisted_222 = {
-    key: 0,
-    class: "cap-mute"
-  };
+  const _hoisted_222 = [ "disabled" ];
 
   const _hoisted_223 = {
-    class: "row"
-  };
-
-  const _hoisted_224 = {
-    key: 0,
     class: "toolbar"
   };
 
-  const _hoisted_225 = {
-    class: "balance"
-  };
+  const _hoisted_224 = [ "disabled" ];
+
+  const _hoisted_225 = [ "disabled" ];
 
   const _hoisted_226 = {
-    key: 1,
-    class: "cap-mute"
-  };
-
-  const _hoisted_227 = {
-    key: 1,
-    class: "cap-mute"
-  };
-
-  const _hoisted_228 = {
-    class: "toolbar"
-  };
-
-  const _hoisted_229 = [ "disabled" ];
-
-  const _hoisted_230 = {
     key: 2,
     class: "cap-mute"
   };
 
-  const _hoisted_231 = {
-    class: "row sep-top"
+  const _hoisted_227 = {
+    class: "home-user"
   };
 
-  const _hoisted_232 = {
+  const _hoisted_228 = {
+    class: "ava lg"
+  };
+
+  const _hoisted_229 = {
+    class: "home-meta"
+  };
+
+  const _hoisted_230 = {
+    class: "ctitle"
+  };
+
+  const _hoisted_231 = {
+    key: 0,
     class: "cap-mute"
   };
 
-  const _hoisted_233 = {
+  const _hoisted_232 = [ "disabled" ];
+
+  const _hoisted_233 = [ "disabled" ];
+
+  const _hoisted_234 = {
+    key: 2,
+    class: "cap-mute"
+  };
+
+  const _hoisted_235 = {
+    class: "row"
+  };
+
+  const _hoisted_236 = {
+    key: 0,
+    class: "toolbar"
+  };
+
+  const _hoisted_237 = {
+    class: "balance"
+  };
+
+  const _hoisted_238 = {
+    key: 1,
+    class: "cap-mute"
+  };
+
+  const _hoisted_239 = {
+    key: 1,
+    class: "cap-mute"
+  };
+
+  const _hoisted_240 = {
+    key: 2,
+    class: "toolbar"
+  };
+
+  const _hoisted_241 = [ "disabled" ];
+
+  const _hoisted_242 = {
+    key: 3,
+    class: "cap-mute"
+  };
+
+  const _hoisted_243 = {
+    key: 4,
+    class: "cap-mute"
+  };
+
+  const _hoisted_244 = {
+    class: "row sep-top"
+  };
+
+  const _hoisted_245 = {
+    class: "cap-mute"
+  };
+
+  const _hoisted_246 = {
     key: 5,
     class: "captcha-cover",
     role: "dialog",
@@ -22157,7 +9913,7 @@
     "aria-label": "\u5b8c\u6210\u6ce8\u518c\u4eba\u673a\u9a8c\u8bc1"
   };
 
-  const _hoisted_234 = {
+  const _hoisted_247 = {
     class: "captcha-card"
   };
 
@@ -22176,7 +9932,7 @@
   const _sfc_main = vue.defineComponent({
     __name: "Panel",
     setup(__props) {
-      var _a2;
+      var _a;
       const IS_DEV = false;
       const collapsed = vue.ref(getCollapsed());
       const expand = () => {
@@ -22214,9 +9970,9 @@
         };
       }
       function switchPanel(nextCollapsed) {
-        var _a3;
+        var _a2;
         if (collapsed.value === nextCollapsed) return;
-        const rect = (_a3 = panelRef.value) == null ? void 0 : _a3.getBoundingClientRect();
+        const rect = (_a2 = panelRef.value) == null ? void 0 : _a2.getBoundingClientRect();
         pendingPanelResize = pos.value && rect ? {
           position: {
             x: rect.left,
@@ -22289,10 +10045,10 @@
         if (next) pos.value = next;
       }
       function finishDrag(event) {
-        var _a3;
+        var _a2;
         const result = endPanelDrag(dragState, event.pointerId);
         const handle = event.currentTarget instanceof HTMLElement ? event.currentTarget : dragHandleRef.value;
-        if ((_a3 = handle == null ? void 0 : handle.hasPointerCapture) == null ? void 0 : _a3.call(handle, event.pointerId)) {
+        if ((_a2 = handle == null ? void 0 : handle.hasPointerCapture) == null ? void 0 : _a2.call(handle, event.pointerId)) {
           try {
             handle.releasePointerCapture(event.pointerId);
           } catch {}
@@ -22400,16 +10156,16 @@
       const announcementAutoOpenedSeq = vue.ref(getAnnouncementAutoOpenedSeq());
       const announcementUnread = vue.computed(() => !!announcement.value && announcement.value.seq > announcementReadSeq.value);
       const announcementTime = vue.computed(() => {
-        var _a3;
-        const iso = (_a3 = announcement.value) == null ? void 0 : _a3.updatedAt;
+        var _a2;
+        const iso = (_a2 = announcement.value) == null ? void 0 : _a2.updatedAt;
         return iso ? new Date(iso).toLocaleString("zh-CN", {
           dateStyle: "short",
           timeStyle: "short"
         }) : "";
       });
       const dismissAnnouncement = () => {
-        var _a3;
-        const seq = (_a3 = announcement.value) == null ? void 0 : _a3.seq;
+        var _a2;
+        const seq = (_a2 = announcement.value) == null ? void 0 : _a2.seq;
         if (seq === void 0) return;
         announcementReadSeq.value = seq;
         setAnnouncementReadSeq(seq);
@@ -22477,14 +10233,17 @@
         l: "\u8bca\u65ad"
       } ];
       const QUESTION_TYPE_LABELS = {
-        [QuestionType.Single]: "\u5355\u9009",
-        [QuestionType.Multiple]: "\u591a\u9009",
-        [QuestionType.Judge]: "\u5224\u65ad",
-        [QuestionType.Fill]: "\u586b\u7a7a"
+        [protocol.QuestionType.Single]: "\u5355\u9009",
+        [protocol.QuestionType.Multiple]: "\u591a\u9009",
+        [protocol.QuestionType.Judge]: "\u5224\u65ad",
+        [protocol.QuestionType.Fill]: "\u586b\u7a7a"
       };
       const accountName = vue.ref(getUsername());
+      const cardSession = vue.ref(getCardSession());
+      const authMode = vue.ref("account");
       const username = vue.ref("");
       const password = vue.ref("");
+      const cardLoginCode = vue.ref("");
       const email = vue.ref("");
       const authMsg = vue.ref("");
       const authing = vue.ref(false);
@@ -22515,14 +10274,14 @@
         });
       }
       function onCaptchaFrameLoad() {
-        var _a3;
+        var _a2;
         if (captchaRequest || !captchaPending || !captchaState.value) return;
-        const frameWindow = (_a3 = captchaFrame.value) == null ? void 0 : _a3.contentWindow;
+        const frameWindow = (_a2 = captchaFrame.value) == null ? void 0 : _a2.contentWindow;
         if (!frameWindow) {
           finishCaptcha(new Error("challenge-unavailable"));
           return;
         }
-        captchaRequest = createCaptchaFrameRequest({
+        captchaRequest = core.createCaptchaFrameRequest({
           frameWindow: frameWindow,
           targetOrigin: new URL(BACKEND_BASE_URL).origin,
           state: captchaState.value,
@@ -22550,7 +10309,9 @@
         if (r.token) {
           setToken(r.token);
           setUsername(username.value.trim());
+          setCardSession(false);
           accountName.value = username.value.trim();
+          cardSession.value = false;
           loggedIn.value = true;
           authStale.value = false;
           password.value = "";
@@ -22567,19 +10328,48 @@
         } else authMsg.value = r.message;
         authing.value = false;
       }
+      async function doCardAuth() {
+        if (authing.value) return;
+        authing.value = true;
+        authMsg.value = "";
+        const r = await authenticateCard(aiaskTransport, cardLoginCode.value, BACKEND_BASE_URL);
+        if (r.token) {
+          setToken(r.token);
+          setUsername("\u5361\u5bc6");
+          setCardSession(true);
+          accountName.value = "\u5361\u5bc6";
+          cardSession.value = true;
+          loggedIn.value = true;
+          authStale.value = false;
+          cardLoginCode.value = "";
+          tab.value = loaded && list.value.length > 0 ? "ask" : "home";
+          pushLog("\u5361\u5bc6\u767b\u5f55\u6210\u529f", "info");
+          void refreshMe();
+          if (noteAction.value === "login") {
+            note2.value = "";
+            noteAction.value = "";
+          }
+        } else authMsg.value = r.message;
+        authing.value = false;
+      }
       async function devAutoLogin() {
         return;
       }
       const markAuthStale = () => {
         authStale.value = true;
+        if (cardSession.value) authMode.value = "card";
         if (!username.value) username.value = accountName.value;
       };
       const logout = () => {
         clearToken();
+        setCardSession(false);
         clearLastBalance();
         balance.value = null;
         loggedIn.value = false;
         authStale.value = false;
+        cardSession.value = false;
+        authMode.value = "account";
+        cardLoginCode.value = "";
         username.value = accountName.value;
         pushLog("\u5df2\u9000\u51fa\u767b\u5f55", "info");
         discard();
@@ -22591,12 +10381,12 @@
       const emailBound = vue.ref(null);
       async function refreshMe() {
         if (!getToken()) return;
-        const snapshot2 = await fetchMe(aiaskTransport, BACKEND_BASE_URL);
-        if (!snapshot2) return;
-        balance.value = snapshot2.balance;
-        setLastBalance(snapshot2.balance);
-        accountName.value = snapshot2.username;
-        emailBound.value = snapshot2.emailBound;
+        const snapshot = await fetchMe(aiaskTransport, BACKEND_BASE_URL);
+        if (!snapshot) return;
+        balance.value = snapshot.balance;
+        setLastBalance(snapshot.balance);
+        accountName.value = snapshot.username;
+        emailBound.value = snapshot.emailBound;
         authStale.value = false;
       }
       async function doRedeem() {
@@ -22703,8 +10493,8 @@
       const coursePositionText = vue.computed(() => coursePositionLine(courseProgress2.value));
       const courseCountText = vue.computed(() => courseCountLine(courseProgress2.value));
       const courseSkipped = vue.computed(() => {
-        var _a3, _b;
-        return ((_b = (_a3 = courseProgress2.value) == null ? void 0 : _a3.section) == null ? void 0 : _b.skipped) ?? [];
+        var _a2, _b;
+        return ((_b = (_a2 = courseProgress2.value) == null ? void 0 : _a2.section) == null ? void 0 : _b.skipped) ?? [];
       });
       const legacyCourseUrl = legacyStudentstudyUpgradeUrl(location);
       const onCourseStudyPage = isNewCourseStudyUrl(location);
@@ -22841,9 +10631,9 @@
       const cachePersistFailed = vue.ref(localAnswerCache.hasPersistFailure());
       const syncCacheCount = () => {
         localCacheCount.value = localAnswerCache.size();
-        const failed2 = localAnswerCache.hasPersistFailure();
-        if (failed2 && !cachePersistFailed.value) pushLog("\u672c\u5730\u7f13\u5b58\u5199\u5165\u5931\u8d25 \xb7 \u6700\u8fd1\u7684\u6536\u5f55\u53ef\u80fd\u6ca1\u6709\u843d\u76d8", "warning");
-        cachePersistFailed.value = failed2;
+        const failed = localAnswerCache.hasPersistFailure();
+        if (failed && !cachePersistFailed.value) pushLog("\u672c\u5730\u7f13\u5b58\u5199\u5165\u5931\u8d25 \xb7 \u6700\u8fd1\u7684\u6536\u5f55\u53ef\u80fd\u6ca1\u6709\u843d\u76d8", "warning");
+        cachePersistFailed.value = failed;
       };
       const cacheNearWarn = vue.computed(() => localCacheCount.value >= CACHE_WARN_ENTRIES * .8);
       const cacheOverWarn = vue.computed(() => localCacheCount.value > CACHE_WARN_ENTRIES);
@@ -22879,14 +10669,14 @@
       const exportCache = () => {
         downloadText(`aiask-cache-${Date.now()}.json`, localAnswerCache.exportJson());
       };
-      const PARSE_IMPORT_URL = `${IMPORT_BRIDGE_ORIGIN}${IMPORT_BRIDGE_PATHNAME}`;
+      const PARSE_IMPORT_URL = `${protocol.IMPORT_BRIDGE_ORIGIN}${IMPORT_BRIDGE_PATHNAME}`;
       const pickImportFile = () => {
         const input = document.createElement("input");
         input.type = "file";
         input.accept = "application/json";
         input.onchange = async () => {
-          var _a3;
-          const file = (_a3 = input.files) == null ? void 0 : _a3[0];
+          var _a2;
+          const file = (_a2 = input.files) == null ? void 0 : _a2[0];
           if (!file) return;
           try {
             const text = await file.text();
@@ -22984,13 +10774,17 @@
         URL.revokeObjectURL(url);
       };
       const exportDiagnostics = () => {
+        var _a2;
         const payload = {
           exportedAt: (new Date).toISOString(),
           version: SCRIPT_VERSION,
+          engine: ENGINE_ID,
           rule: ruleDiag.value ?? null,
           ruleCaptureFailure: lastCaptureFailure.value,
           fontTable: chaoxingFontTableStatus(),
-          aopengCapture: aopengCaptureStatus(document),
+          listener: listenerStatus(),
+          ruleDiagnosticsFlow: ((_a2 = diag.value) == null ? void 0 : _a2.ruleFlow) ?? null,
+          harvestContribute: harvestContributeStatus(),
           logs: logs.value
         };
         downloadText(`aiask-diagnostics-${Date.now()}.json`, JSON.stringify(payload, null, 2));
@@ -23017,7 +10811,7 @@
       const tip = vue.ref("\u7a7a\u95f2");
       const note2 = vue.ref("");
       const noteAction = vue.ref("");
-      const diag = vue.ref(null);
+      const diag = vue.shallowRef(null);
       const lastCaptureFailure = vue.ref(null);
       const diagOpen = vue.ref(true);
       const ruleDiag = vue.ref(null);
@@ -23041,7 +10835,7 @@
       let ctx = null;
       let adapter = null;
       let createAdapter = null;
-      const platform = vue.ref(((_a2 = trustedRemoteRulePlatformFor(location.hostname)) == null ? void 0 : _a2.platform) ?? "chaoxing");
+      const platform = vue.ref(((_a = trustedRemoteRulePlatformFor(location.hostname)) == null ? void 0 : _a.platform) ?? "chaoxing");
       const courseAdapter = courseAdapterFor(platform.value);
       let loaded = false;
       let harvestSettledAt = 0;
@@ -23053,26 +10847,47 @@
       let stopRuleStoreUpdates = null;
       let stopRuleStoreRestored = null;
       const rulesRestoring = vue.ref(ruleStoreRestorePending());
+      const WALK_STOP_TEXT = {
+        "no-card": "\u8fd9\u9875\u6ca1\u6709\u7b54\u9898\u5361\uff0c\u4e0d\u5f80\u4e0b\u8d70",
+        "all-done": "\u5f53\u524d\u9898\u4e4b\u540e\u6ca1\u6709\u672a\u505a\u7684\u9898\u4e86",
+        budget: "\u5df2\u5230\u672c\u8f6e\u4e0a\u9650\uff0c\u505c\u4e0b",
+        "needs-confirm": "\u8fd9\u9898\u7b54\u6848\u5df2\u586b\u597d\uff0c\u4f46\u9700\u8981\u4f60\u70b9\u300c\u786e\u8ba4\u300d\u624d\u7b97\u63d0\u4ea4\u2014\u2014\u811a\u672c\u4e0d\u66ff\u4f60\u63d0\u4ea4\uff1b\u70b9\u5b8c\u8bf7\u518d\u6309\u4e00\u6b21\u300c\u5f00\u59cb\u300d\u7ee7\u7eed",
+        stuck: "\u5207\u9898\u6ca1\u751f\u6548\uff0c\u505c\u4e0b",
+        "capture-failure": "\u89c4\u5219\u6355\u83b7\u5931\u8d25\uff0c\u4e0d\u518d\u5207\u9898",
+        refused: "\u4e0b\u4e00\u683c\u88ab\u5b89\u5168\u5b88\u536b\u62d2\u7edd\uff0c\u505c\u4e0b"
+      };
+      const COMMIT_OUTCOME_TEXT = {
+        committed: "\u5df2\u6536\u5230\u56de\u6267",
+        "commit-unverified": "\u70b9\u4e86\u4f46\u6ca1\u7b49\u5230\u56de\u6267",
+        "no-entry": "\u6ca1\u627e\u5230\u6682\u5b58\u5165\u53e3",
+        "ambiguous-entry": "\u6682\u5b58\u5165\u53e3\u4e0d\u6b62\u4e00\u9897",
+        refused: "\u5165\u53e3\u8fc7\u4e0d\u4e86\u5b88\u536b",
+        "hook-failed": "\u7ad9\u70b9\u6682\u5b58\u5931\u8d25",
+        skipped: "\u672c\u8f6e\u6ca1\u6709\u5199\u5165"
+      };
       let stopPageChanges = null;
+      let stopWalk = null;
       let stopDomChanges = null;
       let stopUrlChanges = null;
       let pageChangeScheduler = null;
+      let completing = false;
+      let pendingPageChange = false;
       function currentReportIdentity() {
         const rule = ruleDiag.value;
         if (!rule) return null;
         return buildReportIdentity(platform.value, getClientId(), SCRIPT_VERSION, RULE_ENGINE_VERSION, rule);
       }
       function refreshRuleDiagnostic() {
-        var _a3;
-        const loadStatus = (_a3 = ruleDiag.value) == null ? void 0 : _a3.loadStatus;
+        var _a2;
+        const loadStatus = (_a2 = ruleDiag.value) == null ? void 0 : _a2.loadStatus;
         if (!adapter || !loadStatus) return;
         ruleDiag.value = buildRuleSessionDiagnostic(adapter, loadStatus, ruleStoreRuntime.snapshot().releaseSummaries);
         syncCourseConfig();
       }
       let courseConfigSource = null;
       function syncCourseConfig() {
-        var _a3, _b, _c;
-        const remote = (_b = (_a3 = resolvedRulePackage(adapter)) == null ? void 0 : _a3.shellConfig) == null ? void 0 : _b.selectors;
+        var _a2, _b, _c;
+        const remote = (_b = (_a2 = resolvedRulePackage(adapter)) == null ? void 0 : _a2.shellConfig) == null ? void 0 : _b.selectors;
         const source = remote ? ((_c = ruleDiag.value) == null ? void 0 : _c.version) ?? "remote" : "built-in";
         if (source === courseConfigSource) return;
         courseConfigSource = source;
@@ -23080,9 +10895,9 @@
         pushLog(remote ? `\u8bfe\u7a0b\u5224\u636e\u6765\u81ea\u89c4\u5219\u5305 ${source} \xb7 ${Object.keys(remote).length} \u9879` : ruleStoreRuntime.usablePackageIds().length === 0 ? "\u8bfe\u7a0b\u5224\u636e\u7528\u5185\u7f6e\u9ed8\u8ba4\u503c \xb7 \u672c\u5730\u6ca1\u6709\u53ef\u7528\u89c4\u5219\u5305" : "\u8bfe\u7a0b\u5224\u636e\u7528\u5185\u7f6e\u9ed8\u8ba4\u503c \xb7 \u672c\u9875\u65e0\u5bf9\u5e94\u89c4\u5219", "info");
       }
       function examSessionStorage() {
-        var _a3;
+        var _a2;
         try {
-          return ((_a3 = document.defaultView) == null ? void 0 : _a3.sessionStorage) ?? null;
+          return ((_a2 = document.defaultView) == null ? void 0 : _a2.sessionStorage) ?? null;
         } catch {
           return null;
         }
@@ -23139,15 +10954,16 @@
       });
       const cur = vue.computed(() => list.value[curInx.value]);
       const currentTypeLabel = vue.computed(() => {
-        var _a3;
+        var _a2;
         if (!cur.value) return "";
-        if (((_a3 = cur.value.unit) == null ? void 0 : _a3.queryType) === "short_answer") return "\u7b80\u7b54";
+        const label = harvestTypeLabel((_a2 = cur.value.unit) == null ? void 0 : _a2.queryType);
+        if (cur.value.unit && core.isTextAnswerType(cur.value.unit.queryType)) return label;
         return QUESTION_TYPE_LABELS[cur.value.q.type];
       });
       const matchedOptionIndexes = vue.computed(() => {
         const current = cur.value;
         if (!(current == null ? void 0 : current.unit)) return new Set;
-        return new Set(answeredOptionIndexes(current.unit, current.answerPlan));
+        return new Set(core.answeredOptionIndexes(current.unit, current.answerPlan));
       });
       const isHit = index => matchedOptionIndexes.value.has(index);
       const optionDisclosure = vue.computed(() => {
@@ -23169,12 +10985,14 @@
         return "";
       });
       function discard() {
-        var _a3;
+        var _a2;
         const discarded = loaded || list.value.length > 0;
         pageChangeScheduler == null ? void 0 : pageChangeScheduler.cancel();
         stopPageChanges == null ? void 0 : stopPageChanges();
         stopPageChanges = null;
-        void ((_a3 = adapter == null ? void 0 : adapter.dispose) == null ? void 0 : _a3.call(adapter));
+        stopWalk == null ? void 0 : stopWalk();
+        stopWalk = null;
+        void ((_a2 = adapter == null ? void 0 : adapter.dispose) == null ? void 0 : _a2.call(adapter));
         session = null;
         ctx = null;
         adapter = null;
@@ -23222,10 +11040,10 @@
               const harvest = active2.lastHarvest;
               harvestedCount.value = (harvest == null ? void 0 : harvest.persisted) ?? 0;
               harvestedList.value = (harvest == null ? void 0 : harvest.items) ?? [];
-              const signature2 = harvestedList.value.map(item => item.unitHash).join();
+              const signature = harvestedList.value.map(item => item.unitHash).join();
               harvestSettledAt = harvestedList.value.length > 0 ? Date.now() : 0;
-              if (harvest && harvest.persisted > 0 && signature2 !== harvestSignature) pushLog(cachePersistFailed.value ? `\u672c\u9875\u6536\u5f55 ${harvest.persisted} \u9898 \xb7 \u672a\u80fd\u843d\u76d8\uff0c\u5173\u6389\u9875\u9762\u4f1a\u4e22` : `\u672c\u9875\u6536\u5f55 ${harvest.persisted} \u9898 \xb7 \u5df2\u5b58\u5165\u672c\u5730\u7f13\u5b58`, cachePersistFailed.value ? "warning" : "info");
-              harvestSignature = signature2;
+              if (harvest && harvest.persisted > 0 && signature !== harvestSignature) pushLog(cachePersistFailed.value ? `\u672c\u9875\u6536\u5f55 ${harvest.persisted} \u9898 \xb7 \u672a\u80fd\u843d\u76d8\uff0c\u5173\u6389\u9875\u9762\u4f1a\u4e22` : `\u672c\u9875\u6536\u5f55 ${harvest.persisted} \u9898 \xb7 \u5df2\u5b58\u5165\u672c\u5730\u7f13\u5b58`, cachePersistFailed.value ? "warning" : "info");
+              harvestSignature = signature;
               if (harvest && harvest.persisted < harvest.harvested) pushLog(`${harvest.harvested - harvest.persisted} \u9898\u6536\u5f55\u5199\u5165\u5931\u8d25 \xb7 \u672a\u5b58\u5165\u7f13\u5b58`, "warning");
               if (n > 0) {
                 list.value = active2.list;
@@ -23258,7 +11076,12 @@
         }
       }
       async function onFrameReady() {
+        var _a2;
         if (running.value) return;
+        (_a2 = adapter == null ? void 0 : adapter.emitLifecycleEvent) == null ? void 0 : _a2.call(adapter, {
+          event: "frame-ready",
+          payload: null
+        });
         if (!loaded) {
           await detectQuestions();
           return;
@@ -23283,13 +11106,17 @@
       vue.onMounted(() => {
         pageChangeScheduler = createPageChangeScheduler(window, () => {
           if (running.value) return;
+          if (completing) {
+            pendingPageChange = true;
+            return;
+          }
           discard();
           void detectQuestions();
         });
         const fontStatus = chaoxingFontTableStatus();
         if (fontStatus !== "ok") pushLog(fontStatus === "unavailable" ? "\u5b57\u4f53\u8868\u672a\u4e0b\u8f7d \xb7 \u5e26\u52a0\u5bc6\u5b57\u4f53\u7684\u9898\u76ee\u65e0\u6cd5\u8bc6\u522b \xb7 \u8bf7\u91cd\u88c5\u811a\u672c\u4ee5\u91cd\u65b0\u4e0b\u8f7d\u8d44\u6e90" : "\u5b57\u4f53\u8868\u5185\u5bb9\u6821\u9a8c\u672a\u901a\u8fc7 \xb7 \u5df2\u5b89\u5168\u62d2\u7528 \xb7 \u5e26\u52a0\u5bc6\u5b57\u4f53\u7684\u9898\u76ee\u65e0\u6cd5\u8bc6\u522b", "warning");
-        const capture2 = aopengCaptureStatus(document);
-        if (capture2 && !capture2.installed) pushLog("\u63a5\u53e3\u65c1\u542c\u672a\u88c5\u4e0a \xb7 \u672c\u9875\u53ea\u80fd\u9760\u9875\u9762 DOM \u6536\u5f55", "warning");
+        const listener = listenerStatus();
+        if (listener && !listener.installed) pushLog("\u63a5\u53e3\u65c1\u542c\u672a\u88c5\u4e0a \xb7 \u672c\u9875\u53ea\u80fd\u9760\u9875\u9762 DOM \u6536\u5f55", "warning");
         stopFrameReady = subscribeFrameReady(document, onFrameReady);
         stopDomChanges = subscribeDomChanges(document, () => {
           if (loaded || running.value) return;
@@ -23329,7 +11156,7 @@
         document.addEventListener("visibilitychange", onVisibilityChange);
       });
       vue.onBeforeUnmount(() => {
-        var _a3;
+        var _a2;
         if (captchaRequest) captchaRequest.cancel(); else if (captchaPending) finishCaptcha(new Error("cancelled"));
         stopFrameReady == null ? void 0 : stopFrameReady();
         stopFrameReady = null;
@@ -23339,6 +11166,8 @@
         stopRuleStoreRestored = null;
         stopPageChanges == null ? void 0 : stopPageChanges();
         stopPageChanges = null;
+        stopWalk == null ? void 0 : stopWalk();
+        stopWalk = null;
         stopDomChanges == null ? void 0 : stopDomChanges();
         stopDomChanges = null;
         stopUrlChanges == null ? void 0 : stopUrlChanges();
@@ -23347,7 +11176,7 @@
         pageChangeScheduler = null;
         mediaRunner == null ? void 0 : mediaRunner.stop();
         mediaRunner = null;
-        void ((_a3 = adapter == null ? void 0 : adapter.dispose) == null ? void 0 : _a3.call(adapter));
+        void ((_a2 = adapter == null ? void 0 : adapter.dispose) == null ? void 0 : _a2.call(adapter));
         if (dragState.pointerId !== null) endPanelDrag(dragState, dragState.pointerId);
         panelResizeObserver == null ? void 0 : panelResizeObserver.disconnect();
         panelResizeObserver = null;
@@ -23415,10 +11244,10 @@
             try {
               const docs = submitDocs();
               pushLog(`\u63d0\u4ea4\u53d6\u8bc1 \xb7 \u626b\u5230 ${docs.length} \u5e27 \xb7 ${docs.map(d => {
-              var _a3;
+              var _a2;
               let where = "?";
               try {
-                where = ((_a3 = d.location) == null ? void 0 : _a3.pathname) ?? "?";
+                where = ((_a2 = d.location) == null ? void 0 : _a2.pathname) ?? "?";
               } catch {
                 where = "\u8de8\u57df";
               }
@@ -23440,8 +11269,32 @@
           tip.value = e.total === 0 ? "\u672a\u8bc6\u522b\u5230\u9898\u76ee" : `\u5b8c\u6210 \xb7 ${e.hit} \u547d\u4e2d / ${e.total} \u9898`;
           running.value = false;
           syncCacheCount();
+          refreshRuleDiagnostic();
           pushLog(tip.value, e.total === 0 ? "warning" : "info");
-          void finishRound();
+          const items = (session == null ? void 0 : session.list) ?? [];
+          const completed = {
+            event: "session-complete",
+            payload: {
+              filled: items.filter(item => item.filled).length,
+              total: e.total,
+              refused: items.filter(item => item.status === "unsafe").length,
+              captureFailed: ruleCaptureFailure(adapter) != null
+            }
+          };
+          const completedAdapter = adapter;
+          completing = true;
+          void finishRound().finally(async () => {
+            var _a2;
+            try {
+              await ((_a2 = completedAdapter == null ? void 0 : completedAdapter.emitLifecycleEvent) == null ? void 0 : _a2.call(completedAdapter, completed));
+            } finally {
+              completing = false;
+              if (pendingPageChange) {
+                pendingPageChange = false;
+                pageChangeScheduler == null ? void 0 : pageChangeScheduler.notify();
+              }
+            }
+          });
         } else if (e.kind === "paused") {
           clearExamAutoResume();
           tip.value = "\u5df2\u6682\u505c";
@@ -23466,10 +11319,10 @@
         }
       }
       function missingRulePackage() {
-        var _a3;
-        const expected = ((_a3 = trustedRemoteRulePlatformFor(location.hostname)) == null ? void 0 : _a3.packageId) ?? validatedRulePackageIdFor(location);
-        if (expected) return ruleStoreRuntime.snapshot().store.resolve(expected) === null ? {
-          packageId: expected,
+        var _a2;
+        const expected2 = ((_a2 = trustedRemoteRulePlatformFor(location.hostname)) == null ? void 0 : _a2.packageId) ?? validatedRulePackageIdFor(location);
+        if (expected2) return ruleStoreRuntime.snapshot().store.resolve(expected2) === null ? {
+          packageId: expected2,
           routed: true
         } : null;
         return SUPPORTED_HOST_PATTERN.test(location.hostname) && CHA0XING_ANSWERABLE_PATH.test(location.href) ? {
@@ -23516,14 +11369,14 @@
         return parts.join(" \xb7 ");
       });
       function evidenceOmittedCount(html) {
-        var _a3;
+        var _a2;
         const first = html.split("\n", 1)[0] ?? "";
-        const nonce = (_a3 = /^<!-- aiask-frame#([0-9a-f]{8}): /u.exec(first)) == null ? void 0 : _a3[1];
+        const nonce = (_a2 = /^<!-- aiask-frame#([0-9a-f]{8}): /u.exec(first)) == null ? void 0 : _a2[1];
         if (!nonce) return 0;
         const prefix = `\x3c!-- aiask-omitted#${nonce}: `;
-        let count2 = 0;
-        for (const line of html.split("\n")) if (line.startsWith(prefix)) count2 += 1;
-        return count2;
+        let count = 0;
+        for (const line of html.split("\n")) if (line.startsWith(prefix)) count += 1;
+        return count;
       }
       function evidenceReportIdentity() {
         const missing = missingRulePackage();
@@ -23588,10 +11441,10 @@
         if (handledEvidenceRequests.has(request.requestId)) return;
         evidenceRequest.value = request;
       }
-      function settleEvidenceRequest(requestId2) {
-        var _a3;
-        handledEvidenceRequests.add(requestId2);
-        if (((_a3 = evidenceRequest.value) == null ? void 0 : _a3.requestId) === requestId2) evidenceRequest.value = null;
+      function settleEvidenceRequest(requestId) {
+        var _a2;
+        handledEvidenceRequests.add(requestId);
+        if (((_a2 = evidenceRequest.value) == null ? void 0 : _a2.requestId) === requestId) evidenceRequest.value = null;
       }
       function openEvidenceRequest() {
         const request = evidenceRequest.value;
@@ -23602,12 +11455,12 @@
         if (request) settleEvidenceRequest(request.requestId);
       }
       function evidenceFailure(code, reason) {
-        if (code === AiAskCode.RateLimited) {
+        if (code === protocol.AiAskCode.RateLimited) {
           if (reason === "ticket") return "\u4e0a\u4f20\u5931\u8d25 \xb7 \u5f00\u53d1\u8005\u70b9\u7684\u8fd9\u4e00\u9875\u5df2\u7ecf\u6536\u591f\u4e86\uff0c\u4e0d\u7528\u518d\u4f20\u3002";
           if (reason === "ip") return "\u4e0a\u4f20\u5931\u8d25 \xb7 \u8fd9\u4e2a\u7f51\u7edc\u4eca\u5929\u4f20\u5f97\u592a\u591a\u4e86\uff0c\u660e\u5929\u518d\u8bd5\u3002";
           return "\u4e0a\u4f20\u5931\u8d25 \xb7 \u4eca\u5929\u4f20\u5f97\u592a\u591a\u4e86\uff0c\u660e\u5929\u518d\u8bd5\u3002";
         }
-        if (code === AiAskCode.Invalid) return "\u4e0a\u4f20\u5931\u8d25 \xb7 \u670d\u52a1\u7aef\u6ca1\u6536\u4e0b\u8fd9\u4efd\u8bc1\u636e\u3002";
+        if (code === protocol.AiAskCode.Invalid) return "\u4e0a\u4f20\u5931\u8d25 \xb7 \u670d\u52a1\u7aef\u6ca1\u6536\u4e0b\u8fd9\u4efd\u8bc1\u636e\u3002";
         return "\u4e0a\u4f20\u5931\u8d25 \xb7 \u7f51\u7edc\u6216\u670d\u52a1\u6682\u65f6\u4e0d\u53ef\u7528\uff0c\u7a0d\u540e\u518d\u8bd5\u3002";
       }
       async function uploadEvidence() {
@@ -23641,7 +11494,7 @@
         try {
           const res = await ruleTransport.send({
             method: "POST",
-            url: BACKEND_BASE_URL + EVIDENCE_PATH,
+            url: BACKEND_BASE_URL + protocol.EVIDENCE_PATH,
             headers: {
               "Content-Type": "application/json",
               "Idempotency-Key": crypto.randomUUID()
@@ -23649,10 +11502,10 @@
             body: JSON.stringify(bundle),
             timeoutMs: 2e4
           });
-          const parsed = EvidenceResponseSchema.safeParse(JSON.parse(res.body));
+          const parsed = protocol.EvidenceResponseSchema.safeParse(JSON.parse(res.body));
           const data = parsed.success ? parsed.data : void 0;
           const code = data == null ? void 0 : data.code;
-          if (code !== AiAskCode.Ok) {
+          if (code !== protocol.AiAskCode.Ok) {
             evidenceStatus.value = evidenceFailure(code, data == null ? void 0 : data.reason);
             pushLog(`\u73b0\u573a\u8bc1\u636e\u4e0a\u4f20\u5931\u8d25 \xb7 code ${String(code)}`, "warning");
             return;
@@ -23671,7 +11524,7 @@
         }
       }
       function build() {
-        var _a3;
+        var _a2, _b;
         if (session && ctx) return true;
         const r = createSession({
           transport: gmTransport,
@@ -23684,6 +11537,10 @@
           baseUrl: BACKEND_BASE_URL,
           settings: settings,
           localStore: localAnswerCache,
+          onHarvested: items => {
+            if (!getToken()) return;
+            void contributeHarvest(aiaskTransport, BACKEND_BASE_URL, platform.value || "unknown", items).catch(() => void 0);
+          },
           emit: onEvent
         });
         if (!r.session) {
@@ -23702,8 +11559,19 @@
         session = r.session;
         ctx = r.ctx;
         adapter = r.adapter;
-        stopPageChanges = ((_a3 = adapter.subscribePageChanges) == null ? void 0 : _a3.call(adapter, () => {
+        stopPageChanges = ((_a2 = adapter.subscribePageChanges) == null ? void 0 : _a2.call(adapter, () => {
+          if (running.value) return false;
           pageChangeScheduler == null ? void 0 : pageChangeScheduler.notify();
+          return true;
+        })) ?? null;
+        stopWalk == null ? void 0 : stopWalk();
+        stopWalk = ((_b = adapter.subscribeWalk) == null ? void 0 : _b.call(adapter, event => {
+          if (event.kind === "stepped") {
+            pushLog(`\u5207\u5230\u7b2c ${event.index + 1}/${event.total} \u9898`, "info");
+            return;
+          }
+          const walked = event.steps > 0 ? `\u5df2\u8fde\u7eed\u5207 ${event.steps} \u9898 \xb7 ` : "";
+          pushLog(`${walked}${WALK_STOP_TEXT[event.reason]}${event.detail ? ` \xb7 ${event.detail}` : ""}`, event.reason === "needs-confirm" ? "warning" : "info");
         })) ?? null;
         createAdapter = r.createAdapter;
         ruleDiag.value = r.rule;
@@ -23713,14 +11581,14 @@
         return true;
       }
       async function runDiag() {
-        var _a3, _b;
+        var _a2, _b;
         if (!build() || !ctx || !createAdapter) return;
         const diagnosticAdapter = createAdapter();
         let reportIdentity = currentReportIdentity();
         try {
           diag.value = await runDiagnostic(diagnosticAdapter, ctx);
           lastCaptureFailure.value = ruleCaptureFailure(diagnosticAdapter);
-          const loadStatus = (_a3 = ruleDiag.value) == null ? void 0 : _a3.loadStatus;
+          const loadStatus = (_a2 = ruleDiag.value) == null ? void 0 : _a2.loadStatus;
           const diagnosticRule = loadStatus ? buildRuleSessionDiagnostic(diagnosticAdapter, loadStatus, ruleStoreRuntime.snapshot().releaseSummaries) : null;
           if (diagnosticRule) {
             reportIdentity = buildReportIdentity(platform.value, getClientId(), SCRIPT_VERSION, RULE_ENGINE_VERSION, diagnosticRule);
@@ -23752,7 +11620,7 @@
         location.reload();
       }
       async function updateRules() {
-        var _a3;
+        var _a2;
         if (running.value || ruleUpdating.value) return;
         ruleUpdating.value = true;
         ruleUpdateNote.value = "\u68c0\u67e5\u4e2d\u2026";
@@ -23760,9 +11628,10 @@
         refreshRuleDiagnostic();
         ruleUpdating.value = false;
         const usable = ruleStoreRuntime.usablePackageIds().length;
-        ruleUpdateNote.value = ((_a3 = ruleUpdateReadout(result, usable)) == null ? void 0 : _a3.note) ?? "";
+        ruleUpdateNote.value = ((_a2 = ruleUpdateReadout(result, usable)) == null ? void 0 : _a2.note) ?? "";
       }
       async function start() {
+        var _a2;
         if (running.value) return;
         if (!hasFeature("answer")) {
           pushLog("\u672c\u5e73\u53f0\u4ec5\u6536\u5f55\u7b54\u6848 \xb7 \u4e0d\u652f\u6301\u81ea\u52a8\u7b54\u9898", "info");
@@ -23785,6 +11654,10 @@
           list.value = session.list;
           loaded = true;
         }
+        (_a2 = adapter == null ? void 0 : adapter.emitLifecycleEvent) == null ? void 0 : _a2.call(adapter, {
+          event: "user-start",
+          payload: null
+        });
         if (!getToken()) {
           note2.value = "\u672a\u767b\u5f55 \xb7 \u5f53\u524d\u4ec5\u67e5\u514d\u8d39\u9898\u5e93";
           noteAction.value = "login";
@@ -23831,9 +11704,9 @@
         start();
       };
       function jump(i) {
-        var _a3;
+        var _a2;
         curInx.value = i;
-        const el = (_a3 = list.value[i]) == null ? void 0 : _a3.q.el;
+        const el = (_a2 = list.value[i]) == null ? void 0 : _a2.q.el;
         if (el) {
           el.scrollIntoView({
             block: "center"
@@ -23864,11 +11737,11 @@
         reloadCacheView();
       };
       vue.watch(visibleSystemSegs, segs => {
-        var _a3;
-        if (!segs.some(seg => seg.k === systemSub.value)) systemSub.value = ((_a3 = segs[0]) == null ? void 0 : _a3.k) ?? "general";
+        var _a2;
+        if (!segs.some(seg => seg.k === systemSub.value)) systemSub.value = ((_a2 = segs[0]) == null ? void 0 : _a2.k) ?? "general";
       });
       return (_ctx, _cache) => {
-        var _a3, _b;
+        var _a2, _b, _c, _d;
         return collapsed.value ? (vue.openBlock(), vue.createElementBlock("div", {
           key: 0,
           ref_key: "panelRef",
@@ -23884,7 +11757,7 @@
           class: "launcher",
           onClick: activateLauncher,
           "aria-label": "\u5c55\u5f00\u7231\u95ee\u7b54"
-        }, [ _cache[29] || (_cache[29] = vue.createElementVNode("span", {
+        }, [ _cache[33] || (_cache[33] = vue.createElementVNode("span", {
           class: "seal s44"
         }, "\u95ee", -1)), detectedCount.value ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_2, vue.toDisplayString(detectedCount.value), 1)) : vue.createCommentVNode("", true) ]) ], 36)) : (vue.openBlock(), 
         vue.createElementBlock("div", {
@@ -23893,7 +11766,7 @@
           ref: panelRef,
           class: "panel",
           style: vue.normalizeStyle(panelStyle.value)
-        }, [ (vue.openBlock(), vue.createElementBlock("svg", _hoisted_3, [ ..._cache[30] || (_cache[30] = [ vue.createStaticVNode('<symbol id="i-chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></symbol><symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></symbol><symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h13M13 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></symbol>', 3) ]) ])), vue.createElementVNode("div", {
+        }, [ (vue.openBlock(), vue.createElementBlock("svg", _hoisted_3, [ ..._cache[34] || (_cache[34] = [ vue.createStaticVNode('<symbol id="i-chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></symbol><symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></symbol><symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h13M13 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></symbol>', 3) ]) ])), vue.createElementVNode("div", {
           ref_key: "dragHandleRef",
           ref: dragHandleRef,
           class: "head",
@@ -23902,11 +11775,11 @@
           onPointerup: finishDrag,
           onPointercancel: finishDrag,
           onLostpointercapture: finishDrag
-        }, [ _cache[33] || (_cache[33] = vue.createElementVNode("span", {
+        }, [ _cache[37] || (_cache[37] = vue.createElementVNode("span", {
           class: "seal s22"
-        }, "\u95ee", -1)), _cache[34] || (_cache[34] = vue.createElementVNode("span", {
+        }, "\u95ee", -1)), _cache[38] || (_cache[38] = vue.createElementVNode("span", {
           class: "name"
-        }, "\u7231\u95ee\u7b54", -1)), _cache[35] || (_cache[35] = vue.createElementVNode("span", {
+        }, "\u7231\u95ee\u7b54", -1)), _cache[39] || (_cache[39] = vue.createElementVNode("span", {
           class: "spacer"
         }, null, -1)), headChip.value ? (vue.openBlock(), vue.createElementBlock("span", {
           key: 0,
@@ -23922,7 +11795,7 @@
         }, [ loggedIn.value ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
         }, [ vue.createTextVNode(vue.toDisplayString(avatarInitial.value), 1) ], 64)) : (vue.openBlock(), 
-        vue.createElementBlock("svg", _hoisted_5, [ ..._cache[31] || (_cache[31] = [ vue.createElementVNode("circle", {
+        vue.createElementBlock("svg", _hoisted_5, [ ..._cache[35] || (_cache[35] = [ vue.createElementVNode("circle", {
           cx: "12",
           cy: "8",
           r: "3.4"
@@ -23933,7 +11806,7 @@
           class: "x",
           onClick: collapse,
           "aria-label": "\u6536\u8d77"
-        }, [ ..._cache[32] || (_cache[32] = [ vue.createElementVNode("svg", {
+        }, [ ..._cache[36] || (_cache[36] = [ vue.createElementVNode("svg", {
           class: "ic"
         }, [ vue.createElementVNode("use", {
           href: "#i-minus"
@@ -23944,9 +11817,9 @@
           } ]),
           onClick: $event => tab.value = t.k
         }, vue.toDisplayString(t.l), 11, _hoisted_7)), 64)) ]), evidenceRequest.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_8, [ _cache[36] || (_cache[36] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_8, [ _cache[40] || (_cache[40] = vue.createElementVNode("span", {
           class: "dot"
-        }, null, -1)), _cache[37] || (_cache[37] = vue.createElementVNode("span", {
+        }, null, -1)), _cache[41] || (_cache[41] = vue.createElementVNode("span", {
           class: "t"
         }, "\u5f00\u53d1\u8005\u60f3\u770b\u770b\u8fd9\u4e00\u9875\u51fa\u4e86\u4ec0\u4e48\u95ee\u9898", -1)), vue.createElementVNode("button", {
           class: "btn ghost sm",
@@ -23958,7 +11831,7 @@
         vue.createElementBlock("div", {
           key: 1,
           class: vue.normalizeClass([ "anb", announcement.value.level ])
-        }, [ _cache[38] || (_cache[38] = vue.createElementVNode("span", {
+        }, [ _cache[42] || (_cache[42] = vue.createElementVNode("span", {
           class: "dot"
         }, null, -1)), vue.createElementVNode("span", {
           class: "t",
@@ -23980,13 +11853,13 @@
         }, vue.toDisplayString(s.l), 11, _hoisted_11))), 128)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_12, [ tab.value === "home" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ announcement.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_13, [ vue.createElementVNode("div", _hoisted_14, [ _cache[39] || (_cache[39] = vue.createElementVNode("span", {
+        }, [ announcement.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_13, [ vue.createElementVNode("div", _hoisted_14, [ _cache[43] || (_cache[43] = vue.createElementVNode("span", {
           class: "locator"
         }, "\u516c\u544a", -1)), vue.createElementVNode("span", _hoisted_15, vue.toDisplayString(announcementTime.value), 1) ]), vue.createElementVNode("div", _hoisted_16, vue.toDisplayString(announcement.value.title), 1), vue.createElementVNode("div", {
           class: "an-body",
           innerHTML: announcement.value.html
         }, null, 8, _hoisted_17) ])) : vue.createCommentVNode("", true), hasFeature("course-automation") ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_18, [ vue.createElementVNode("div", _hoisted_19, [ _cache[40] || (_cache[40] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_18, [ vue.createElementVNode("div", _hoisted_19, [ _cache[44] || (_cache[44] = vue.createElementVNode("span", {
           class: "locator"
         }, "\u8bfe\u7a0b\u5b66\u4e60", -1)), vue.createElementVNode("div", _hoisted_20, [ vue.createElementVNode("button", {
           class: "btn ghost sm",
@@ -23999,9 +11872,9 @@
         }, vue.toDisplayString(settings.courseAuto ? "\u6682\u505c" : "\u7ee7\u7eed"), 1)) : vue.createCommentVNode("", true) ]) ]), vue.unref(legacyCourseUrl) ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ _cache[41] || (_cache[41] = vue.createElementVNode("div", {
+        }, [ _cache[45] || (_cache[45] = vue.createElementVNode("div", {
           class: "gate-h course-status"
-        }, "\u65e7\u7248\u8bfe\u7a0b\u9875\u9762 \xb7 \u8bfe\u7a0b\u5b66\u4e60\u53ea\u652f\u6301\u65b0\u7248", -1)), _cache[42] || (_cache[42] = vue.createElementVNode("div", {
+        }, "\u65e7\u7248\u8bfe\u7a0b\u9875\u9762 \xb7 \u8bfe\u7a0b\u5b66\u4e60\u53ea\u652f\u6301\u65b0\u7248", -1)), _cache[46] || (_cache[46] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u8d85\u661f\u540c\u4e00\u7ae0\u8282\u6709\u65b0\u65e7\u4e24\u79cd\u9875\u9762\uff0c\u5207\u6362\u540e\u8d26\u53f7\u4e0e\u8fdb\u5ea6\u4e0d\u53d8\u3002", -1)), vue.createElementVNode("button", {
           class: "btn ghost sm",
@@ -24009,9 +11882,9 @@
         }, "\u5207\u6362\u65b0\u7248") ], 64)) : !vue.unref(onCourseStudyPage) ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ _cache[43] || (_cache[43] = vue.createElementVNode("div", {
+        }, [ _cache[47] || (_cache[47] = vue.createElementVNode("div", {
           class: "gate-h course-status"
-        }, "\u8bfe\u7a0b\u5b66\u4e60\u53ea\u5728\u8bfe\u7a0b\u7ae0\u8282\u9875\u8fd0\u884c", -1)), _cache[44] || (_cache[44] = vue.createElementVNode("div", {
+        }, "\u8bfe\u7a0b\u5b66\u4e60\u53ea\u5728\u8bfe\u7a0b\u7ae0\u8282\u9875\u8fd0\u884c", -1)), _cache[48] || (_cache[48] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u6253\u5f00\u67d0\u95e8\u8bfe\u7684\u7ae0\u8282\u5b66\u4e60\u9875\u540e\uff0c\u8fd9\u91cc\u4f1a\u663e\u793a\u8fdb\u5ea6\u4e0e\u72b6\u6001\u3002", -1)) ], 64)) : (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
@@ -24035,13 +11908,13 @@
         vue.createElementBlock("div", {
           key: i,
           class: "cap-mute"
-        }, vue.toDisplayString(item.name) + " \xb7 " + vue.toDisplayString(skipReasonLabel(item.reason)), 1))), 128)) ])) : vue.createCommentVNode("", true), _cache[45] || (_cache[45] = vue.createElementVNode("div", {
+        }, vue.toDisplayString(item.name) + " \xb7 " + vue.toDisplayString(skipReasonLabel(item.reason)), 1))), 128)) ])) : vue.createCommentVNode("", true), _cache[49] || (_cache[49] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u6682\u505c\u4f1a\u540c\u65f6\u505c\u4e0b\u6b63\u5728\u64ad\u653e\u7684\u89c6\u9891\u3002", -1)) ], 64)) ])) : vue.createCommentVNode("", true), !detectedCount.value && !harvestedCount.value && !settings.courseAuto ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_27, [ _cache[46] || (_cache[46] = vue.createElementVNode("div", {
+        vue.createElementBlock("div", _hoisted_27, [ _cache[50] || (_cache[50] = vue.createElementVNode("div", {
           class: "standby-title"
         }, "\u9759\u5019\u4e00\u95ee", -1)), vue.createElementVNode("div", _hoisted_28, vue.toDisplayString(standbyHint.value), 1) ])) : (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_29, [ vue.createElementVNode("div", _hoisted_30, [ _cache[47] || (_cache[47] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_29, [ vue.createElementVNode("div", _hoisted_30, [ _cache[51] || (_cache[51] = vue.createElementVNode("span", {
           class: "locator"
         }, "\u9875\u9762\u72b6\u6001", -1)), vue.createElementVNode("span", _hoisted_31, vue.toDisplayString(platformLabel.value), 1) ]), vue.createElementVNode("div", _hoisted_32, vue.toDisplayString(pageStatus.value), 1), vue.createElementVNode("div", _hoisted_33, vue.toDisplayString(homeHint.value), 1) ])), evidenceOpen.value || evidenceStatus.value || missingRule.value ? (vue.openBlock(), 
         vue.createElementBlock("div", _hoisted_34, [ evidenceOpen.value ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
@@ -24049,11 +11922,11 @@
         }, [ vue.createElementVNode("button", {
           class: "fold",
           onClick: cancelEvidenceDrawer
-        }, [ ..._cache[48] || (_cache[48] = [ vue.createTextVNode("\u62a5\u7ed9\u5f00\u53d1\u8005 \xb7 \u4e0a\u4f20\u524d\u5148\u8fc7\u76ee", -1), vue.createElementVNode("svg", {
+        }, [ ..._cache[52] || (_cache[52] = [ vue.createTextVNode("\u62a5\u7ed9\u5f00\u53d1\u8005 \xb7 \u4e0a\u4f20\u524d\u5148\u8fc7\u76ee", -1), vue.createElementVNode("svg", {
           class: "ic sm chev"
         }, [ vue.createElementVNode("use", {
           href: "#i-chevron"
-        }) ], -1) ]) ]), _cache[49] || (_cache[49] = vue.createElementVNode("div", {
+        }) ], -1) ]) ]), _cache[53] || (_cache[53] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u4e0b\u9762\u5c31\u662f\u8981\u4e0a\u4f20\u7684\u9875\u9762\u5185\u5bb9\u3002\u59d3\u540d\u3001\u5b66\u53f7\u3001\u4ee4\u724c\u7b49\u5df2\u81ea\u52a8\u906e\u76d6\uff0c\u4ecd\u8981\u81ea\u5df1\u8fc7\u4e00\u904d\u773c\u3002", -1)), vue.createElementVNode("div", _hoisted_35, vue.toDisplayString(evidenceSummary.value), 1), vue.withDirectives(vue.createElementVNode("input", {
           class: "in evi-note",
@@ -24089,7 +11962,7 @@
           key: 0,
           class: "btn ghost sm",
           onClick: exportPage
-        }, "\u5bfc\u51fa\u672c\u9875\u9898\u76ee")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_44, [ _cache[50] || (_cache[50] = vue.createElementVNode("div", {
+        }, "\u5bfc\u51fa\u672c\u9875\u9898\u76ee")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_44, [ _cache[54] || (_cache[54] = vue.createElementVNode("div", {
           class: "sep"
         }, null, -1)), vue.createElementVNode("div", _hoisted_45, [ vue.createElementVNode("span", _hoisted_46, vue.toDisplayString(!loggedIn.value ? "\u672a\u767b\u5f55" : authStale.value ? `${accountName.value || "\u8d26\u53f7"} \xb7 \u9700\u91cd\u65b0\u9a8c\u8bc1` : accountName.value || "\u5df2\u767b\u5f55"), 1), vue.createElementVNode("div", _hoisted_47, [ loggedIn.value && balance.value != null ? (vue.openBlock(), 
         vue.createElementBlock("span", _hoisted_48, "\u4f59\u989d " + vue.toDisplayString(balance.value) + " \u5206", 1)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
@@ -24103,7 +11976,7 @@
           key: 0,
           class: "btn ghost sm sub",
           onClick: _cache[4] || (_cache[4] = $event => accountOpen.value = true)
-        }, [ ..._cache[51] || (_cache[51] = [ vue.createTextVNode("\u53bb\u8d26\u6237 ", -1), vue.createElementVNode("svg", {
+        }, [ ..._cache[55] || (_cache[55] = [ vue.createTextVNode("\u53bb\u8d26\u6237 ", -1), vue.createElementVNode("svg", {
           class: "ic sm"
         }, [ vue.createElementVNode("use", {
           href: "#i-arrow"
@@ -24111,104 +11984,103 @@
           key: 1,
           class: "btn ghost sm sub",
           onClick: _cache[5] || (_cache[5] = $event => accountOpen.value = true)
-        }, [ ..._cache[52] || (_cache[52] = [ vue.createTextVNode("\u53bb\u767b\u5f55 ", -1), vue.createElementVNode("svg", {
+        }, [ ..._cache[56] || (_cache[56] = [ vue.createTextVNode("\u53bb\u767b\u5f55 ", -1), vue.createElementVNode("svg", {
           class: "ic sm"
         }, [ vue.createElementVNode("use", {
           href: "#i-arrow"
         }) ], -1) ]) ])) : vue.createCommentVNode("", true) ])) : vue.createCommentVNode("", true), runDone.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_52, [ _cache[67] || (_cache[67] = vue.createElementVNode("div", {
+        vue.createElementBlock("div", _hoisted_52, [ _cache[70] || (_cache[70] = vue.createElementVNode("div", {
           class: "ctitle"
-        }, "\u672c\u8f6e\u5b8c\u6210", -1)), vue.createElementVNode("div", _hoisted_53, [ _cache[53] || (_cache[53] = vue.createElementVNode("span", {
+        }, "\u672c\u8f6e\u5b8c\u6210", -1)), vue.createElementVNode("div", _hoisted_53, [ _cache[57] || (_cache[57] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u5df2\u56de\u586b", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.filled) + " \u9898", 1), _cache[54] || (_cache[54] = vue.createElementVNode("span", {
+        }, "\u5df2\u56de\u586b", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.filled) + " \u9898", 1), runSummary.value.filled > 0 ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_54, "\u5df2\u6682\u5b58")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_55, [ _cache[58] || (_cache[58] = vue.createElementVNode("span", {
+          class: "k"
+        }, "\u8ba1\u8d39", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.charged) + " \u5206", 1), _cache[59] || (_cache[59] = vue.createElementVNode("span", {
           class: "cap-mute"
-        }, "\u5df2\u6682\u5b58", -1)) ]), vue.createElementVNode("div", _hoisted_54, [ _cache[55] || (_cache[55] = vue.createElementVNode("span", {
+        }, "\u547d\u4e2d\u5373\u8ba1\u8d39", -1)) ]), vue.createElementVNode("div", _hoisted_56, [ _cache[60] || (_cache[60] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u8ba1\u8d39", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.charged) + " \u5206", 1), _cache[56] || (_cache[56] = vue.createElementVNode("span", {
+        }, "\u672a\u547d\u4e2d", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.missed) + " \u9898", 1), _cache[61] || (_cache[61] = vue.createElementVNode("span", {
           class: "cap-mute"
-        }, "\u547d\u4e2d\u5373\u8ba1\u8d39", -1)) ]), vue.createElementVNode("div", _hoisted_55, [ _cache[57] || (_cache[57] = vue.createElementVNode("span", {
+        }, "\u672a\u6263\u5206", -1)) ]), runSummary.value.unqueried ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_57, [ _cache[62] || (_cache[62] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u672a\u547d\u4e2d", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.missed) + " \u9898", 1), _cache[58] || (_cache[58] = vue.createElementVNode("span", {
-          class: "cap-mute"
-        }, "\u672a\u6263\u5206", -1)) ]), runSummary.value.unqueried ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_56, [ _cache[59] || (_cache[59] = vue.createElementVNode("span", {
-          class: "k"
-        }, "\u672a\u67e5\u8be2", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.unqueried) + " \u9898", 1), _cache[60] || (_cache[60] = vue.createElementVNode("span", {
+        }, "\u672a\u67e5\u8be2", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.unqueried) + " \u9898", 1), _cache[63] || (_cache[63] = vue.createElementVNode("span", {
           class: "cap-mute"
         }, "\u672a\u53d1\u8d77\u4ed8\u8d39\u67e5\u8be2 \xb7 \u672a\u6263\u5206", -1)) ])) : vue.createCommentVNode("", true), runSummary.value.chargedUnfilled ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_57, [ _cache[61] || (_cache[61] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_58, [ _cache[64] || (_cache[64] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u5df2\u6263\u672a\u586b", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.chargedUnfilled) + " \u9898", 1), _cache[62] || (_cache[62] = vue.createElementVNode("span", {
+        }, "\u5df2\u6263\u672a\u586b", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.chargedUnfilled) + " \u9898", 1), _cache[65] || (_cache[65] = vue.createElementVNode("span", {
           class: "cap-mute"
         }, "\u672a\u80fd\u5b89\u5168\u5199\u5165\u9875\u9762 \xb7 \u5df2\u6263\u5206\uff0c\u9700\u624b\u52a8\u6838\u5bf9", -1)) ])) : vue.createCommentVNode("", true), runSummary.value.hitUnfilled ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_58, [ _cache[63] || (_cache[63] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_59, [ _cache[66] || (_cache[66] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u6709\u7b54\u6848\u672a\u5199\u5165", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.hitUnfilled) + " \u9898", 1), _cache[64] || (_cache[64] = vue.createElementVNode("span", {
+        }, "\u6709\u7b54\u6848\u672a\u5199\u5165", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.hitUnfilled) + " \u9898", 1), _cache[67] || (_cache[67] = vue.createElementVNode("span", {
           class: "cap-mute"
         }, "\u672a\u80fd\u5b89\u5168\u5199\u5165\u9875\u9762 \xb7 \u672a\u6263\u5206\uff0c\u53ef\u5c55\u5f00\u6838\u5bf9", -1)) ])) : vue.createCommentVNode("", true), runSummary.value.skipped ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_59, [ _cache[65] || (_cache[65] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_60, [ _cache[68] || (_cache[68] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u672a\u5904\u7406", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.skipped) + " \u9898", 1), _cache[66] || (_cache[66] = vue.createElementVNode("span", {
+        }, "\u672a\u5904\u7406", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.skipped) + " \u9898", 1), _cache[69] || (_cache[69] = vue.createElementVNode("span", {
           class: "cap-mute"
-        }, "\u89e3\u6790\u5931\u8d25\u6216\u9898\u578b\u4e0d\u652f\u6301 \xb7 \u672a\u67e5\u8be2\u3001\u672a\u6263\u5206", -1)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_60, vue.toDisplayString(submitNote.value), 1), _cache[68] || (_cache[68] = vue.createElementVNode("span", {
+        }, "\u89e3\u6790\u5931\u8d25\u6216\u9898\u578b\u4e0d\u652f\u6301 \xb7 \u672a\u67e5\u8be2\u3001\u672a\u6263\u5206", -1)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_61, vue.toDisplayString(submitNote.value), 1), _cache[71] || (_cache[71] = vue.createElementVNode("span", {
           class: "done-seal",
           "aria-hidden": "true"
-        }, "\u7b54", -1)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_61, [ !list.value.length ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_62, vue.toDisplayString(tip.value === "\u7a7a\u95f2" ? "\u5f53\u524d\u9875\u672a\u8bc6\u522b\u5230\u9898\u76ee \xb7 \u6253\u5f00\u4f5c\u4e1a\u9875\u540e\u81ea\u52a8\u5207\u5165" : tip.value), 1)) : vue.createCommentVNode("", true), _cache[70] || (_cache[70] = vue.createElementVNode("div", {
+        }, "\u7b54", -1)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_62, [ !list.value.length ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_63, vue.toDisplayString(tip.value === "\u7a7a\u95f2" ? "\u5f53\u524d\u9875\u672a\u8bc6\u522b\u5230\u9898\u76ee \xb7 \u6253\u5f00\u4f5c\u4e1a\u9875\u540e\u81ea\u52a8\u5207\u5165" : tip.value), 1)) : vue.createCommentVNode("", true), _cache[73] || (_cache[73] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u4ed8\u8d39\u9898\u5e93\u627e\u5230\u53ef\u7528\u7b54\u6848\u540e\u6263\u5206\uff1b\u514d\u8d39\u7b54\u6848\u4e0d\u6263\u5206\uff1b\u65e0\u6cd5\u5b89\u5168\u5339\u914d\u65f6\u4e0d\u4f1a\u56de\u586b\u3002", -1)), stats.value.charged ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_63, [ _cache[69] || (_cache[69] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_64, [ _cache[72] || (_cache[72] = vue.createElementVNode("span", {
           class: "spacer"
-        }, null, -1)), vue.createElementVNode("span", _hoisted_64, "\u4ed8\u8d39\u9898\u5e93\u547d\u4e2d " + vue.toDisplayString(stats.value.charged) + " \u9898", 1) ])) : vue.createCommentVNode("", true), stats.value.charged ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_65, "\u91cd\u590d\u7b54\u9898\u4f1a\u590d\u7528\u5df2\u6263\u5206\u7ed3\u679c\uff0c\u4e0d\u4f1a\u91cd\u590d\u6263\u5206\u3002")) : vue.createCommentVNode("", true) ]), list.value.length ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_66, [ vue.createElementVNode("button", {
+        }, null, -1)), vue.createElementVNode("span", _hoisted_65, "\u4ed8\u8d39\u9898\u5e93\u547d\u4e2d " + vue.toDisplayString(stats.value.charged) + " \u9898", 1) ])) : vue.createCommentVNode("", true), stats.value.charged ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_66, "\u91cd\u590d\u7b54\u9898\u4f1a\u590d\u7528\u5df2\u6263\u5206\u7ed3\u679c\uff0c\u4e0d\u4f1a\u91cd\u590d\u6263\u5206\u3002")) : vue.createCommentVNode("", true) ]), list.value.length ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_67, [ vue.createElementVNode("button", {
           class: "fold",
           onClick: _cache[6] || (_cache[6] = $event => navOpen.value = !navOpen.value)
-        }, [ _cache[72] || (_cache[72] = vue.createTextVNode("\u9898\u76ee\u5bfc\u822a", -1)), (vue.openBlock(), 
+        }, [ _cache[75] || (_cache[75] = vue.createTextVNode("\u9898\u76ee\u5bfc\u822a", -1)), (vue.openBlock(), 
         vue.createElementBlock("svg", {
           class: vue.normalizeClass([ "ic sm chev", {
             right: !navOpen.value
           } ])
-        }, [ ..._cache[71] || (_cache[71] = [ vue.createElementVNode("use", {
+        }, [ ..._cache[74] || (_cache[74] = [ vue.createElementVNode("use", {
           href: "#i-chevron"
         }, null, -1) ]) ], 2)) ]), navOpen.value ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ _cache[73] || (_cache[73] = vue.createStaticVNode('<div class="legend"><span><i class="sw cur"></i>\u5f53\u524d</span><span><i class="sw hit"></i>\u5df2\u7b54</span><span><i class="sw"></i>\u672a\u7b54</span><span><i class="sw miss"></i>\u65e0\u7b54\u6848</span></div>', 1)), vue.createElementVNode("div", _hoisted_67, [ (vue.openBlock(true), 
+        }, [ _cache[76] || (_cache[76] = vue.createStaticVNode('<div class="legend"><span><i class="sw cur"></i>\u5f53\u524d</span><span><i class="sw hit"></i>\u5df2\u7b54</span><span><i class="sw"></i>\u672a\u7b54</span><span><i class="sw miss"></i>\u65e0\u7b54\u6848</span></div>', 1)), vue.createElementVNode("div", _hoisted_68, [ (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(list.value, (it, i) => (vue.openBlock(), 
         vue.createElementBlock("button", {
           key: i,
           class: vue.normalizeClass([ "cell", cellClass(it, i) ]),
           onClick: $event => jump(i)
-        }, vue.toDisplayString(i + 1), 11, _hoisted_68))), 128)) ]) ], 64)) : vue.createCommentVNode("", true) ])) : vue.createCommentVNode("", true), cur.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_69, [ cur.value.status === "decodeFail" ? (vue.openBlock(), 
+        }, vue.toDisplayString(i + 1), 11, _hoisted_69))), 128)) ]) ], 64)) : vue.createCommentVNode("", true) ])) : vue.createCommentVNode("", true), cur.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_70, [ cur.value.status === "decodeFail" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ vue.createElementVNode("div", _hoisted_70, [ vue.createElementVNode("span", _hoisted_71, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), _cache[74] || (_cache[74] = vue.createElementVNode("span", {
+        }, [ vue.createElementVNode("div", _hoisted_71, [ vue.createElementVNode("span", _hoisted_72, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), _cache[77] || (_cache[77] = vue.createElementVNode("span", {
           class: "tag neutral"
-        }, "\u89e3\u7801\u5931\u8d25", -1)) ]), _cache[75] || (_cache[75] = vue.createElementVNode("div", {
+        }, "\u89e3\u7801\u5931\u8d25", -1)) ]), _cache[78] || (_cache[78] = vue.createElementVNode("div", {
           class: "stem"
-        }, "\uff08\u9898\u9762\u89e3\u6790\u5931\u8d25\uff0c\u5df2\u8df3\u8fc7\uff09", -1)), _cache[76] || (_cache[76] = vue.createElementVNode("div", {
+        }, "\uff08\u9898\u9762\u89e3\u6790\u5931\u8d25\uff0c\u5df2\u8df3\u8fc7\uff09", -1)), _cache[79] || (_cache[79] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u89e3\u6790\u5931\u8d25 \xb7 \u672a\u6263\u5206 \xb7 \u9700\u624b\u52a8\u6838\u5bf9", -1)) ], 64)) : cur.value.status === "unsupported" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ vue.createElementVNode("div", _hoisted_72, [ vue.createElementVNode("span", _hoisted_73, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), _cache[77] || (_cache[77] = vue.createElementVNode("span", {
+        }, [ vue.createElementVNode("div", _hoisted_73, [ vue.createElementVNode("span", _hoisted_74, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), _cache[80] || (_cache[80] = vue.createElementVNode("span", {
           class: "tag neutral"
-        }, "\u5185\u5bb9\u89e3\u6790\u5931\u8d25", -1)) ]), _cache[78] || (_cache[78] = vue.createElementVNode("div", {
+        }, "\u5185\u5bb9\u89e3\u6790\u5931\u8d25", -1)) ]), _cache[81] || (_cache[81] = vue.createElementVNode("div", {
           class: "stem"
-        }, "\uff08\u9898\u76ee\u65e0\u5408\u6cd5\u6587\u5b57\u6216\u56fe\u7247\uff0c\u5df2\u8df3\u8fc7\uff09", -1)), _cache[79] || (_cache[79] = vue.createElementVNode("div", {
+        }, "\uff08\u9898\u76ee\u65e0\u5408\u6cd5\u6587\u5b57\u6216\u56fe\u7247\uff0c\u5df2\u8df3\u8fc7\uff09", -1)), _cache[82] || (_cache[82] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u672a\u641c\u7d22 \xb7 \u672a\u6263\u5206 \xb7 \u672a\u56de\u586b", -1)) ], 64)) : (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 2
-        }, [ vue.createElementVNode("div", _hoisted_74, [ vue.createElementVNode("span", _hoisted_75, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), vue.createElementVNode("div", _hoisted_76, [ cur.value.treeProgress && cur.value.treeProgress.total > 1 ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_77, " \u7236\u9898 " + vue.toDisplayString(cur.value.treeProgress.hit) + "/" + vue.toDisplayString(cur.value.treeProgress.total) + " \xb7 " + vue.toDisplayString(treeStatusLabel(cur.value.treeProgress.status)), 1)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
+        }, [ vue.createElementVNode("div", _hoisted_75, [ vue.createElementVNode("span", _hoisted_76, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), vue.createElementVNode("div", _hoisted_77, [ cur.value.treeProgress && cur.value.treeProgress.total > 1 ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_78, " \u7236\u9898 " + vue.toDisplayString(cur.value.treeProgress.hit) + "/" + vue.toDisplayString(cur.value.treeProgress.total) + " \xb7 " + vue.toDisplayString(treeStatusLabel(cur.value.treeProgress.status)), 1)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
           class: "btn ghost sm sub",
           disabled: running.value,
           onClick: reAnswerCurrent
-        }, "\u91cd\u7b54\u672c\u9898", 8, _hoisted_78) ]) ]), vue.createElementVNode("div", _hoisted_79, [ vue.createElementVNode("span", _hoisted_80, "[" + vue.toDisplayString(currentTypeLabel.value) + "]", 1), vue.createVNode(_sfc_main$1, {
+        }, "\u91cd\u7b54\u672c\u9898", 8, _hoisted_79) ]) ]), vue.createElementVNode("div", _hoisted_80, [ vue.createElementVNode("span", _hoisted_81, "[" + vue.toDisplayString(currentTypeLabel.value) + "]", 1), vue.createVNode(_sfc_main$1, {
           content: cur.value.q.stem,
           "max-height": "180px"
-        }, null, 8, [ "content" ]) ]), vue.createElementVNode("div", _hoisted_81, [ (vue.openBlock(true), 
+        }, null, 8, [ "content" ]) ]), vue.createElementVNode("div", _hoisted_82, [ (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(shownOpts.value, x => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: x.i,
@@ -24233,63 +12105,63 @@
           class: vue.normalizeClass([ "ic sm chev", {
             right: !optsExpanded.value
           } ])
-        }, [ ..._cache[80] || (_cache[80] = [ vue.createElementVNode("use", {
+        }, [ ..._cache[83] || (_cache[83] = [ vue.createElementVNode("use", {
           href: "#i-chevron"
-        }, null, -1) ]) ], 2)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_82, [ vue.createElementVNode("div", _hoisted_83, [ _cache[81] || (_cache[81] = vue.createElementVNode("span", {
+        }, null, -1) ]) ], 2)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_83, [ vue.createElementVNode("div", _hoisted_84, [ _cache[84] || (_cache[84] = vue.createElementVNode("span", {
           class: "answer-label"
-        }, "\u53c2\u8003\u7b54\u6848", -1)), vue.createElementVNode("div", _hoisted_84, [ cur.value.aiGenerated ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_85, "AI \u751f\u6210 \xb7 \u5f85\u6838\u5bf9")) : vue.createCommentVNode("", true), cur.value.answer.length ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_86, vue.toDisplayString(cur.value.filled ? "\u5df2\u56de\u586b" : "\u5339\u914d\u5931\u8d25"), 1)) : vue.createCommentVNode("", true) ]) ]), _cache[83] || (_cache[83] = vue.createElementVNode("div", {
+        }, "\u53c2\u8003\u7b54\u6848", -1)), vue.createElementVNode("div", _hoisted_85, [ cur.value.aiGenerated ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_86, "AI \u751f\u6210 \xb7 \u5f85\u6838\u5bf9")) : vue.createCommentVNode("", true), cur.value.answer.length ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_87, vue.toDisplayString(cur.value.filled ? "\u5df2\u56de\u586b" : "\u5339\u914d\u5931\u8d25"), 1)) : vue.createCommentVNode("", true) ]) ]), _cache[86] || (_cache[86] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u7b54\u6848\u4ec5\u4f9b\u53c2\u8003\uff0c\u81ea\u884c\u6838\u5bf9\u3002", -1)), ((_a3 = cur.value.answerPlan) == null ? void 0 : _a3.kind) === "slots" ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_87, [ (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(cur.value.answerPlan.slots, (slot, slotIndex) => (vue.openBlock(), 
+        }, "\u7b54\u6848\u4ec5\u4f9b\u53c2\u8003\uff0c\u81ea\u884c\u6838\u5bf9\u3002", -1)), ((_a2 = cur.value.answerPlan) == null ? void 0 : _a2.kind) === "slots" ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_88, [ (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(cur.value.answerPlan.slots, (slot, slotIndex) => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: slot.slotId,
           class: "answer-item"
-        }, [ vue.createElementVNode("span", _hoisted_88, "\u7a7a " + vue.toDisplayString(slotIndex + 1), 1), vue.createElementVNode("span", _hoisted_89, [ (vue.openBlock(true), 
+        }, [ vue.createElementVNode("span", _hoisted_89, "\u7a7a " + vue.toDisplayString(slotIndex + 1), 1), vue.createElementVNode("span", _hoisted_90, [ (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(slot.values, (value, valueIndex) => (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: valueIndex
-        }, [ valueIndex ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_90, "\u3001")) : vue.createCommentVNode("", true), vue.createVNode(_sfc_main$1, {
+        }, [ valueIndex ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_91, "\u3001")) : vue.createCommentVNode("", true), vue.createVNode(_sfc_main$1, {
           content: value,
           "max-height": "120px"
         }, null, 8, [ "content" ]) ], 64))), 128)) ]) ]))), 128)) ])) : ((_b = cur.value.answerPlan) == null ? void 0 : _b.kind) === "matching-pair" ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_91, [ _cache[82] || (_cache[82] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_92, [ _cache[85] || (_cache[85] = vue.createElementVNode("span", {
           class: "answer-key"
-        }, "\u914d\u5bf9", -1)), vue.createElementVNode("span", _hoisted_92, [ vue.createVNode(_sfc_main$1, {
+        }, "\u914d\u5bf9", -1)), vue.createElementVNode("span", _hoisted_93, [ vue.createVNode(_sfc_main$1, {
           content: cur.value.answerPlan.displayValue,
           "max-height": "120px"
-        }, null, 8, [ "content" ]) ]) ])) : cur.value.answer.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_93, [ (vue.openBlock(true), 
+        }, null, 8, [ "content" ]) ]) ])) : cur.value.answer.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_94, [ (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(cur.value.answer, (answer, index) => (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: index
-        }, [ index ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_94, "\u3001")) : vue.createCommentVNode("", true), vue.createVNode(_sfc_main$1, {
+        }, [ index ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_95, "\u3001")) : vue.createCommentVNode("", true), vue.createVNode(_sfc_main$1, {
           content: answer,
           "max-height": "120px"
-        }, null, 8, [ "content" ]) ], 64))), 128)) ])) : (vue.openBlock(), vue.createElementBlock("div", _hoisted_95, vue.toDisplayString(cur.value.status === "pending" ? "\u7b49\u5f85\u67e5\u9898" : "\u6682\u672a\u627e\u5230\u7b54\u6848"), 1)) ]) ], 64)) ])) : vue.createCommentVNode("", true) ], 64)) : tab.value === "harvest" ? (vue.openBlock(), 
+        }, null, 8, [ "content" ]) ], 64))), 128)) ])) : (vue.openBlock(), vue.createElementBlock("div", _hoisted_96, vue.toDisplayString(cur.value.status === "pending" ? "\u7b49\u5f85\u67e5\u9898" : "\u6682\u672a\u627e\u5230\u7b54\u6848"), 1)) ]) ], 64)) ])) : vue.createCommentVNode("", true) ], 64)) : tab.value === "harvest" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 2
         }, [ harvestedList.value.length ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ vue.createElementVNode("div", _hoisted_96, [ vue.createElementVNode("div", _hoisted_97, [ _cache[84] || (_cache[84] = vue.createElementVNode("span", {
+        }, [ vue.createElementVNode("div", _hoisted_97, [ vue.createElementVNode("div", _hoisted_98, [ _cache[87] || (_cache[87] = vue.createElementVNode("span", {
           class: "locator"
-        }, "\u672c\u9875\u6536\u5f55", -1)), vue.createElementVNode("div", _hoisted_98, [ vue.createElementVNode("span", _hoisted_99, vue.toDisplayString(harvestedList.value.length) + " \u9898", 1), vue.createElementVNode("button", {
+        }, "\u672c\u9875\u6536\u5f55", -1)), vue.createElementVNode("div", _hoisted_99, [ vue.createElementVNode("span", _hoisted_100, vue.toDisplayString(harvestedList.value.length) + " \u9898", 1), vue.createElementVNode("button", {
           class: "btn ghost sm",
           onClick: exportHarvest
-        }, "\u5bfc\u51fa\u672c\u9875\u6536\u5f55") ]) ]), _cache[85] || (_cache[85] = vue.createElementVNode("div", {
+        }, "\u5bfc\u51fa\u672c\u9875\u6536\u5f55") ]) ]), _cache[88] || (_cache[88] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u505a\u8fc7\u5e76\u51fa\u5206\u7684\u9898\u76ee\u5df2\u6536\u5f55\u5230\u672c\u673a\uff0c\u547d\u4e2d\u4e0d\u6263\u5206\u3001\u4e0d\u8054\u7f51\u3002\u5168\u90e8\u8bb0\u5f55\u4e0e\u5907\u4efd\u5728\u300c\u7cfb\u7edf \xb7 \u7f13\u5b58\u300d\u3002", -1)) ]), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(harvestedList.value, (h, i) => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: h.unitHash,
           class: "ent"
-        }, [ vue.createElementVNode("div", _hoisted_100, [ vue.createElementVNode("span", _hoisted_101, vue.toDisplayString(h.stem ? vue.unref(harvestTypeLabel)(h.itemType) : "\u65e0\u9898\u9762"), 1), vue.createElementVNode("span", _hoisted_102, vue.toDisplayString(i + 1), 1), !h.persisted ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_103, "\xb7 \u672a\u4fdd\u5b58")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", {
+        }, [ vue.createElementVNode("div", _hoisted_101, [ vue.createElementVNode("span", _hoisted_102, vue.toDisplayString(h.stem ? vue.unref(harvestTypeLabel)(h.itemType) : "\u65e0\u9898\u9762"), 1), vue.createElementVNode("span", _hoisted_103, vue.toDisplayString(i + 1), 1), !h.persisted ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_104, "\xb7 \u672a\u4fdd\u5b58")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", {
           class: vue.normalizeClass([ "ent-q", {
             "cap-mute": !h.stem
           } ])
-        }, vue.toDisplayString(h.stem || "\u8fd9\u6761\u6ca1\u6709\u9898\u9762\uff08\u6765\u6e90\u672a\u63d0\u4f9b\uff09\uff0c\u4ecd\u53ef\u6b63\u5e38\u547d\u4e2d"), 3), vue.createElementVNode("div", _hoisted_104, vue.toDisplayString(h.values.join("\u3001")), 1), h.options && h.options.length ? (vue.openBlock(), 
-        vue.createElementBlock("details", _hoisted_105, [ vue.createElementVNode("summary", _hoisted_106, "\u9009\u9879 " + vue.toDisplayString(h.options.length) + " \u9879", 1), (vue.openBlock(true), 
+        }, vue.toDisplayString(h.stem || "\u8fd9\u6761\u6ca1\u6709\u9898\u9762\uff08\u6765\u6e90\u672a\u63d0\u4f9b\uff09\uff0c\u4ecd\u53ef\u6b63\u5e38\u547d\u4e2d"), 3), vue.createElementVNode("div", _hoisted_105, vue.toDisplayString(h.values.join("\u3001")), 1), h.options && h.options.length ? (vue.openBlock(), 
+        vue.createElementBlock("details", _hoisted_106, [ vue.createElementVNode("summary", _hoisted_107, "\u9009\u9879 " + vue.toDisplayString(h.options.length) + " \u9879", 1), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(h.options, (op, oi) => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: oi,
@@ -24297,19 +12169,19 @@
         }, vue.toDisplayString(letter2(oi)) + "\u3001" + vue.toDisplayString(op), 1))), 128)) ])) : vue.createCommentVNode("", true) ]))), 128)) ], 64)) : (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ vue.createElementVNode("div", _hoisted_107, [ _cache[86] || (_cache[86] = vue.createElementVNode("div", {
+        }, [ vue.createElementVNode("div", _hoisted_108, [ _cache[89] || (_cache[89] = vue.createElementVNode("div", {
           class: "standby-title"
-        }, "\u672c\u9875\u6682\u65e0\u6536\u5f55", -1)), vue.createElementVNode("div", _hoisted_108, "\u6253\u5f00\u5df2\u6279\u9605\u7684\u4f5c\u4e1a\u6216\u8003\u8bd5\u7ed3\u679c\u9875\uff0c\u4f1a\u81ea\u52a8\u628a\u4f60\u505a\u5bf9\u7684\u9898\u6536\u5f55\u5230\u672c\u673a\u3002\u7d2f\u8ba1\u5df2\u6536\u5f55 " + vue.toDisplayString(localCacheCount.value) + " \u9898\uff0c\u5168\u90e8\u8bb0\u5f55\u5728\u300c\u7cfb\u7edf \xb7 \u7f13\u5b58\u300d\u3002", 1) ]), vue.createElementVNode("button", {
+        }, "\u672c\u9875\u6682\u65e0\u6536\u5f55", -1)), vue.createElementVNode("div", _hoisted_109, "\u6253\u5f00\u5df2\u6279\u9605\u7684\u4f5c\u4e1a\u6216\u8003\u8bd5\u7ed3\u679c\u9875\uff0c\u4f1a\u81ea\u52a8\u628a\u4f60\u505a\u5bf9\u7684\u9898\u6536\u5f55\u5230\u672c\u673a\u3002\u7d2f\u8ba1\u5df2\u6536\u5f55 " + vue.toDisplayString(localCacheCount.value) + " \u9898\uff0c\u5168\u90e8\u8bb0\u5f55\u5728\u300c\u7cfb\u7edf \xb7 \u7f13\u5b58\u300d\u3002", 1) ]), vue.createElementVNode("button", {
           class: "btn ghost block",
           onClick: goCacheManage
         }, "\u53bb\u7f13\u5b58\u7ba1\u7406") ], 64)) ], 64)) : tab.value === "system" && systemSub.value === "general" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 3
-        }, [ hasFeature("answer") ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_109, [ _cache[90] || (_cache[90] = vue.createElementVNode("div", {
+        }, [ hasFeature("answer") ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_110, [ _cache[93] || (_cache[93] = vue.createElementVNode("div", {
           class: "gh2"
-        }, "\u7b54\u9898\u884c\u4e3a", -1)), vue.createElementVNode("div", _hoisted_110, [ _cache[87] || (_cache[87] = vue.createElementVNode("span", {
+        }, "\u7b54\u9898\u884c\u4e3a", -1)), vue.createElementVNode("div", _hoisted_111, [ _cache[90] || (_cache[90] = vue.createElementVNode("span", {
           class: "lbl"
-        }, "\u7b54\u9898\u95f4\u9694", -1)), vue.createElementVNode("span", _hoisted_111, vue.toDisplayString(settings.delayMs) + " ms", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
+        }, "\u7b54\u9898\u95f4\u9694", -1)), vue.createElementVNode("span", _hoisted_112, vue.toDisplayString(settings.delayMs) + " ms", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
           class: "range",
           type: "range",
           min: "500",
@@ -24319,21 +12191,21 @@
           onChange: persist
         }, null, 544), [ [ vue.vModelText, settings.delayMs, void 0, {
           number: true
-        } ] ]), _cache[91] || (_cache[91] = vue.createElementVNode("div", {
+        } ] ]), _cache[94] || (_cache[94] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u76f8\u90bb\u4e24\u9898\u4e4b\u95f4\u7684\u5904\u7406\u95f4\u9694", -1)), (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(GENERAL_SWITCHES, s => (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: s.key
-        }, [ vue.createElementVNode("div", _hoisted_112, [ vue.createElementVNode("button", {
+        }, [ vue.createElementVNode("div", _hoisted_113, [ vue.createElementVNode("button", {
           class: vue.normalizeClass([ "switch", {
             off: !settings[s.key]
           } ]),
           onClick: s.toggle,
           "aria-label": `${s.label}\u5f00\u5173`
-        }, [ ..._cache[88] || (_cache[88] = [ vue.createElementVNode("i", null, null, -1) ]) ], 10, _hoisted_113), vue.createElementVNode("span", _hoisted_114, vue.toDisplayString(s.label), 1) ]), vue.createElementVNode("div", _hoisted_115, vue.toDisplayString(s.hint), 1) ], 64))), 64)), vue.createElementVNode("div", _hoisted_116, [ _cache[89] || (_cache[89] = vue.createElementVNode("span", {
+        }, [ ..._cache[91] || (_cache[91] = [ vue.createElementVNode("i", null, null, -1) ]) ], 10, _hoisted_114), vue.createElementVNode("span", _hoisted_115, vue.toDisplayString(s.label), 1) ]), vue.createElementVNode("div", _hoisted_116, vue.toDisplayString(s.hint), 1) ], 64))), 64)), vue.createElementVNode("div", _hoisted_117, [ _cache[92] || (_cache[92] = vue.createElementVNode("span", {
           class: "lbl"
-        }, "\u63d0\u4ea4\u9608\u503c", -1)), vue.createElementVNode("span", _hoisted_117, "\u53ef\u4fe1\u547d\u4e2d \u2265 " + vue.toDisplayString(Math.round(settings.autoSubmitThreshold * 100)) + "%", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
+        }, "\u63d0\u4ea4\u9608\u503c", -1)), vue.createElementVNode("span", _hoisted_118, "\u53ef\u4fe1\u547d\u4e2d \u2265 " + vue.toDisplayString(Math.round(settings.autoSubmitThreshold * 100)) + "%", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
           class: "range",
           type: "range",
           min: "0.5",
@@ -24343,36 +12215,36 @@
           onChange: persist
         }, null, 544), [ [ vue.vModelText, settings.autoSubmitThreshold, void 0, {
           number: true
-        } ] ]), _cache[92] || (_cache[92] = vue.createElementVNode("div", {
+        } ] ]), _cache[95] || (_cache[95] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u8fbe\u5230\u9608\u503c\u624d\u63d0\u4ea4\uff0c\u4f4e\u4e8e\u53ea\u6682\u5b58\u3002\u968f\u673a\u4f5c\u7b54\u586b\u7684\u7a7a\u4e0d\u7b97\u53ef\u4fe1\u547d\u4e2d\u3002", -1)) ])) : vue.createCommentVNode("", true), _cache[100] || (_cache[100] = vue.createElementVNode("div", {
+        }, "\u8fbe\u5230\u9608\u503c\u624d\u63d0\u4ea4\uff0c\u4f4e\u4e8e\u53ea\u6682\u5b58\u3002\u968f\u673a\u4f5c\u7b54\u586b\u7684\u7a7a\u4e0d\u7b97\u53ef\u4fe1\u547d\u4e2d\u3002", -1)) ])) : vue.createCommentVNode("", true), _cache[103] || (_cache[103] = vue.createElementVNode("div", {
           class: "sep"
-        }, null, -1)), vue.createElementVNode("div", _hoisted_118, [ _cache[95] || (_cache[95] = vue.createElementVNode("div", {
+        }, null, -1)), vue.createElementVNode("div", _hoisted_119, [ _cache[98] || (_cache[98] = vue.createElementVNode("div", {
           class: "gh2"
-        }, "\u9690\u79c1", -1)), vue.createElementVNode("div", _hoisted_119, [ vue.createElementVNode("button", {
+        }, "\u9690\u79c1", -1)), vue.createElementVNode("div", _hoisted_120, [ vue.createElementVNode("button", {
           class: vue.normalizeClass([ "switch", {
             off: !settings.reportUsage
           } ]),
           onClick: toggleReport,
           "aria-label": "\u4e0a\u62a5\u533f\u540d\u5065\u5eb7\u5f00\u5173"
-        }, [ ..._cache[93] || (_cache[93] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[94] || (_cache[94] = vue.createElementVNode("span", {
+        }, [ ..._cache[96] || (_cache[96] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[97] || (_cache[97] = vue.createElementVNode("span", {
           class: "lbl",
           style: {
             flex: "1"
           }
-        }, "\u4e0a\u62a5\u533f\u540d\u5065\u5eb7", -1)) ]), _cache[96] || (_cache[96] = vue.createElementVNode("div", {
+        }, "\u4e0a\u62a5\u533f\u540d\u5065\u5eb7", -1)) ]), _cache[99] || (_cache[99] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u4ec5\u4e0a\u62a5\u547d\u4e2d\u7387\u4e0e\u9898\u578b\uff0c\u4e0d\u542b\u9898\u9762\u4e0e\u8d26\u53f7", -1)) ]), _cache[101] || (_cache[101] = vue.createElementVNode("div", {
+        }, "\u4ec5\u4e0a\u62a5\u547d\u4e2d\u7387\u4e0e\u9898\u578b\uff0c\u4e0d\u542b\u9898\u9762\u4e0e\u8d26\u53f7", -1)) ]), _cache[104] || (_cache[104] = vue.createElementVNode("div", {
           class: "sep"
-        }, null, -1)), vue.createElementVNode("div", _hoisted_120, [ _cache[99] || (_cache[99] = vue.createElementVNode("div", {
+        }, null, -1)), vue.createElementVNode("div", _hoisted_121, [ _cache[102] || (_cache[102] = vue.createElementVNode("div", {
           class: "gh2"
-        }, "\u6570\u636e\u4e0e\u66f4\u65b0", -1)), vue.createElementVNode("div", _hoisted_121, [ vue.createElementVNode("div", null, [ _cache[97] || (_cache[97] = vue.createElementVNode("div", {
+        }, "\u6570\u636e\u4e0e\u66f4\u65b0", -1)), vue.createElementVNode("div", _hoisted_122, [ vue.createElementVNode("div", null, [ _cache[100] || (_cache[100] = vue.createElementVNode("div", {
           class: "lbl"
-        }, "\u672c\u5730\u7b54\u6848\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_122, "\u5df2\u6536\u5f55 " + vue.toDisplayString(localCacheCount.value) + " \u9898 \xb7 \u53ea\u5b58\u4f60\u505a\u8fc7\u5e76\u51fa\u5206\u7684\u9898\u76ee \xb7 \u547d\u4e2d\u4e0d\u6263\u5206\u3001\u4e0d\u8054\u7f51", 1) ]), vue.createElementVNode("button", {
+        }, "\u672c\u5730\u7b54\u6848\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_123, "\u5df2\u6536\u5f55 " + vue.toDisplayString(localCacheCount.value) + " \u9898 \xb7 \u53ea\u5b58\u4f60\u505a\u8fc7\u5e76\u51fa\u5206\u7684\u9898\u76ee \xb7 \u547d\u4e2d\u4e0d\u6263\u5206\u3001\u4e0d\u8054\u7f51", 1) ]), vue.createElementVNode("button", {
           class: "btn ghost sm",
           onClick: _cache[10] || (_cache[10] = $event => systemSub.value = "cache")
-        }, "\u7ba1\u7406") ]), cachePersistFailed.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_123, "\u5b58\u4e0d\u4e0b\u4e86 \xb7 \u672c\u673a\u5b58\u50a8\u5199\u5165\u88ab\u62d2\uff0c\u6700\u8fd1\u7684\u6536\u5f55\u6ca1\u6709\u843d\u76d8\u3002\u5230\u7f13\u5b58\u9875\u5bfc\u51fa\u5907\u4efd\u5e76\u6e05\u7406\u3002")) : cacheOverWarn.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_124, "\u5df2\u8d85\u51fa\u5efa\u8bae\u5bb9\u91cf " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898 \xb7 \u4e0d\u4f1a\u81ea\u52a8\u5220\u9664\u8bb0\u5f55\uff0c\u5efa\u8bae\u5bfc\u51fa\u5907\u4efd\u540e\u6e05\u7406\u3002", 1)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_125, [ _cache[98] || (_cache[98] = vue.createElementVNode("div", null, [ vue.createElementVNode("div", {
+        }, "\u7ba1\u7406") ]), cachePersistFailed.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_124, "\u5b58\u4e0d\u4e0b\u4e86 \xb7 \u672c\u673a\u5b58\u50a8\u5199\u5165\u88ab\u62d2\uff0c\u6700\u8fd1\u7684\u6536\u5f55\u6ca1\u6709\u843d\u76d8\u3002\u5230\u7f13\u5b58\u9875\u5bfc\u51fa\u5907\u4efd\u5e76\u6e05\u7406\u3002")) : cacheOverWarn.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_125, "\u5df2\u8d85\u51fa\u5efa\u8bae\u5bb9\u91cf " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898 \xb7 \u4e0d\u4f1a\u81ea\u52a8\u5220\u9664\u8bb0\u5f55\uff0c\u5efa\u8bae\u5bfc\u51fa\u5907\u4efd\u540e\u6e05\u7406\u3002", 1)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_126, [ _cache[101] || (_cache[101] = vue.createElementVNode("div", null, [ vue.createElementVNode("div", {
           class: "lbl"
         }, "\u89c4\u5219\u66f4\u65b0"), vue.createElementVNode("div", {
           class: "cap-mute"
@@ -24380,26 +12252,26 @@
           class: "btn ghost sm",
           disabled: running.value || ruleUpdating.value,
           onClick: updateRules
-        }, vue.toDisplayString(ruleUpdating.value ? "\u68c0\u67e5\u4e2d\u2026" : "\u68c0\u67e5\u66f4\u65b0"), 9, _hoisted_126) ]), ruleUpdateNote.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_127, vue.toDisplayString(ruleUpdateNote.value), 1)) : vue.createCommentVNode("", true) ]) ], 64)) : tab.value === "system" && systemSub.value === "course" ? (vue.openBlock(), 
+        }, vue.toDisplayString(ruleUpdating.value ? "\u68c0\u67e5\u4e2d\u2026" : "\u68c0\u67e5\u66f4\u65b0"), 9, _hoisted_127) ]), ruleUpdateNote.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_128, vue.toDisplayString(ruleUpdateNote.value), 1)) : vue.createCommentVNode("", true) ]) ], 64)) : tab.value === "system" && systemSub.value === "course" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 4
-        }, [ vue.createElementVNode("div", _hoisted_128, [ _cache[106] || (_cache[106] = vue.createElementVNode("div", {
+        }, [ vue.createElementVNode("div", _hoisted_129, [ _cache[109] || (_cache[109] = vue.createElementVNode("div", {
           class: "gh2"
-        }, "\u5b66\u4e60\u884c\u4e3a", -1)), vue.createElementVNode("div", _hoisted_129, [ vue.createElementVNode("button", {
+        }, "\u5b66\u4e60\u884c\u4e3a", -1)), vue.createElementVNode("div", _hoisted_130, [ vue.createElementVNode("button", {
           class: vue.normalizeClass([ "switch", {
             off: !settings.courseAuto
           } ]),
           onClick: _cache[11] || (_cache[11] = (...args) => vue.unref(toggleCourseAuto) && vue.unref(toggleCourseAuto)(...args)),
           "aria-label": "\u4efb\u52a1\u70b9\u81ea\u52a8\u64ad\u653e\u5f00\u5173"
-        }, [ ..._cache[102] || (_cache[102] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[103] || (_cache[103] = vue.createElementVNode("span", {
+        }, [ ..._cache[105] || (_cache[105] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[106] || (_cache[106] = vue.createElementVNode("span", {
           class: "lbl",
           style: {
             flex: "1"
           }
-        }, "\u81ea\u52a8\u64ad\u653e\u89c6\u9891/\u97f3\u9891\uff08\u5b9e\u9a8c\uff09", -1)) ]), vue.createElementVNode("div", _hoisted_130, [ _cache[104] || (_cache[104] = vue.createElementVNode("span", {
+        }, "\u81ea\u52a8\u64ad\u653e\u89c6\u9891/\u97f3\u9891\uff08\u5b9e\u9a8c\uff09", -1)) ]), vue.createElementVNode("div", _hoisted_131, [ _cache[107] || (_cache[107] = vue.createElementVNode("span", {
           class: "lbl"
-        }, "\u64ad\u653e\u500d\u901f", -1)), vue.createElementVNode("span", _hoisted_131, vue.toDisplayString(settings.coursePlaybackRate) + "\xd7", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
+        }, "\u64ad\u653e\u500d\u901f", -1)), vue.createElementVNode("span", _hoisted_132, vue.toDisplayString(settings.coursePlaybackRate) + "\xd7", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
           class: "range",
           type: "range",
           min: "1",
@@ -24409,11 +12281,11 @@
           onChange: persist
         }, null, 544), [ [ vue.vModelText, settings.coursePlaybackRate, void 0, {
           number: true
-        } ] ]), vue.createElementVNode("div", _hoisted_132, [ _cache[105] || (_cache[105] = vue.createElementVNode("span", {
+        } ] ]), vue.createElementVNode("div", _hoisted_133, [ _cache[108] || (_cache[108] = vue.createElementVNode("span", {
           class: "lbl"
-        }, "\u5f53\u524d\u72b6\u6001", -1)), vue.createElementVNode("span", _hoisted_133, vue.toDisplayString(mediaStatusText.value), 1) ]) ]), _cache[110] || (_cache[110] = vue.createElementVNode("div", {
+        }, "\u5f53\u524d\u72b6\u6001", -1)), vue.createElementVNode("span", _hoisted_134, vue.toDisplayString(mediaStatusText.value), 1) ]) ]), _cache[113] || (_cache[113] = vue.createElementVNode("div", {
           class: "sep"
-        }, null, -1)), vue.createElementVNode("div", _hoisted_134, [ _cache[108] || (_cache[108] = vue.createElementVNode("div", {
+        }, null, -1)), vue.createElementVNode("div", _hoisted_135, [ _cache[111] || (_cache[111] = vue.createElementVNode("div", {
           class: "gh2"
         }, "\u5904\u7406\u54ea\u4e9b\u4efb\u52a1\u70b9", -1)), (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(vue.unref(taskToggles), k => (vue.openBlock(), 
         vue.createElementBlock("div", {
@@ -24425,47 +12297,47 @@
           } ]),
           onClick: $event => toggleTaskKind(k),
           "aria-label": `${vue.unref(taskToggleLabel)[k]}\u4efb\u52a1\u70b9\u5f00\u5173`
-        }, [ ..._cache[107] || (_cache[107] = [ vue.createElementVNode("i", null, null, -1) ]) ], 10, _hoisted_135), vue.createElementVNode("span", _hoisted_136, vue.toDisplayString(vue.unref(taskToggleLabel)[k]), 1) ]))), 128)), _cache[109] || (_cache[109] = vue.createElementVNode("div", {
+        }, [ ..._cache[110] || (_cache[110] = [ vue.createElementVNode("i", null, null, -1) ]) ], 10, _hoisted_136), vue.createElementVNode("span", _hoisted_137, vue.toDisplayString(vue.unref(taskToggleLabel)[k]), 1) ]))), 128)), _cache[112] || (_cache[112] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u5173\u6389\u7684\u7c7b\u578b\u76f4\u63a5\u8df3\u8fc7\uff0c\u4e5f\u4e0d\u8ba1\u5165\u672c\u8282\u8fd8\u5269\u591a\u5c11\u6ca1\u505a\u3002", -1)) ]) ], 64)) : tab.value === "system" && systemSub.value === "cache" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 5
         }, [ cacheImportPreview.value ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ _cache[116] || (_cache[116] = vue.createElementVNode("div", {
+        }, [ _cache[119] || (_cache[119] = vue.createElementVNode("div", {
           class: "ctitle"
-        }, "\u5bfc\u5165\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_137, [ vue.createElementVNode("div", _hoisted_138, [ _cache[111] || (_cache[111] = vue.createElementVNode("span", {
+        }, "\u5bfc\u5165\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_138, [ vue.createElementVNode("div", _hoisted_139, [ _cache[114] || (_cache[114] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u6587\u4ef6\u5185", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.fileCount) + " \u6761", 1) ]), vue.createElementVNode("div", _hoisted_139, [ _cache[112] || (_cache[112] = vue.createElementVNode("span", {
+        }, "\u6587\u4ef6\u5185", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.fileCount) + " \u6761", 1) ]), vue.createElementVNode("div", _hoisted_140, [ _cache[115] || (_cache[115] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u5c06\u65b0\u589e", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.added) + " \u6761", 1) ]), vue.createElementVNode("div", _hoisted_140, [ _cache[113] || (_cache[113] = vue.createElementVNode("span", {
+        }, "\u5c06\u65b0\u589e", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.added) + " \u6761", 1) ]), vue.createElementVNode("div", _hoisted_141, [ _cache[116] || (_cache[116] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u5c06\u8986\u76d6", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.replaced) + " \u6761", 1), _cache[114] || (_cache[114] = vue.createElementVNode("span", {
+        }, "\u5c06\u8986\u76d6", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.replaced) + " \u6761", 1), _cache[117] || (_cache[117] = vue.createElementVNode("span", {
           class: "cap-mute"
-        }, "\u540c\u9898\u5c06\u88ab\u66ff\u6362", -1)) ]), vue.createElementVNode("div", _hoisted_141, [ _cache[115] || (_cache[115] = vue.createElementVNode("span", {
+        }, "\u540c\u9898\u5c06\u88ab\u66ff\u6362", -1)) ]), vue.createElementVNode("div", _hoisted_142, [ _cache[118] || (_cache[118] = vue.createElementVNode("span", {
           class: "k"
         }, "\u5bfc\u5165\u540e", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.total) + " \u9898", 1) ]) ]), cacheImportPreview.value.replaced ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_142, "\u5c06\u8986\u76d6 " + vue.toDisplayString(cacheImportPreview.value.replaced) + " \u6761\u5df2\u6709\u8bb0\u5f55 \xb7 \u91cc\u9762\u53ef\u80fd\u6709\u4f60\u505a\u8fc7\u5e76\u51fa\u5206\u540e\u6536\u5f55\u7684\u7b54\u6848\uff0c\u5bfc\u5165\u4f1a\u7528\u6587\u4ef6\u91cc\u7684\u7b54\u6848\u9876\u6389\u5b83\u4eec\uff0c\u9876\u6389\u540e\u4e0d\u53ef\u64a4\u9500\u3002\u60f3\u7559\u5e95\u5c31\u5148\u53d6\u6d88\uff0c\u5bfc\u51fa\u4e00\u4efd\u518d\u5bfc\u5165\u3002", 1)) : vue.createCommentVNode("", true), _cache[117] || (_cache[117] = vue.createElementVNode("div", {
+        vue.createElementBlock("div", _hoisted_143, "\u5c06\u8986\u76d6 " + vue.toDisplayString(cacheImportPreview.value.replaced) + " \u6761\u5df2\u6709\u8bb0\u5f55 \xb7 \u91cc\u9762\u53ef\u80fd\u6709\u4f60\u505a\u8fc7\u5e76\u51fa\u5206\u540e\u6536\u5f55\u7684\u7b54\u6848\uff0c\u5bfc\u5165\u4f1a\u7528\u6587\u4ef6\u91cc\u7684\u7b54\u6848\u9876\u6389\u5b83\u4eec\uff0c\u9876\u6389\u540e\u4e0d\u53ef\u64a4\u9500\u3002\u60f3\u7559\u5e95\u5c31\u5148\u53d6\u6d88\uff0c\u5bfc\u51fa\u4e00\u4efd\u518d\u5bfc\u5165\u3002", 1)) : vue.createCommentVNode("", true), _cache[120] || (_cache[120] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u5bfc\u5165\u7684\u7b54\u6848\u547d\u4e2d\u65f6\u4e0d\u6263\u5206\u3002\u7231\u95ee\u7b54\u4e0d\u6838\u9a8c\u5bfc\u5165\u5185\u5bb9\u662f\u5426\u6b63\u786e\uff0c\u63d0\u4ea4\u4f5c\u4e1a\u524d\u81ea\u884c\u6838\u5bf9\u3002", -1)), _cache[118] || (_cache[118] = vue.createElementVNode("div", {
+        }, "\u5bfc\u5165\u7684\u7b54\u6848\u547d\u4e2d\u65f6\u4e0d\u6263\u5206\u3002\u7231\u95ee\u7b54\u4e0d\u6838\u9a8c\u5bfc\u5165\u5185\u5bb9\u662f\u5426\u6b63\u786e\uff0c\u63d0\u4ea4\u4f5c\u4e1a\u524d\u81ea\u884c\u6838\u5bf9\u3002", -1)), _cache[121] || (_cache[121] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u5bfc\u5165\u4e0d\u4f1a\u6dd8\u6c70\u5df2\u6709\u8bb0\u5f55\uff0c\u4e5f\u4e0d\u4f1a\u6539\u52a8\u5df2\u56de\u586b\u7684\u9875\u9762\u6216\u89e6\u53d1\u63d0\u4ea4\u3002", -1)) ], 64)) : cacheClearPending.value ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ _cache[121] || (_cache[121] = vue.createElementVNode("div", {
+        }, [ _cache[124] || (_cache[124] = vue.createElementVNode("div", {
           class: "ctitle"
-        }, "\u6e05\u7a7a\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_143, [ vue.createElementVNode("div", _hoisted_144, [ _cache[119] || (_cache[119] = vue.createElementVNode("span", {
+        }, "\u6e05\u7a7a\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_144, [ vue.createElementVNode("div", _hoisted_145, [ _cache[122] || (_cache[122] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u5c06\u6e05\u7a7a", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheEntries.value.length) + " \u9898", 1) ]), _cache[120] || (_cache[120] = vue.createElementVNode("div", {
+        }, "\u5c06\u6e05\u7a7a", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheEntries.value.length) + " \u9898", 1) ]), _cache[123] || (_cache[123] = vue.createElementVNode("div", {
           class: "prow"
         }, [ vue.createElementVNode("span", {
           class: "k"
-        }, "\u5f71\u54cd"), vue.createElementVNode("span", null, "\u518d\u9047\u5230\u8fd9\u4e9b\u9898\u9700\u91cd\u65b0\u67e5\u8be2\uff0c\u4ed8\u8d39\u547d\u4e2d\u4f1a\u91cd\u65b0\u6263\u5206\u3002") ], -1)) ]), _cache[122] || (_cache[122] = vue.createElementVNode("div", {
+        }, "\u5f71\u54cd"), vue.createElementVNode("span", null, "\u518d\u9047\u5230\u8fd9\u4e9b\u9898\u9700\u91cd\u65b0\u67e5\u8be2\uff0c\u4ed8\u8d39\u547d\u4e2d\u4f1a\u91cd\u65b0\u6263\u5206\u3002") ], -1)) ]), _cache[125] || (_cache[125] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u6e05\u7a7a\u4e0d\u53ef\u64a4\u9500\u3002\u5bfc\u51fa\u53ef\u7559\u4e00\u4efd\u5907\u4efd\u3002", -1)) ], 64)) : !cacheEntries.value.length ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 2
-        }, [ _cache[123] || (_cache[123] = vue.createElementVNode("div", {
+        }, [ _cache[126] || (_cache[126] = vue.createElementVNode("div", {
           class: "standby"
         }, [ vue.createElementVNode("div", {
           class: "standby-title"
@@ -24481,42 +12353,42 @@
           rel: "noopener noreferrer"
         }, "\u89e3\u6790\u5bfc\u5165") ], 64)) : (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 3
-        }, [ vue.createElementVNode("div", _hoisted_145, [ vue.createElementVNode("span", _hoisted_146, [ vue.createElementVNode("b", null, vue.toDisplayString(cacheEntries.value.length), 1), vue.createTextVNode(" / " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898", 1) ]), vue.createElementVNode("div", _hoisted_147, [ vue.createElementVNode("i", {
+        }, [ vue.createElementVNode("div", _hoisted_146, [ vue.createElementVNode("span", _hoisted_147, [ vue.createElementVNode("b", null, vue.toDisplayString(cacheEntries.value.length), 1), vue.createTextVNode(" / " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898", 1) ]), vue.createElementVNode("div", _hoisted_148, [ vue.createElementVNode("i", {
           class: vue.normalizeClass({
             over: cacheOverWarn.value
           }),
           style: vue.normalizeStyle({
             width: `${Math.min(100, cacheEntries.value.length / vue.unref(CACHE_WARN_ENTRIES) * 100)}%`
           })
-        }, null, 6) ]) ]), cachePersistFailed.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_148, "\u5b58\u4e0d\u4e0b\u4e86 \xb7 \u672c\u673a\u5b58\u50a8\u5199\u5165\u88ab\u62d2\uff0c\u6700\u8fd1\u7684\u6536\u5f55\u6ca1\u6709\u843d\u76d8\u3002\u5148\u5bfc\u51fa\u5907\u4efd\uff0c\u518d\u5220\u6389\u4e00\u4e9b\u4e0d\u9700\u8981\u7684\u8bb0\u5f55\u3002")) : cacheOverWarn.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_149, "\u5df2\u8d85\u51fa\u5efa\u8bae\u5bb9\u91cf \xb7 \u4e0d\u4f1a\u81ea\u52a8\u5220\u9664\u4efb\u4f55\u8bb0\u5f55\uff0c\u4f46\u8868\u8d8a\u5927\u5199\u5165\u8d8a\u6162\u3002\u5efa\u8bae\u5bfc\u51fa\u5907\u4efd\u540e\u6e05\u7406\u4e0d\u518d\u9700\u8981\u7684\u3002")) : cacheNearWarn.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_150, "\u63a5\u8fd1\u5efa\u8bae\u5bb9\u91cf " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898 \xb7 \u53ef\u5148\u5bfc\u51fa\u5907\u4efd\u3002", 1)) : vue.createCommentVNode("", true), _cache[126] || (_cache[126] = vue.createElementVNode("div", {
+        }, null, 6) ]) ]), cachePersistFailed.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_149, "\u5b58\u4e0d\u4e0b\u4e86 \xb7 \u672c\u673a\u5b58\u50a8\u5199\u5165\u88ab\u62d2\uff0c\u6700\u8fd1\u7684\u6536\u5f55\u6ca1\u6709\u843d\u76d8\u3002\u5148\u5bfc\u51fa\u5907\u4efd\uff0c\u518d\u5220\u6389\u4e00\u4e9b\u4e0d\u9700\u8981\u7684\u8bb0\u5f55\u3002")) : cacheOverWarn.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_150, "\u5df2\u8d85\u51fa\u5efa\u8bae\u5bb9\u91cf \xb7 \u4e0d\u4f1a\u81ea\u52a8\u5220\u9664\u4efb\u4f55\u8bb0\u5f55\uff0c\u4f46\u8868\u8d8a\u5927\u5199\u5165\u8d8a\u6162\u3002\u5efa\u8bae\u5bfc\u51fa\u5907\u4efd\u540e\u6e05\u7406\u4e0d\u518d\u9700\u8981\u7684\u3002")) : cacheNearWarn.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_151, "\u63a5\u8fd1\u5efa\u8bae\u5bb9\u91cf " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898 \xb7 \u53ef\u5148\u5bfc\u51fa\u5907\u4efd\u3002", 1)) : vue.createCommentVNode("", true), _cache[129] || (_cache[129] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u547d\u4e2d\u7f13\u5b58\u4e0d\u6263\u5206\u3001\u4e0d\u8054\u7f51\u3002\u53ea\u6536\u5f55\u4f60\u505a\u8fc7\u5e76\u51fa\u5206\u7684\u9898\u76ee\uff0c\u4e0d\u4f1a\u81ea\u52a8\u5220\u9664\u3002", -1)), importedNeverHit.value.total ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 3
         }, [ importedNeverHit.value.neverHit === importedNeverHit.value.total ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_151, "\u5bfc\u5165\u7684 " + vue.toDisplayString(importedNeverHit.value.total) + " \u6761\u4e00\u6761\u90fd\u8fd8\u6ca1\u547d\u4e2d\u8fc7 \xb7 \u5982\u679c\u5176\u4e2d\u7684\u9898\u4f60\u5df2\u7ecf\u505a\u5230\u8fc7\uff0c\u591a\u534a\u662f\u9898\u9762\u4e0e\u9875\u9762\u5bf9\u4e0d\u4e0a\u3002\u5148\u62ff\u4e00\u9053\u5df2\u77e5\u7684\u9898\u9a8c\u4e00\u6b21\u518d\u8bf4\u3002", 1)) : (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_152, "\u5bfc\u5165 " + vue.toDisplayString(importedNeverHit.value.total) + " \u6761 \xb7 \u5176\u4e2d " + vue.toDisplayString(importedNeverHit.value.neverHit) + " \u6761\u6682\u672a\u547d\u4e2d\u3002", 1)), _cache[124] || (_cache[124] = vue.createElementVNode("div", {
+        vue.createElementBlock("div", _hoisted_152, "\u5bfc\u5165\u7684 " + vue.toDisplayString(importedNeverHit.value.total) + " \u6761\u4e00\u6761\u90fd\u8fd8\u6ca1\u547d\u4e2d\u8fc7 \xb7 \u5982\u679c\u5176\u4e2d\u7684\u9898\u4f60\u5df2\u7ecf\u505a\u5230\u8fc7\uff0c\u591a\u534a\u662f\u9898\u9762\u4e0e\u9875\u9762\u5bf9\u4e0d\u4e0a\u3002\u5148\u62ff\u4e00\u9053\u5df2\u77e5\u7684\u9898\u9a8c\u4e00\u6b21\u518d\u8bf4\u3002", 1)) : (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_153, "\u5bfc\u5165 " + vue.toDisplayString(importedNeverHit.value.total) + " \u6761 \xb7 \u5176\u4e2d " + vue.toDisplayString(importedNeverHit.value.neverHit) + " \u6761\u6682\u672a\u547d\u4e2d\u3002", 1)), _cache[127] || (_cache[127] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u300c\u547d\u4e2d\u300d\u53ea\u8868\u793a\u9898\u76ee\u5bf9\u4e0a\u4e86\u53f7\uff0c\u4e0d\u8868\u793a\u7b54\u6848\u771f\u7684\u7528\u4e0a\u4e86\u3002\u8fd9\u4e2a\u6570\u53ea\u4f5c\u53c2\u8003\uff1a\u521a\u547d\u4e2d\u7684\u6700\u591a\u4e00\u5206\u949f\u540e\u624d\u8ba1\u5165\uff0c\u5173\u9875\u9762\u592a\u5feb\u5c31\u6c38\u8fdc\u4e0d\u8ba1\uff1b\u6682\u672a\u547d\u4e2d\u91cc\u65e2\u6709\u4f60\u8fd8\u6ca1\u505a\u5230\u7684\u9898\uff0c\u4e5f\u53ef\u80fd\u6709\u9898\u9762\u5bf9\u4e0d\u4e0a\u7684\u3002", -1)) ], 64)) : vue.createCommentVNode("", true), vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
           "onUpdate:modelValue": _cache[13] || (_cache[13] = $event => cacheQuery.value = $event),
           placeholder: "\u641c\u7d22\u9898\u5e72\u6216\u7b54\u6848"
         }, null, 512), [ [ vue.vModelText, cacheQuery.value ] ]), cacheNote.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_153, vue.toDisplayString(cacheNote.value), 1)) : vue.createCommentVNode("", true), matchedCache.value.length > CACHE_LIST_LIMIT ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_154, "\u5171 " + vue.toDisplayString(matchedCache.value.length) + " \u6761 \xb7 \u53ea\u5217\u51fa\u524d " + vue.toDisplayString(CACHE_LIST_LIMIT) + " \u6761\uff0c\u7528\u641c\u7d22\u7f29\u5c0f\u8303\u56f4\u3002", 1)) : vue.createCommentVNode("", true), (vue.openBlock(true), 
+        vue.createElementBlock("div", _hoisted_154, vue.toDisplayString(cacheNote.value), 1)) : vue.createCommentVNode("", true), matchedCache.value.length > CACHE_LIST_LIMIT ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_155, "\u5171 " + vue.toDisplayString(matchedCache.value.length) + " \u6761 \xb7 \u53ea\u5217\u51fa\u524d " + vue.toDisplayString(CACHE_LIST_LIMIT) + " \u6761\uff0c\u7528\u641c\u7d22\u7f29\u5c0f\u8303\u56f4\u3002", 1)) : vue.createCommentVNode("", true), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(filteredCache.value, entry => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: entry.unitHash,
           class: "ent"
-        }, [ vue.createElementVNode("div", _hoisted_155, [ vue.createElementVNode("span", _hoisted_156, vue.toDisplayString(entry.stem ? vue.unref(harvestTypeLabel)(entry.itemType) : "\u65e0\u9898\u9762"), 1), entry.importedAt ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_157, "\u5bfc\u5165")) : entry.platform ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_158, vue.toDisplayString(entry.platform), 1)) : vue.createCommentVNode("", true), vue.createElementVNode("span", _hoisted_159, vue.toDisplayString(cacheDate(entry.savedAt)), 1), vue.createElementVNode("button", {
+        }, [ vue.createElementVNode("div", _hoisted_156, [ vue.createElementVNode("span", _hoisted_157, vue.toDisplayString(entry.stem ? vue.unref(harvestTypeLabel)(entry.itemType) : "\u65e0\u9898\u9762"), 1), entry.importedAt ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_158, "\u5bfc\u5165")) : entry.platform ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_159, vue.toDisplayString(entry.platform), 1)) : vue.createCommentVNode("", true), vue.createElementVNode("span", _hoisted_160, vue.toDisplayString(cacheDate(entry.savedAt)), 1), vue.createElementVNode("button", {
           class: "ent-del",
           "aria-label": `\u5220\u9664\u7f13\u5b58 ${entry.unitHash.slice(0, 8)}`,
           onClick: $event => removeCacheEntry(entry.unitHash)
-        }, [ ..._cache[125] || (_cache[125] = [ vue.createElementVNode("svg", {
+        }, [ ..._cache[128] || (_cache[128] = [ vue.createElementVNode("svg", {
           class: "ic sm",
           viewBox: "0 0 24 24",
           fill: "none",
@@ -24526,59 +12398,62 @@
           d: "M6 7h12M9.5 7V5.5h5V7M8 7l.7 12h6.6L16 7",
           "stroke-linecap": "round",
           "stroke-linejoin": "round"
-        }) ], -1) ]) ], 8, _hoisted_160) ]), vue.createElementVNode("div", {
+        }) ], -1) ]) ], 8, _hoisted_161) ]), vue.createElementVNode("div", {
           class: vue.normalizeClass([ "ent-q", {
             "cap-mute": !entry.stem
           } ])
-        }, vue.toDisplayString(entry.stem || "\u8fd9\u6761\u8bb0\u5f55\u6ca1\u6709\u9898\u9762\uff08\u6765\u6e90\u672a\u63d0\u4f9b\uff09\uff0c\u4ecd\u53ef\u6b63\u5e38\u547d\u4e2d"), 3), vue.createElementVNode("div", _hoisted_161, vue.toDisplayString(entry.values.join("\u3001")), 1), entry.options.length ? (vue.openBlock(), 
-        vue.createElementBlock("details", _hoisted_162, [ vue.createElementVNode("summary", _hoisted_163, "\u9009\u9879 " + vue.toDisplayString(entry.options.length) + " \u9879", 1), (vue.openBlock(true), 
+        }, vue.toDisplayString(entry.stem || "\u8fd9\u6761\u8bb0\u5f55\u6ca1\u6709\u9898\u9762\uff08\u6765\u6e90\u672a\u63d0\u4f9b\uff09\uff0c\u4ecd\u53ef\u6b63\u5e38\u547d\u4e2d"), 3), vue.createElementVNode("div", _hoisted_162, vue.toDisplayString(entry.values.join("\u3001")), 1), entry.options.length ? (vue.openBlock(), 
+        vue.createElementBlock("details", _hoisted_163, [ vue.createElementVNode("summary", _hoisted_164, "\u9009\u9879 " + vue.toDisplayString(entry.options.length) + " \u9879", 1), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(entry.options, (op, oi) => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: oi,
           class: "cap-mute"
         }, vue.toDisplayString(letter2(oi)) + "\u3001" + vue.toDisplayString(op), 1))), 128)) ])) : vue.createCommentVNode("", true) ]))), 128)), !filteredCache.value.length ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_164, "\u6ca1\u6709\u5339\u914d\u7684\u7f13\u5b58\u3002")) : vue.createCommentVNode("", true) ], 64)) ], 64)) : tab.value === "system" && systemSub.value === "diag" ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_165, "\u6ca1\u6709\u5339\u914d\u7684\u7f13\u5b58\u3002")) : vue.createCommentVNode("", true) ], 64)) ], 64)) : tab.value === "system" && systemSub.value === "diag" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 6
-        }, [ vue.createElementVNode("div", _hoisted_165, [ vue.createElementVNode("div", _hoisted_166, [ _cache[127] || (_cache[127] = vue.createElementVNode("span", {
+        }, [ vue.createElementVNode("div", _hoisted_166, [ vue.createElementVNode("div", _hoisted_167, [ _cache[130] || (_cache[130] = vue.createElementVNode("span", {
           class: "ctitle"
         }, "\u5f53\u524d\u89c4\u5219", -1)), ruleDiag.value ? (vue.openBlock(), vue.createElementBlock("span", {
           key: 0,
           class: vue.normalizeClass([ "tag", ruleDiag.value.source === "remote-active" ? "acc" : "neutral" ])
         }, vue.toDisplayString(ruleDiag.value.sourceLabel), 3)) : vue.createCommentVNode("", true) ]), ruleDiag.value ? (vue.openBlock(), 
-        vue.createElementBlock("dl", _hoisted_167, [ _cache[128] || (_cache[128] = vue.createElementVNode("dt", null, "\u89c4\u5219\u5305", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.packageId), 1), _cache[129] || (_cache[129] = vue.createElementVNode("dt", null, "\u7248\u672c", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.version) + " \xb7 seq " + vue.toDisplayString(ruleDiag.value.releaseSequence), 1), ruleDiag.value.release ? (vue.openBlock(), 
-        vue.createElementBlock("dt", _hoisted_168, "\u901a\u9053")) : vue.createCommentVNode("", true), ruleDiag.value.release ? (vue.openBlock(), 
-        vue.createElementBlock("dd", _hoisted_169, vue.toDisplayString(ruleDiag.value.release.channel) + " \xb7 " + vue.toDisplayString(ruleDiag.value.release.rolloutPercent) + "%", 1)) : vue.createCommentVNode("", true), _cache[130] || (_cache[130] = vue.createElementVNode("dt", null, "\u6821\u9a8c", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.loadStatusLabel), 1) ])) : (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_170, "\u672c\u6b21\u4f1a\u8bdd\u8fd8\u6ca1\u6709\u5339\u914d\u5230\u89c4\u5219\u3002")), lastCaptureFailure.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_171, "\u89c4\u5219\u6355\u83b7\u5931\u8d25 \xb7 " + vue.toDisplayString(lastCaptureFailure.value) + " \xb7 \u8fd9\u9875\u4e0d\u662f\u6ca1\u6709\u9898\uff0c\u662f\u89c4\u5219\u6ca1\u8dd1\u5b8c", 1)) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_172, [ vue.createElementVNode("div", {
+        vue.createElementBlock("dl", _hoisted_168, [ _cache[131] || (_cache[131] = vue.createElementVNode("dt", null, "\u89c4\u5219\u5305", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.packageId), 1), _cache[132] || (_cache[132] = vue.createElementVNode("dt", null, "\u7248\u672c", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.version) + " \xb7 seq " + vue.toDisplayString(ruleDiag.value.releaseSequence), 1), ruleDiag.value.release ? (vue.openBlock(), 
+        vue.createElementBlock("dt", _hoisted_169, "\u901a\u9053")) : vue.createCommentVNode("", true), ruleDiag.value.release ? (vue.openBlock(), 
+        vue.createElementBlock("dd", _hoisted_170, vue.toDisplayString(ruleDiag.value.release.channel) + " \xb7 " + vue.toDisplayString(ruleDiag.value.release.rolloutPercent) + "%", 1)) : vue.createCommentVNode("", true), _cache[133] || (_cache[133] = vue.createElementVNode("dt", null, "\u6821\u9a8c", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.loadStatusLabel), 1) ])) : (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_171, "\u672c\u6b21\u4f1a\u8bdd\u8fd8\u6ca1\u6709\u5339\u914d\u5230\u89c4\u5219\u3002")), ruleDiag.value && (ruleDiag.value.lifecycle || ruleDiag.value.lifecycleFailure || ruleDiag.value.rechecks.used > 0) ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_172, "\u751f\u547d\u5468\u671f \xb7 " + vue.toDisplayString(ruleDiag.value.lifecycle ? `${ruleDiag.value.lifecycle.state} \xb7 \u8f6c\u79fb ${ruleDiag.value.lifecycle.transitions}` : `\u672a\u542f\u52a8 \xb7 ${ruleDiag.value.lifecycleFailure}`) + vue.toDisplayString(ruleDiag.value.eventFailure ? ` \xb7 \u6700\u8fd1\u5931\u8d25 ${ruleDiag.value.eventFailure.event} ${ruleDiag.value.eventFailure.code}` : "") + " \xb7 \u91cd\u68c0 " + vue.toDisplayString(ruleDiag.value.rechecks.used) + "/" + vue.toDisplayString(ruleDiag.value.rechecks.max), 1)) : vue.createCommentVNode("", true), ((_c = ruleDiag.value) == null ? void 0 : _c.walker.session) ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_173, "\u8d70\u67e5 \xb7 \u5df2\u5207 " + vue.toDisplayString(ruleDiag.value.walker.session.steps) + " \u9898" + vue.toDisplayString(ruleDiag.value.walker.session.lastStop ? ` \xb7 ${WALK_STOP_TEXT[ruleDiag.value.walker.session.lastStop]}` : ""), 1)) : vue.createCommentVNode("", true), ((_d = ruleDiag.value) == null ? void 0 : _d.commit.last) ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_174, "\u6682\u5b58 \xb7 " + vue.toDisplayString(COMMIT_OUTCOME_TEXT[ruleDiag.value.commit.last]) + "\uff08" + vue.toDisplayString(ruleDiag.value.commit.runs) + " \u6b21\uff09", 1)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_175, "\u5f15\u64ce " + vue.toDisplayString(vue.unref(ENGINE_ID)) + " \xb7 \u811a\u672c " + vue.toDisplayString(vue.unref(SCRIPT_VERSION)), 1), lastCaptureFailure.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_176, "\u89c4\u5219\u6355\u83b7\u5931\u8d25 \xb7 " + vue.toDisplayString(lastCaptureFailure.value) + " \xb7 \u8fd9\u9875\u4e0d\u662f\u6ca1\u6709\u9898\uff0c\u662f\u89c4\u5219\u6ca1\u8dd1\u5b8c", 1)) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_177, [ vue.createElementVNode("div", {
           class: "row"
-        }, [ _cache[131] || (_cache[131] = vue.createElementVNode("span", {
+        }, [ _cache[134] || (_cache[134] = vue.createElementVNode("span", {
           class: "ctitle"
         }, "\u8fd0\u884c\u65e5\u5fd7", -1)), vue.createElementVNode("button", {
           class: "btn ghost sm",
           onClick: clearLogs
-        }, "\u6e05\u7a7a") ]), vue.createElementVNode("div", _hoisted_173, [ (vue.openBlock(), vue.createElementBlock(vue.Fragment, null, vue.renderList(LOG_LEVELS, lvl => vue.createElementVNode("button", {
+        }, "\u6e05\u7a7a") ]), vue.createElementVNode("div", _hoisted_178, [ (vue.openBlock(), vue.createElementBlock(vue.Fragment, null, vue.renderList(LOG_LEVELS, lvl => vue.createElementVNode("button", {
           key: lvl.k,
           class: vue.normalizeClass([ "seg", {
             active: logFilter.value === lvl.k
           } ]),
           onClick: $event => logFilter.value = lvl.k
-        }, vue.toDisplayString(lvl.l), 11, _hoisted_174)), 64)) ]), filteredLogs.value.length ? (vue.openBlock(), 
-        vue.createElementBlock("ul", _hoisted_175, [ (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(filteredLogs.value, (item, i) => (vue.openBlock(), 
+        }, vue.toDisplayString(lvl.l), 11, _hoisted_179)), 64)) ]), filteredLogs.value.length ? (vue.openBlock(), 
+        vue.createElementBlock("ul", _hoisted_180, [ (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(filteredLogs.value, (item, i) => (vue.openBlock(), 
         vue.createElementBlock("li", {
           key: i,
           class: vue.normalizeClass([ "log-row", `log-${item.type}` ])
-        }, [ vue.createElementVNode("span", _hoisted_176, vue.toDisplayString(item.time), 1), vue.createElementVNode("span", _hoisted_177, [ vue.createTextVNode(vue.toDisplayString(item.content), 1), item.repeat > 1 ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_178, " \xd7 " + vue.toDisplayString(item.repeat), 1)) : vue.createCommentVNode("", true) ]) ], 2))), 128)) ])) : (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_179, "\u6682\u65e0\u65e5\u5fd7")) ]), vue.createElementVNode("div", _hoisted_180, [ vue.createElementVNode("button", {
+        }, [ vue.createElementVNode("span", _hoisted_181, vue.toDisplayString(item.time), 1), vue.createElementVNode("span", _hoisted_182, [ vue.createTextVNode(vue.toDisplayString(item.content), 1), item.repeat > 1 ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_183, " \xd7 " + vue.toDisplayString(item.repeat), 1)) : vue.createCommentVNode("", true) ]) ], 2))), 128)) ])) : (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_184, "\u6682\u65e0\u65e5\u5fd7")) ]), vue.createElementVNode("div", _hoisted_185, [ vue.createElementVNode("button", {
           class: "fold",
           onClick: _cache[14] || (_cache[14] = $event => diagOpen.value = !diagOpen.value)
-        }, [ _cache[133] || (_cache[133] = vue.createTextVNode("\u9875\u9762\u8bca\u65ad \xb7 \u53ea\u8bc6\u522b\u4e0d\u6263\u5206", -1)), (vue.openBlock(), 
+        }, [ _cache[136] || (_cache[136] = vue.createTextVNode("\u9875\u9762\u8bca\u65ad \xb7 \u53ea\u8bc6\u522b\u4e0d\u6263\u5206", -1)), (vue.openBlock(), 
         vue.createElementBlock("svg", {
           class: vue.normalizeClass([ "ic sm chev", {
             right: !diagOpen.value
           } ])
-        }, [ ..._cache[132] || (_cache[132] = [ vue.createElementVNode("use", {
+        }, [ ..._cache[135] || (_cache[135] = [ vue.createElementVNode("use", {
           href: "#i-chevron"
         }, null, -1) ]) ], 2)) ]), diagOpen.value ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
@@ -24586,47 +12461,49 @@
           class: "btn ghost sm",
           disabled: running.value,
           onClick: runDiag
-        }, "\u8fd0\u884c\u8bca\u65ad", 8, _hoisted_181), diag.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_182, [ vue.createTextVNode(vue.toDisplayString(diag.value.matched ? `\u547d\u4e2d${platformLabel.value} \xb7 \u6293\u5230 ${diag.value.count} \u9898 \xb7 \u56fe\u7247 ${diag.value.imageCount} \u5f20 \xb7 \u6536\u5f55 ${diag.value.harvestedCount} \u9898` : "\u672a\u547d\u4e2d\u5f53\u524d\u9875") + " ", 1), (vue.openBlock(true), 
+        }, "\u8fd0\u884c\u8bca\u65ad", 8, _hoisted_186), diag.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_187, [ vue.createTextVNode(vue.toDisplayString(diag.value.matched ? `\u547d\u4e2d${platformLabel.value} \xb7 \u6293\u5230 ${diag.value.count} \u9898 \xb7 \u56fe\u7247 ${diag.value.imageCount} \u5f20 \xb7 \u6536\u5f55 ${diag.value.harvestedCount} \u9898` : "\u672a\u547d\u4e2d\u5f53\u524d\u9875") + " ", 1), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(diag.value.items, (it, i) => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: i
-        }, vue.toDisplayString(i + 1) + ". [" + vue.toDisplayString(it.type) + "] " + vue.toDisplayString(it.decodeFailed ? "\u89e3\u7801\u5931\u8d25" : it.stemPreview) + " \xb7 " + vue.toDisplayString(it.optionCount) + " \u9009\u9879", 1))), 128)) ])) : (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_183, "\u70b9\u300c\u8fd0\u884c\u8bca\u65ad\u300d\u8bc6\u522b\u5f53\u524d\u9875")) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
+        }, vue.toDisplayString(i + 1) + ". [" + vue.toDisplayString(it.type) + "] " + vue.toDisplayString(it.decodeFailed ? "\u89e3\u7801\u5931\u8d25" : it.stemPreview) + " \xb7 " + vue.toDisplayString(it.optionCount) + " \u9009\u9879", 1))), 128)), diag.value.ruleFlow && diag.value.ruleFlow.status === "ok" ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_188, "\u89c4\u5219\u8bca\u65ad " + vue.toDisplayString(JSON.stringify(diag.value.ruleFlow.value)), 1)) : diag.value.ruleFlow && diag.value.ruleFlow.status === "failed" ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_189, "\u89c4\u5219\u8bca\u65ad\u5931\u8d25 \xb7 " + vue.toDisplayString(diag.value.ruleFlow.error), 1)) : vue.createCommentVNode("", true) ])) : (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_190, "\u70b9\u300c\u8fd0\u884c\u8bca\u65ad\u300d\u8bc6\u522b\u5f53\u524d\u9875")) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
           class: "fold",
           onClick: _cache[15] || (_cache[15] = $event => ruleMetaOpen.value = !ruleMetaOpen.value)
-        }, [ _cache[135] || (_cache[135] = vue.createTextVNode("\u89c4\u5219\u660e\u7ec6", -1)), (vue.openBlock(), 
+        }, [ _cache[138] || (_cache[138] = vue.createTextVNode("\u89c4\u5219\u660e\u7ec6", -1)), (vue.openBlock(), 
         vue.createElementBlock("svg", {
           class: vue.normalizeClass([ "ic sm chev", {
             right: !ruleMetaOpen.value
           } ])
-        }, [ ..._cache[134] || (_cache[134] = [ vue.createElementVNode("use", {
+        }, [ ..._cache[137] || (_cache[137] = [ vue.createElementVNode("use", {
           href: "#i-chevron"
         }, null, -1) ]) ], 2)) ]), ruleMetaOpen.value && ruleDiag.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_184, [ vue.createElementVNode("div", _hoisted_185, [ _cache[136] || (_cache[136] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_191, [ vue.createElementVNode("div", _hoisted_192, [ _cache[139] || (_cache[139] = vue.createElementVNode("span", {
           class: "rule-key"
-        }, "hash", -1)), vue.createElementVNode("span", _hoisted_186, vue.toDisplayString(ruleDiag.value.contentHash), 1) ]), ruleDiag.value.release ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_187, [ _cache[137] || (_cache[137] = vue.createElementVNode("span", {
+        }, "hash", -1)), vue.createElementVNode("span", _hoisted_193, vue.toDisplayString(ruleDiag.value.contentHash), 1) ]), ruleDiag.value.release ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_194, [ _cache[140] || (_cache[140] = vue.createElementVNode("span", {
           class: "rule-key"
-        }, "release", -1)), vue.createElementVNode("span", _hoisted_188, [ vue.createTextVNode(vue.toDisplayString(ruleDiag.value.release.releaseId) + " \xb7 bucket " + vue.toDisplayString(ruleDiag.value.release.cohortBucket), 1), vue.unref(isRuleCandidateTestDelivery)(ruleDiag.value.release) ? (vue.openBlock(), 
+        }, "release", -1)), vue.createElementVNode("span", _hoisted_195, [ vue.createTextVNode(vue.toDisplayString(ruleDiag.value.release.releaseId) + " \xb7 bucket " + vue.toDisplayString(ruleDiag.value.release.cohortBucket), 1), vue.unref(protocol.isRuleCandidateTestDelivery)(ruleDiag.value.release) ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
         }, [ vue.createTextVNode(" \xb7 \u6d4b\u8bd5\u8bbe\u5907\u56fa\u5b9a\u547d\u4e2d") ], 64)) : vue.createCommentVNode("", true) ]) ])) : vue.createCommentVNode("", true), ruleDiag.value.candidateVersion ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_189, [ _cache[138] || (_cache[138] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_196, [ _cache[141] || (_cache[141] = vue.createElementVNode("span", {
           class: "rule-key"
-        }, "candidate", -1)), vue.createElementVNode("span", _hoisted_190, vue.toDisplayString(ruleDiag.value.candidateVersion), 1) ])) : vue.createCommentVNode("", true), ruleDiag.value.lastKnownGoodVersion ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_191, [ _cache[139] || (_cache[139] = vue.createElementVNode("span", {
+        }, "candidate", -1)), vue.createElementVNode("span", _hoisted_197, vue.toDisplayString(ruleDiag.value.candidateVersion), 1) ])) : vue.createCommentVNode("", true), ruleDiag.value.lastKnownGoodVersion ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_198, [ _cache[142] || (_cache[142] = vue.createElementVNode("span", {
           class: "rule-key"
-        }, "\u4e0a\u6b21\u53ef\u7528", -1)), vue.createElementVNode("span", _hoisted_192, vue.toDisplayString(ruleDiag.value.lastKnownGoodVersion), 1) ])) : vue.createCommentVNode("", true) ])) : ruleMetaOpen.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_193, "\u672c\u6b21\u4f1a\u8bdd\u8fd8\u6ca1\u6709\u5339\u914d\u5230\u89c4\u5219\u3002")) : vue.createCommentVNode("", true) ]) ], 64)) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_194, [ tab.value === "home" ? (vue.openBlock(), 
+        }, "\u4e0a\u6b21\u53ef\u7528", -1)), vue.createElementVNode("span", _hoisted_199, vue.toDisplayString(ruleDiag.value.lastKnownGoodVersion), 1) ])) : vue.createCommentVNode("", true) ])) : ruleMetaOpen.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_200, "\u672c\u6b21\u4f1a\u8bdd\u8fd8\u6ca1\u6709\u5339\u914d\u5230\u89c4\u5219\u3002")) : vue.createCommentVNode("", true) ]) ], 64)) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_201, [ tab.value === "home" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ detectedCount.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_195, [ vue.createElementVNode("div", _hoisted_196, [ _cache[140] || (_cache[140] = vue.createElementVNode("span", {
+        }, [ detectedCount.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_202, [ vue.createElementVNode("div", _hoisted_203, [ _cache[143] || (_cache[143] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u5c06\u56de\u586b", -1)), vue.createElementVNode("b", null, "\u6700\u591a " + vue.toDisplayString(detectedCount.value) + " \u9898", 1) ]), vue.createElementVNode("div", _hoisted_197, [ _cache[141] || (_cache[141] = vue.createElementVNode("span", {
+        }, "\u5c06\u56de\u586b", -1)), vue.createElementVNode("b", null, "\u6700\u591a " + vue.toDisplayString(detectedCount.value) + " \u9898", 1) ]), vue.createElementVNode("div", _hoisted_204, [ _cache[144] || (_cache[144] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u9884\u8ba1\u6263\u5206", -1)), vue.createElementVNode("b", null, "\u2264 " + vue.toDisplayString(detectedCount.value) + " \u5206", 1), _cache[142] || (_cache[142] = vue.createElementVNode("span", {
+        }, "\u9884\u8ba1\u6263\u5206", -1)), vue.createElementVNode("b", null, "\u2264 " + vue.toDisplayString(detectedCount.value) + " \u5206", 1), _cache[145] || (_cache[145] = vue.createElementVNode("span", {
           class: "cap-mute"
-        }, "\u547d\u4e2d\u624d\u6263", -1)) ]), _cache[143] || (_cache[143] = vue.createElementVNode("div", {
+        }, "\u547d\u4e2d\u624d\u6263", -1)) ]), _cache[146] || (_cache[146] = vue.createElementVNode("div", {
           class: "prow"
         }, [ vue.createElementVNode("span", {
           class: "k"
@@ -24636,15 +12513,15 @@
           class: "btn block",
           disabled: running.value,
           onClick: start
-        }, "\u5f00\u59cb\u7b54\u9898", 8, _hoisted_198)) : (vue.openBlock(), vue.createElementBlock("button", {
+        }, "\u5f00\u59cb\u7b54\u9898", 8, _hoisted_205)) : (vue.openBlock(), vue.createElementBlock("button", {
           key: 2,
           class: "btn ghost block",
           disabled: running.value,
           onClick: _cache[16] || (_cache[16] = $event => detectQuestions())
-        }, "\u91cd\u65b0\u8bc6\u522b\u672c\u9875", 8, _hoisted_199)) ], 64)) : tab.value === "ask" ? (vue.openBlock(), 
+        }, "\u91cd\u65b0\u8bc6\u522b\u672c\u9875", 8, _hoisted_206)) ], 64)) : tab.value === "ask" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ list.value.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_200, [ vue.createElementVNode("span", _hoisted_201, vue.toDisplayString(tip.value), 1), vue.createElementVNode("div", _hoisted_202, [ (vue.openBlock(true), 
+        }, [ list.value.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_207, [ vue.createElementVNode("span", _hoisted_208, vue.toDisplayString(tip.value), 1), vue.createElementVNode("div", _hoisted_209, [ (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(list.value, (it, i) => (vue.openBlock(), 
         vue.createElementBlock("i", {
           key: i,
@@ -24652,14 +12529,14 @@
             on: it.status !== "pending"
           })
         }, null, 2))), 128)) ]) ])) : vue.createCommentVNode("", true), hasFeature("answer") ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_203, [ vue.createElementVNode("button", {
+        vue.createElementBlock("div", _hoisted_210, [ vue.createElementVNode("button", {
           class: "btn",
           style: {
             flex: "1"
           },
           disabled: running.value,
           onClick: start
-        }, "\u5f00\u59cb\u7b54\u9898", 8, _hoisted_204), running.value ? (vue.openBlock(), vue.createElementBlock("button", {
+        }, "\u5f00\u59cb\u7b54\u9898", 8, _hoisted_211), running.value ? (vue.openBlock(), vue.createElementBlock("button", {
           key: 0,
           class: "btn ghost",
           style: {
@@ -24676,7 +12553,7 @@
         }, "\u91cd\u65b0\u7b54\u9898")) ])) : vue.createCommentVNode("", true) ], 64)) : tab.value === "system" && systemSub.value === "cache" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 2
-        }, [ cacheImportPreview.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_205, [ vue.createElementVNode("button", {
+        }, [ cacheImportPreview.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_212, [ vue.createElementVNode("button", {
           class: "btn ghost",
           style: {
             flex: "1"
@@ -24689,7 +12566,7 @@
           },
           onClick: confirmImport
         }, "\u5bfc\u5165 " + vue.toDisplayString(cacheImportPreview.value.fileCount) + " \u6761", 1) ])) : cacheClearPending.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_206, [ vue.createElementVNode("button", {
+        vue.createElementBlock("div", _hoisted_213, [ vue.createElementVNode("button", {
           class: "btn ghost",
           style: {
             flex: "1"
@@ -24701,7 +12578,7 @@
             flex: "2"
           },
           onClick: clearCacheAll
-        }, "\u786e\u8ba4\u6e05\u7a7a") ])) : cacheEntries.value.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_207, [ vue.createElementVNode("button", {
+        }, "\u786e\u8ba4\u6e05\u7a7a") ])) : cacheEntries.value.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_214, [ vue.createElementVNode("button", {
           class: "btn ghost",
           style: {
             flex: "1"
@@ -24733,7 +12610,7 @@
         }, "\u5bfc\u51fa\u8bca\u65ad\uff08\u65e5\u5fd7 + \u89c4\u5219\u4fe1\u606f\uff09"), vue.createElementVNode("button", {
           class: "btn ghost block",
           onClick: exportPageSnapshot
-        }, "\u5bfc\u51fa\u9875\u9762\u5feb\u7167"), _cache[144] || (_cache[144] = vue.createElementVNode("div", {
+        }, "\u5bfc\u51fa\u9875\u9762\u5feb\u7167"), _cache[147] || (_cache[147] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u9875\u9762\u7ed3\u6784\u7684\u5b58\u6863\uff0c\u7528\u4e8e\u590d\u73b0\u95ee\u9898\uff1b\u59d3\u540d\u3001\u5b66\u53f7\u3001\u4ee4\u724c\u7b49\u5df2\u81ea\u52a8\u906e\u76d6\u3002", -1)), vue.unref(IS_DEV) ? (vue.openBlock(), 
         vue.createElementBlock("button", {
@@ -24741,100 +12618,155 @@
           class: "btn ghost danger block",
           disabled: ruleUpdating.value,
           onClick: resetRuleStorageAndReload
-        }, " \u91cd\u7f6e\u89c4\u5219\u6570\u636e\u5e76\u5237\u65b0\uff08dev\uff09 ", 8, _hoisted_208)) : vue.createCommentVNode("", true) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_209, [ vue.createElementVNode("span", _hoisted_210, "v" + vue.toDisplayString(vue.unref(SCRIPT_VERSION)) + " \xb7 " + vue.toDisplayString(ruleVersionLabel.value), 1), _cache[145] || (_cache[145] = vue.createElementVNode("span", {
+        }, " \u91cd\u7f6e\u89c4\u5219\u6570\u636e\u5e76\u5237\u65b0\uff08dev\uff09 ", 8, _hoisted_215)) : vue.createCommentVNode("", true) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_216, [ vue.createElementVNode("span", _hoisted_217, "v" + vue.toDisplayString(vue.unref(SCRIPT_VERSION)) + " \xb7 " + vue.toDisplayString(ruleVersionLabel.value), 1), _cache[148] || (_cache[148] = vue.createElementVNode("span", {
           class: "luokuan"
         }, "\u95ee\uff0c\u5fc5\u6709\u7b54\u3002", -1)) ]) ]), accountOpen.value ? (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: 3,
           class: "scrim",
           onClick: closeAccount
-        })) : vue.createCommentVNode("", true), accountOpen.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_211, [ !loggedIn.value ? (vue.openBlock(), 
+        })) : vue.createCommentVNode("", true), accountOpen.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_218, [ !loggedIn.value ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ _cache[146] || (_cache[146] = vue.createElementVNode("div", {
+        }, [ _cache[152] || (_cache[152] = vue.createElementVNode("div", {
           class: "ctitle"
-        }, "\u767b\u5f55", -1)), vue.withDirectives(vue.createElementVNode("input", {
+        }, "\u767b\u5f55", -1)), vue.createElementVNode("div", _hoisted_219, [ vue.createElementVNode("button", {
+          class: vue.normalizeClass([ "btn sm", {
+            ghost: authMode.value !== "account"
+          } ]),
+          disabled: authing.value,
+          onClick: _cache[19] || (_cache[19] = $event => {
+            authMode.value = "account";
+            authMsg.value = "";
+          })
+        }, " \u8d26\u53f7\u767b\u5f55 ", 10, _hoisted_220), vue.createElementVNode("button", {
+          class: vue.normalizeClass([ "btn sm", {
+            ghost: authMode.value !== "card"
+          } ]),
+          disabled: authing.value,
+          onClick: _cache[20] || (_cache[20] = $event => {
+            authMode.value = "card";
+            authMsg.value = "";
+          })
+        }, " \u5361\u5bc6\u76f4\u8fde ", 10, _hoisted_221) ]), authMode.value === "card" ? (vue.openBlock(), 
+        vue.createElementBlock(vue.Fragment, {
+          key: 0
+        }, [ vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[19] || (_cache[19] = $event => username.value = $event),
+          "onUpdate:modelValue": _cache[21] || (_cache[21] = $event => cardLoginCode.value = $event),
+          placeholder: "\u8f93\u5165\u5361\u5bc6",
+          autocomplete: "off",
+          onKeyup: vue.withKeys(doCardAuth, [ "enter" ])
+        }, null, 544), [ [ vue.vModelText, cardLoginCode.value ] ]), vue.createElementVNode("button", {
+          class: "btn",
+          disabled: authing.value,
+          onClick: doCardAuth
+        }, vue.toDisplayString(authing.value ? "\u9a8c\u8bc1\u4e2d\u2026" : "\u8fdb\u5165"), 9, _hoisted_222), _cache[149] || (_cache[149] = vue.createElementVNode("div", {
+          class: "cap-mute"
+        }, "\u5361\u5bc6\u4f59\u989d\u4f1a\u5728\u65b0\u7ebf\u4e0e\u8001\u7ebf\u5171\u7528\uff0c\u8017\u5c3d\u524d\u65e0\u9700\u5151\u6362\u5230\u8d26\u53f7\u3002", -1)) ], 64)) : (vue.openBlock(), 
+        vue.createElementBlock(vue.Fragment, {
+          key: 1
+        }, [ vue.withDirectives(vue.createElementVNode("input", {
+          class: "in",
+          "onUpdate:modelValue": _cache[22] || (_cache[22] = $event => username.value = $event),
           placeholder: "\u7528\u6237\u540d\u6216\u90ae\u7bb1"
         }, null, 512), [ [ vue.vModelText, username.value ] ]), vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[20] || (_cache[20] = $event => password.value = $event),
+          "onUpdate:modelValue": _cache[23] || (_cache[23] = $event => password.value = $event),
           type: "password",
           placeholder: "\u5bc6\u7801",
-          onKeyup: _cache[21] || (_cache[21] = vue.withKeys($event => doAuth("login"), [ "enter" ]))
+          onKeyup: _cache[24] || (_cache[24] = vue.withKeys($event => doAuth("login"), [ "enter" ]))
         }, null, 544), [ [ vue.vModelText, password.value ] ]), vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[22] || (_cache[22] = $event => email.value = $event),
+          "onUpdate:modelValue": _cache[25] || (_cache[25] = $event => email.value = $event),
           type: "email",
           placeholder: "\u90ae\u7bb1 \u9009\u586b\uff0c\u53ef\u7528\u4e8e\u767b\u5f55\u4e0e\u627e\u56de\u5bc6\u7801"
-        }, null, 512), [ [ vue.vModelText, email.value ] ]), vue.createElementVNode("div", _hoisted_212, [ vue.createElementVNode("button", {
+        }, null, 512), [ [ vue.vModelText, email.value ] ]), vue.createElementVNode("div", _hoisted_223, [ vue.createElementVNode("button", {
           class: "btn",
           style: {
             flex: "1"
           },
           disabled: authing.value,
-          onClick: _cache[23] || (_cache[23] = $event => doAuth("login"))
-        }, "\u767b\u5f55", 8, _hoisted_213), vue.createElementVNode("button", {
+          onClick: _cache[26] || (_cache[26] = $event => doAuth("login"))
+        }, "\u767b\u5f55", 8, _hoisted_224), vue.createElementVNode("button", {
           class: "btn ghost",
           style: {
             flex: "1"
           },
           disabled: authing.value,
-          onClick: _cache[24] || (_cache[24] = $event => doAuth("register"))
-        }, "\u6ce8\u518c", 8, _hoisted_214) ]), authMsg.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_215, vue.toDisplayString(authMsg.value), 1)) : vue.createCommentVNode("", true), _cache[147] || (_cache[147] = vue.createElementVNode("div", {
+          onClick: _cache[27] || (_cache[27] = $event => doAuth("register"))
+        }, "\u6ce8\u518c", 8, _hoisted_225) ]), _cache[150] || (_cache[150] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u6ce8\u518c\u8981\u6c42\u7528\u6237\u540d 3-32 \u4f4d\u3001\u5bc6\u7801\u81f3\u5c11 8 \u4f4d\uff1b\u767b\u5f55\u4e0d\u53d7\u6b64\u9650\uff0c\u8001\u8d26\u53f7\u7167\u539f\u6837\u586b\u3002", -1)), _cache[148] || (_cache[148] = vue.createElementVNode("div", {
+        }, "\u6ce8\u518c\u8981\u6c42\u7528\u6237\u540d 3-32 \u4f4d\u3001\u5bc6\u7801\u81f3\u5c11 8 \u4f4d\uff1b\u767b\u5f55\u4e0d\u53d7\u6b64\u9650\uff0c\u8001\u8d26\u53f7\u7167\u539f\u6837\u586b\u3002", -1)), _cache[151] || (_cache[151] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u90ae\u7bb1\u4e0d\u586b\u4e5f\u80fd\u6ce8\u518c\u3002\u586b\u4e86\u53ef\u4ee5\u62ff\u5b83\u767b\u5f55\uff1b\u4e0d\u586b\u5219\u5fd8\u8bb0\u5bc6\u7801\u540e\u65e0\u6cd5\u627e\u56de\u3002", -1)), _cache[149] || (_cache[149] = vue.createElementVNode("div", {
+        }, "\u90ae\u7bb1\u4e0d\u586b\u4e5f\u80fd\u6ce8\u518c\u3002\u586b\u4e86\u53ef\u4ee5\u62ff\u5b83\u767b\u5f55\uff1b\u4e0d\u586b\u5219\u5fd8\u8bb0\u5bc6\u7801\u540e\u65e0\u6cd5\u627e\u56de\u3002", -1)) ], 64)), authMsg.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_226, vue.toDisplayString(authMsg.value), 1)) : vue.createCommentVNode("", true), _cache[153] || (_cache[153] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u672a\u767b\u5f55\u65f6\u4ec5\u67e5\u8be2\u514d\u8d39\u9898\u5e93\u3002", -1)) ], 64)) : (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ vue.createElementVNode("div", _hoisted_216, [ vue.createElementVNode("span", _hoisted_217, vue.toDisplayString(avatarInitial.value), 1), vue.createElementVNode("div", _hoisted_218, [ vue.createElementVNode("div", _hoisted_219, vue.toDisplayString(accountName.value || "\u5df2\u767b\u5f55"), 1), authStale.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_220, vue.toDisplayString(AUTH_STALE_NOTE))) : vue.createCommentVNode("", true) ]) ]), authStale.value ? (vue.openBlock(), 
+        }, [ vue.createElementVNode("div", _hoisted_227, [ vue.createElementVNode("span", _hoisted_228, vue.toDisplayString(avatarInitial.value), 1), vue.createElementVNode("div", _hoisted_229, [ vue.createElementVNode("div", _hoisted_230, vue.toDisplayString(accountName.value || "\u5df2\u767b\u5f55"), 1), authStale.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_231, vue.toDisplayString(AUTH_STALE_NOTE))) : vue.createCommentVNode("", true) ]) ]), authStale.value ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
+          key: 0
+        }, [ cardSession.value ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
         }, [ vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[25] || (_cache[25] = $event => password.value = $event),
+          "onUpdate:modelValue": _cache[28] || (_cache[28] = $event => cardLoginCode.value = $event),
+          placeholder: "\u91cd\u65b0\u8f93\u5165\u5361\u5bc6",
+          autocomplete: "off",
+          onKeyup: vue.withKeys(doCardAuth, [ "enter" ])
+        }, null, 544), [ [ vue.vModelText, cardLoginCode.value ] ]), vue.createElementVNode("button", {
+          class: "btn",
+          disabled: authing.value,
+          onClick: doCardAuth
+        }, "\u91cd\u65b0\u9a8c\u8bc1\u5361\u5bc6", 8, _hoisted_232) ], 64)) : (vue.openBlock(), 
+        vue.createElementBlock(vue.Fragment, {
+          key: 1
+        }, [ vue.withDirectives(vue.createElementVNode("input", {
+          class: "in",
+          "onUpdate:modelValue": _cache[29] || (_cache[29] = $event => password.value = $event),
           type: "password",
           placeholder: "\u5bc6\u7801",
-          onKeyup: _cache[26] || (_cache[26] = vue.withKeys($event => doAuth("login"), [ "enter" ]))
+          onKeyup: _cache[30] || (_cache[30] = vue.withKeys($event => doAuth("login"), [ "enter" ]))
         }, null, 544), [ [ vue.vModelText, password.value ] ]), vue.createElementVNode("button", {
           class: "btn",
           disabled: authing.value,
-          onClick: _cache[27] || (_cache[27] = $event => doAuth("login"))
-        }, "\u91cd\u65b0\u767b\u5f55", 8, _hoisted_221), authMsg.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_222, vue.toDisplayString(authMsg.value), 1)) : vue.createCommentVNode("", true) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_223, [ _cache[150] || (_cache[150] = vue.createElementVNode("span", {
+          onClick: _cache[31] || (_cache[31] = $event => doAuth("login"))
+        }, "\u91cd\u65b0\u767b\u5f55", 8, _hoisted_233) ], 64)), authMsg.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_234, vue.toDisplayString(authMsg.value), 1)) : vue.createCommentVNode("", true) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_235, [ _cache[154] || (_cache[154] = vue.createElementVNode("span", {
           class: "lbl"
-        }, "\u79ef\u5206\u4f59\u989d", -1)), balance.value != null ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_224, [ vue.createElementVNode("span", _hoisted_225, vue.toDisplayString(balance.value), 1) ])) : (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_226, "\u8bfb\u53d6\u4e2d\u2026")) ]), emailBound.value === false ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_227, " \u8fd9\u4e2a\u8d26\u53f7\u6ca1\u6709\u7ed1\u5b9a\u90ae\u7bb1\uff0c\u5fd8\u8bb0\u5bc6\u7801\u540e\u65e0\u6cd5\u81ea\u52a9\u627e\u56de\u3002 ")) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_228, [ vue.withDirectives(vue.createElementVNode("input", {
+        }, "\u79ef\u5206\u4f59\u989d", -1)), balance.value != null ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_236, [ vue.createElementVNode("span", _hoisted_237, vue.toDisplayString(balance.value), 1) ])) : (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_238, "\u8bfb\u53d6\u4e2d\u2026")) ]), !cardSession.value && emailBound.value === false ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_239, " \u8fd9\u4e2a\u8d26\u53f7\u6ca1\u6709\u7ed1\u5b9a\u90ae\u7bb1\uff0c\u5fd8\u8bb0\u5bc6\u7801\u540e\u65e0\u6cd5\u81ea\u52a9\u627e\u56de\u3002 ")) : vue.createCommentVNode("", true), !cardSession.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_240, [ vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[28] || (_cache[28] = $event => cardCode.value = $event),
+          "onUpdate:modelValue": _cache[32] || (_cache[32] = $event => cardCode.value = $event),
           placeholder: "\u8f93\u5165\u5361\u5bc6",
           onKeyup: vue.withKeys(doRedeem, [ "enter" ])
         }, null, 544), [ [ vue.vModelText, cardCode.value ] ]), vue.createElementVNode("button", {
           class: "btn",
           disabled: !cardCode.value.trim() || redeeming.value,
           onClick: doRedeem
-        }, vue.toDisplayString(redeeming.value ? "\u5151\u6362\u4e2d\u2026" : "\u5151\u6362"), 9, _hoisted_229) ]), redeemNote.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_230, vue.toDisplayString(redeemNote.value), 1)) : vue.createCommentVNode("", true), _cache[151] || (_cache[151] = vue.createElementVNode("div", {
+        }, vue.toDisplayString(redeeming.value ? "\u5151\u6362\u4e2d\u2026" : "\u5151\u6362"), 9, _hoisted_241) ])) : (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_242, "\u5361\u5bc6\u76f4\u8fde\u4f59\u989d\u53ef\u5728\u65b0\u7ebf\u4e0e\u8001\u7ebf\u76f4\u63a5\u4f7f\u7528\uff1b\u8981\u5151\u6362\u5230\u8d26\u53f7\uff0c\u5148\u9000\u51fa\u5361\u5bc6\u76f4\u8fde\u3002")), redeemNote.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_243, vue.toDisplayString(redeemNote.value), 1)) : vue.createCommentVNode("", true), _cache[155] || (_cache[155] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u547d\u4e2d\u624d\u8ba1\u5206\uff0c\u672a\u547d\u4e2d\u4e0d\u6263\u5206\uff1b\u540c\u4e00\u9898\u91cd\u8dd1\u4e0d\u91cd\u590d\u6263\u5206\u3002", -1)), vue.createElementVNode("div", _hoisted_231, [ vue.createElementVNode("span", _hoisted_232, vue.toDisplayString(accountName.value), 1), vue.createElementVNode("button", {
+        }, "\u547d\u4e2d\u624d\u8ba1\u5206\uff0c\u672a\u547d\u4e2d\u4e0d\u6263\u5206\uff1b\u540c\u4e00\u9898\u91cd\u8dd1\u4e0d\u91cd\u590d\u6263\u5206\u3002", -1)), vue.createElementVNode("div", _hoisted_244, [ vue.createElementVNode("span", _hoisted_245, vue.toDisplayString(accountName.value), 1), vue.createElementVNode("button", {
           class: "btn danger sm",
           onClick: logout
         }, "\u9000\u51fa\u767b\u5f55") ]) ], 64)) ])) : vue.createCommentVNode("", true), captchaOpen.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_233, [ vue.createElementVNode("div", _hoisted_234, [ vue.createElementVNode("div", {
+        vue.createElementBlock("div", _hoisted_246, [ vue.createElementVNode("div", _hoisted_247, [ vue.createElementVNode("div", {
           class: "row"
-        }, [ _cache[153] || (_cache[153] = vue.createElementVNode("span", {
+        }, [ _cache[157] || (_cache[157] = vue.createElementVNode("span", {
           class: "ctitle"
         }, "\u5b8c\u6210\u4eba\u673a\u9a8c\u8bc1", -1)), vue.createElementVNode("button", {
           class: "x",
           type: "button",
           "aria-label": "\u53d6\u6d88\u4eba\u673a\u9a8c\u8bc1",
           onClick: cancelCaptcha
-        }, [ ..._cache[152] || (_cache[152] = [ vue.createElementVNode("svg", {
+        }, [ ..._cache[156] || (_cache[156] = [ vue.createElementVNode("svg", {
           class: "ic"
         }, [ vue.createElementVNode("use", {
           href: "#i-minus"
@@ -24846,7 +12778,7 @@
           title: "\u7231\u95ee\u7b54\u6ce8\u518c\u4eba\u673a\u9a8c\u8bc1",
           sandbox: "allow-scripts allow-same-origin",
           onLoad: onCaptchaFrameLoad
-        }, null, 544), _cache[154] || (_cache[154] = vue.createElementVNode("div", {
+        }, null, 544), _cache[158] || (_cache[158] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u9a8c\u8bc1\u7ed3\u679c\u53ea\u968f\u52a0\u5bc6\u6ce8\u518c\u8bf7\u6c42\u53d1\u9001\u3002", -1)) ]) ])) : vue.createCommentVNode("", true) ], 4));
       };
@@ -24872,7 +12804,7 @@
     vue.createApp(_sfc_main).mount(root);
   }
 
-  installAopengResponseCapture(location.hostname);
+  installResponseListener(location.hostname);
 
   const bridgeMode = bridgeModeFor(location);
 
@@ -24916,4 +12848,4 @@
     }
   }
 
-})(Vue);
+})((typeof AiaskEngine === "undefined" ? void 0 : AiaskEngine.protocol), (typeof AiaskEngine === "undefined" ? void 0 : AiaskEngine.core), (typeof Vue === "undefined" ? void 0 : Vue));
