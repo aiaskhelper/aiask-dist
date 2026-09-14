@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.3.0
+// @version      3.3.1
 // @author       爱问答
-// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校】，更多平台持续适配中...
+// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
 // @homepage     https://www.aiask.site/
 // @supportURL   https://www.aiask.site/contact.html
@@ -15,7 +15,7 @@
 // @match        https://www.aiask.site/feedback.html
 // @match        https://www.aiask.site/feedback
 // @require      https://registry.npmmirror.com/vue/3.5.39/files/dist/vue.global.prod.js
-// @require      https://www.aiask.site/engine/aiask-engine-341192f5c6ff764b.js#sha256=341192f5c6ff764b6066e60b6f6af17e19aaa6ef0cc427f1d7614f423bb14fac
+// @require      https://www.aiask.site/engine/aiask-engine-52539fd9fa208db4.js#sha256=52539fd9fa208db4e6c12fdd868561387f570a52c1593f46e5c5919646e3754c
 // @resource     chaoxingFontTable  https://www.aiask.site/assets/chaoxing-font-table.json
 // @connect      www.aiask.site
 // @connect      cx.icodef.com
@@ -135,9 +135,9 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.3.0";
+  const SCRIPT_VERSION = "3.3.1";
 
-  const ENGINE_ID = "341192f5c6ff764b";
+  const ENGINE_ID = "52539fd9fa208db4";
 
   const DEFAULT_ROOT_PUBLIC_JWK = protocol.PRODUCTION_ROOT_PUBLIC_JWK;
 
@@ -719,7 +719,7 @@
   const getClientId = () => {
     let id = _GM_getValue(CLIENT_ID_KEY, "") || "";
     if (!id) {
-      id = crypto.randomUUID();
+      id = protocol.randomUuid();
       _GM_setValue(CLIENT_ID_KEY, id);
     }
     return id;
@@ -3607,7 +3607,7 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID()
+          "Idempotency-Key": protocol.randomUuid()
         },
         body: JSON.stringify({
           code: trimmedCode
@@ -3663,7 +3663,7 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID()
+          "Idempotency-Key": protocol.randomUuid()
         },
         body: JSON.stringify(mode === "register" ? {
           username: username,
@@ -3701,609 +3701,6 @@
         message: MESSAGE$1[protocol.AiAskCode.Busy]
       };
     }
-  }
-
-  const ALL_KINDS = [ "media", "chapter-test", "document", "ppt-audio", "timed-read", "hyperlink", "flash", "unknown" ];
-
-  const isTaskKind = value => ALL_KINDS.includes(value);
-
-  const TASK_TOGGLES = [ "media", "chapter-test", "reading", "hyperlink" ];
-
-  const TOGGLE_LABEL = {
-    media: "\u89c6\u9891\u4e0e\u97f3\u9891",
-    "chapter-test": "\u7ae0\u8282\u6d4b\u9a8c",
-    reading: "PPT / \u6587\u6863 / \u4e66\u7c4d",
-    hyperlink: "\u94fe\u63a5"
-  };
-
-  const KIND_TOGGLE = {
-    media: "media",
-    "chapter-test": "chapter-test",
-    document: "reading",
-    "ppt-audio": "reading",
-    "timed-read": "reading",
-    flash: "reading",
-    hyperlink: "hyperlink",
-    unknown: null
-  };
-
-  const toggleForKind = kind => KIND_TOGGLE[kind];
-
-  const KIND_LABEL = {
-    media: "\u89c6\u9891\u4e0e\u97f3\u9891",
-    "chapter-test": "\u7ae0\u8282\u6d4b\u9a8c",
-    document: "\u6587\u6863\u4e0e\u4e66\u7c4d",
-    "ppt-audio": "\u5e26\u97f3\u9891\u8bfe\u4ef6",
-    "timed-read": "\u957f\u65f6\u9605\u8bfb",
-    hyperlink: "\u94fe\u63a5",
-    flash: "Flash \u52a8\u753b",
-    unknown: "\u672a\u77e5\u7c7b\u578b"
-  };
-
-  const TASK_SKIP_LABEL = {
-    passed: "\u7ad9\u70b9\u6807\u8bb0\u5df2\u64ad\u5b8c",
-    "not-a-job": "\u7ad9\u70b9\u672a\u8ba1\u4e3a\u4efb\u52a1\u70b9",
-    "test-done": "\u9875\u9762\u6807\u8bb0\u6d4b\u9a8c\u5df2\u5b8c\u6210",
-    "section-clear": "\u7ad9\u70b9\u6e05\u5355\u5df2\u65e0\u5f85\u529e",
-    "marked-done": "\u4efb\u52a1\u70b9\u5df2\u5b8c\u6210\u6807\u8bb0",
-    "kind-off": "\u8be5\u7c7b\u578b\u5df2\u88ab\u4f60\u5173\u95ed",
-    handled: "\u672c\u8282\u5185\u5df2\u5904\u7406\u8fc7"
-  };
-
-  const isPendingTask = task => task.skip === null;
-
-  const DEFAULT_COURSE_CONFIG = Object.freeze({
-    probes: Object.freeze([ Object.freeze([ "media", "#video, #audio" ]), Object.freeze([ "chapter-test", ".TiMu" ]), Object.freeze([ "timed-read", 'iframe[name="bookifame"][src*="timing"]' ]), Object.freeze([ "ppt-audio", ".swiper-container" ]), Object.freeze([ "document", "#img.imglook" ]), Object.freeze([ "hyperlink", "#hyperlink" ]), Object.freeze([ "media", "video, audio" ]) ]),
-    moduleKind: Object.freeze({
-      insertvideo: "media",
-      insertaudio: "media",
-      insertdoc: "document",
-      insertbook: "document",
-      insertflash: "flash",
-      work: "chapter-test",
-      insertimage: "document"
-    }),
-    faceLegacy: "#fcqrimg",
-    faceMask: ".chapterVideoFaceMaskDiv",
-    videoQuiz: "#videoquiz-submit",
-    playerError: ".vjs-modal-dialog-content",
-    playerErrorTexts: Object.freeze([ "\u89c6\u9891\u6587\u4ef6\u635f\u574f", "\u7f51\u7edc\u9519\u8bef\u5bfc\u81f4\u89c6\u9891\u4e0b\u8f7d\u4e2d\u9014\u5931\u8d25", "\u89c6\u9891\u56e0\u683c\u5f0f\u4e0d\u652f\u6301", "\u7f51\u7edc\u7684\u95ee\u9898\u65e0\u6cd5\u52a0\u8f7d" ]),
-    taskDoneText: "\u4efb\u52a1\u70b9\u5df2\u5b8c\u6210",
-    chapterTestAnswerable: '.TiMu input[name^="answertype"]',
-    chapterTestStatus: ".testTit_status",
-    chapterTestDoneClass: "testTit_status_complete",
-    chapterTestDoneText: "\u5df2\u5b8c\u6210",
-    chapterTestSubmittedTexts: Object.freeze([ "\u5f85\u6279\u9605", "\u5df2\u63d0\u4ea4" ]),
-    taskTab: ".prev_ul li",
-    chapter: '[onclick^="getTeacherAjax"]',
-    jobUnfinishCount: ".jobUnfinishCount",
-    chapterName: ".posCatalog_name",
-    specialMode: ".catalog_points_sa, .catalog_points_er",
-    cursorCourseId: "#curCourseId",
-    cursorChapterId: "#curChapterId",
-    cursorClazzId: "#curClazzId",
-    sectionTabs: "#prev_tab .prev_ul li",
-    nextSectionFallback: ".nodeItem.r i",
-    bigPlay: ".vjs-big-play-button",
-    bigPlayLabel: "\u64ad\u653e\u89c6\u9891",
-    readerPager: ".readerPager",
-    activePagerZIndex: "101",
-    pptSlide: ".swiper-container .swiper-slide",
-    timedReadFrame: 'iframe[name="bookifame"][src*="timing"]'
-  });
-
-  const SELECTOR_KEYS = Object.freeze({
-    "course.gate.faceLegacy": "faceLegacy",
-    "course.gate.faceMask": "faceMask",
-    "course.gate.videoQuiz": "videoQuiz",
-    "course.gate.playerError": "playerError",
-    "course.marker.taskDone": "taskDoneText",
-    "course.probe.chapterTestAnswerable": "chapterTestAnswerable",
-    "course.marker.chapterTestStatus": "chapterTestStatus",
-    "course.marker.chapterTestDoneClass": "chapterTestDoneClass",
-    "course.marker.chapterTestDoneText": "chapterTestDoneText",
-    "course.nav.taskTab": "taskTab",
-    "course.nav.chapter": "chapter",
-    "course.nav.jobUnfinishCount": "jobUnfinishCount",
-    "course.nav.chapterName": "chapterName",
-    "course.nav.specialMode": "specialMode",
-    "course.nav.cursorCourseId": "cursorCourseId",
-    "course.nav.cursorChapterId": "cursorChapterId",
-    "course.nav.cursorClazzId": "cursorClazzId",
-    "course.nav.sectionTabs": "sectionTabs",
-    "course.nav.nextSectionFallback": "nextSectionFallback",
-    "course.action.bigPlay": "bigPlay",
-    "course.action.bigPlayLabel": "bigPlayLabel",
-    "course.reader.pager": "readerPager",
-    "course.reader.pagerZIndex": "activePagerZIndex",
-    "course.reader.pptSlide": "pptSlide",
-    "course.reader.timedReadFrame": "timedReadFrame"
-  });
-
-  const PROBE_PREFIX = "course.probe.";
-
-  const MODULE_PREFIX = "course.module.";
-
-  const SUBMITTED_TEXTS_KEY = "course.marker.chapterTestSubmittedTexts";
-
-  const ERROR_TEXTS_KEY = "course.gate.playerErrorTexts";
-
-  const usableSelector = (value, probe2) => {
-    try {
-      probe2.createDocumentFragment().querySelector(value);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const firstString = value => typeof value === "string" && value.trim() ? value : null;
-
-  function resolveCourseConfig(remote, probe2 = globalThis.document) {
-    if (!remote || typeof remote !== "object" || !probe2) return DEFAULT_COURSE_CONFIG;
-    const table = remote;
-    const next = {
-      ...DEFAULT_COURSE_CONFIG
-    };
-    for (const [key, field] of Object.entries(SELECTOR_KEYS)) {
-      const value = firstString(table[key]);
-      if (value === null) continue;
-      const isSelector = field !== "taskDoneText" && field !== "bigPlayLabel" && field !== "activePagerZIndex" && field !== "chapterTestDoneClass" && field !== "chapterTestDoneText";
-      if (isSelector && !usableSelector(value, probe2)) continue;
-      next[field] = value;
-    }
-    const errorTexts = table[ERROR_TEXTS_KEY];
-    if (Array.isArray(errorTexts)) {
-      const texts = errorTexts.filter(item => typeof item === "string" && !!item.trim());
-      if (texts.length > 0) next.playerErrorTexts = Object.freeze(texts);
-    }
-    const submittedTexts = table[SUBMITTED_TEXTS_KEY];
-    if (Array.isArray(submittedTexts)) {
-      const texts = submittedTexts.filter(item => typeof item === "string" && !!item.trim());
-      if (texts.length > 0) next.chapterTestSubmittedTexts = Object.freeze(texts);
-    }
-    next.probes = Object.freeze(DEFAULT_COURSE_CONFIG.probes.map(([kind, selector], index) => {
-      const override = firstString(table[`${PROBE_PREFIX}${kind}.${index}`]);
-      return Object.freeze([ kind, override && usableSelector(override, probe2) ? override : selector ]);
-    }));
-    const moduleKind = {
-      ...DEFAULT_COURSE_CONFIG.moduleKind
-    };
-    for (const [key, value] of Object.entries(table)) {
-      if (!key.startsWith(MODULE_PREFIX)) continue;
-      const name = key.slice(MODULE_PREFIX.length);
-      const kind = firstString(value);
-      if (!name || !kind || !isTaskKind(kind)) continue;
-      moduleKind[name] = kind;
-    }
-    next.moduleKind = Object.freeze(moduleKind);
-    return Object.freeze(next);
-  }
-
-  let active = DEFAULT_COURSE_CONFIG;
-
-  const courseConfig = () => active;
-
-  function applyCourseConfig(remote, probe2) {
-    active = resolveCourseConfig(remote, probe2);
-    return active;
-  }
-
-  function activeMedia(documents) {
-    for (const doc of documents) for (const candidate of doc.querySelectorAll("video, audio")) {
-      const media = candidate;
-      if (!media.paused && media.readyState > 0) return media;
-    }
-    return null;
-  }
-
-  function mediaPosition(media) {
-    return {
-      currentSeconds: media.currentTime,
-      totalSeconds: Number.isFinite(media.duration) ? media.duration : null,
-      rate: media.playbackRate
-    };
-  }
-
-  const WILL_NOT_BE_DONE = new Set([ "kind-off", "not-a-job" ]);
-
-  function sectionLayer(survey, skipped) {
-    if (!survey.authoritative) return null;
-    const offCount = skipped.filter(item => item.reason === "kind-off").length;
-    const total = Math.max(0, survey.declared - offCount);
-    const pending = Math.max(0, survey.tasks.filter(isPendingTask).length - offCount);
-    return {
-      done: Math.max(0, total - pending),
-      total: total,
-      skipped: skipped.filter(item => WILL_NOT_BE_DONE.has(item.reason)).map(item => ({
-        name: item.name,
-        kind: item.kind,
-        reason: item.reason
-      }))
-    };
-  }
-
-  function courseProgress(documents, survey, skipped, activeTask, course) {
-    const media = activeMedia(documents);
-    return {
-      task: activeTask ? {
-        name: activeTask.name,
-        kind: activeTask.kind,
-        position: media ? mediaPosition(media) : null
-      } : null,
-      section: sectionLayer(survey, skipped),
-      course: course
-    };
-  }
-
-  const MAX_READ_FRAMES = 64;
-
-  const MAX_READ_DEPTH = 8;
-
-  function readableDocuments(root) {
-    const out = [ root ];
-    const seen = new Set([ root ]);
-    const queue = [ {
-      doc: root,
-      depth: 0
-    } ];
-    let frames = 0;
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (!current || current.depth >= MAX_READ_DEPTH) continue;
-      let list = [];
-      try {
-        list = [ ...current.doc.querySelectorAll("iframe, frame") ];
-      } catch {
-        continue;
-      }
-      for (const el of list) {
-        if (++frames > MAX_READ_FRAMES) return out;
-        let child = null;
-        try {
-          child = el.contentDocument;
-        } catch {
-          child = null;
-        }
-        if (!child || seen.has(child)) continue;
-        seen.add(child);
-        out.push(child);
-        queue.push({
-          doc: child,
-          depth: current.depth + 1
-        });
-      }
-    }
-    return out;
-  }
-
-  const playableSource = media => !!(media.currentSrc || media.getAttribute("src") || media.querySelector("source[src]") || media.readyState >= 1);
-
-  const playableMediaList = documents => {
-    const found = [];
-    for (const doc of documents) for (const candidate of doc.querySelectorAll("video, audio")) {
-      const media = candidate;
-      if (playableSource(media)) found.push(media);
-    }
-    return found;
-  };
-
-  const allMediaEnded = document2 => {
-    const media = playableMediaList([ document2 ]);
-    return media.length > 0 && media.every(item => item.ended);
-  };
-
-  function skippedTasks(survey, options) {
-    const handled = options.isHandled ?? (() => false);
-    const kindEnabled = options.isKindEnabled ?? (() => true);
-    const out = [];
-    for (const task of survey.tasks) {
-      const reason = task.skip ? task.skip : !kindEnabled(task.kind) ? "kind-off" : task.kind === "media" ? allMediaEnded(task.document) ? "media-ended" : null : handled(task.key) ? "handled" : null;
-      if (reason) out.push({
-        name: task.name,
-        kind: task.kind,
-        reason: reason,
-        key: task.key
-      });
-    }
-    return out;
-  }
-
-  function pauseAllMedia(documents) {
-    let paused = false;
-    for (const doc of documents) for (const el of doc.querySelectorAll("video, audio")) {
-      const media = el;
-      if (media.paused) continue;
-      try {
-        media.pause();
-        paused = true;
-      } catch {}
-    }
-    return paused;
-  }
-
-  function pauseCourseMedia(document2) {
-    return pauseAllMedia(readableDocuments(document2));
-  }
-
-  const STOPPING_BLOCK_REASONS = [ "budget-exhausted", "advance-failed", "locked" ];
-
-  const isStoppingBlockReason = reason => STOPPING_BLOCK_REASONS.includes(reason);
-
-  function courseStopReason(state) {
-    switch (state.kind) {
-     case "course-done":
-     case "section-done":
-     case "finished":
-     case "section-stalled":
-      return state.kind;
-
-     case "blocked":
-      return isStoppingBlockReason(state.reason) ? state.reason : null;
-
-     default:
-      return null;
-    }
-  }
-
-  const DEFAULT_INTERVAL_MS = 3e3;
-
-  const IDLE_TICKS_BEFORE_ADVANCE = 2;
-
-  const LOADING_TICKS_BEFORE_ADVANCE = 10;
-
-  const DEFAULT_MAX_DURATION_MS = 3 * 60 * 60 * 1e3;
-
-  const ANSWERING_TICKS_BUDGET = 60;
-
-  function runMediaTask(document2, options) {
-    const adapter = options.adapter;
-    const view = document2.defaultView;
-    if (!view) throw new Error("media task document has no window");
-    const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
-    const maxDurationMs = options.maxDurationMs ?? DEFAULT_MAX_DURATION_MS;
-    let elapsed = 0;
-    let idleTicks = 0;
-    let sectionsDone = 0;
-    let pendingAdvanceFrom = null;
-    let pendingTabFrom = null;
-    let readingTaskKey = null;
-    let readingSummary = null;
-    let lastSignature = null;
-    let lastSurveyKey = null;
-    const handled = new Set;
-    const pptSteps = new Map;
-    const answeringTicks = new Map;
-    let dwellUntil = 0;
-    let dwellState = null;
-    let timer = null;
-    const stop = () => {
-      if (timer != null) view.clearInterval(timer);
-      timer = null;
-    };
-    const stepOptions = Object.create(options, {
-      isHandled: {
-        value: key => handled.has(key)
-      }
-    });
-    timer = view.setInterval(() => {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
-      const memoryPressure = (_a = options.memoryGuard) == null ? void 0 : _a.check();
-      if (memoryPressure != null) {
-        stop();
-        (_b = options.onMemoryPressure) == null ? void 0 : _b.call(options, memoryPressure);
-        return;
-      }
-      elapsed += intervalMs;
-      if (elapsed > maxDurationMs) {
-        stop();
-        (_c = options.onState) == null ? void 0 : _c.call(options, {
-          kind: "blocked",
-          reason: "budget-exhausted"
-        });
-        return;
-      }
-      const documents = ((_d = options.documents) == null ? void 0 : _d.call(options)) ?? readableDocuments(document2);
-      const readable = documents;
-      const signatureNow = adapter.navigate.sectionSignature(documents);
-      if (signatureNow !== lastSignature) {
-        lastSignature = signatureNow;
-        handled.clear();
-        pptSteps.clear();
-        answeringTicks.clear();
-        readingTaskKey = null;
-      }
-      if (options.onSurvey || options.onProgress) {
-        const survey = adapter.survey(documents);
-        const skipped = skippedTasks(survey, stepOptions);
-        if (options.onSurvey) {
-          const kinds = survey.tasks.map(task => task.kind);
-          const key = `${kinds.join(",")}#${skipped.map(item => `${item.name}:${item.reason}`).join("|")}`;
-          if (key !== lastSurveyKey) {
-            lastSurveyKey = key;
-            options.onSurvey({
-              frames: documents.length,
-              authoritative: survey.authoritative,
-              declared: survey.declared,
-              kinds: kinds,
-              pending: survey.tasks.filter(isPendingTask).length,
-              skipped: skipped
-            });
-          }
-        }
-        if (options.onProgress) {
-          const skippedKeys = new Set(skipped.map(item => item.key));
-          const actionable = survey.tasks.find(item => isPendingTask(item) && !skippedKeys.has(item.key));
-          options.onProgress(courseProgress(documents, survey, skipped, actionable ?? null, adapter.courseCounter(documents)));
-        }
-      }
-      const tryAdvanceTab = tabs2 => {
-        const tabKey = `${adapter.navigate.sectionSignature(documents)}#${tabs2.activeIndex}`;
-        if (pendingTabFrom === tabKey) {
-          pendingTabFrom = null;
-          return false;
-        }
-        if (!adapter.navigate.advanceTab(documents)) return false;
-        pendingTabFrom = tabKey;
-        return true;
-      };
-      if (dwellState && dwellUntil > elapsed) {
-        (_e = options.onState) == null ? void 0 : _e.call(options, {
-          ...dwellState,
-          remainingMs: dwellUntil - elapsed
-        });
-        return;
-      }
-      dwellState = null;
-      const state = adapter.step(documents, stepOptions);
-      if (state.kind === "playing" || state.kind === "blocked") {
-        idleTicks = 0;
-        (_f = options.onState) == null ? void 0 : _f.call(options, state);
-        return;
-      }
-      if (state.kind === "dwelling") {
-        idleTicks = 0;
-        handled.add(state.taskKey);
-        dwellState = state;
-        dwellUntil = elapsed + state.remainingMs;
-        (_g = options.onState) == null ? void 0 : _g.call(options, state);
-        return;
-      }
-      if (state.kind === "answering") {
-        idleTicks = 0;
-        const spent = (answeringTicks.get(state.taskKey) ?? 0) + 1;
-        answeringTicks.set(state.taskKey, spent);
-        if (spent >= ANSWERING_TICKS_BUDGET || ((_h = options.isAnsweringDone) == null ? void 0 : _h.call(options, state.taskKey))) handled.add(state.taskKey);
-        if (!state.frameLoaded) {
-          const tabs2 = adapter.navigate.tabs(documents);
-          if (tabs2 && tryAdvanceTab(tabs2)) {
-            (_i = options.onState) == null ? void 0 : _i.call(options, {
-              kind: "advancing",
-              toIndex: tabs2.activeIndex + 1
-            });
-            return;
-          }
-        }
-        (_j = options.onState) == null ? void 0 : _j.call(options, {
-          ...state,
-          ticks: spent
-        });
-        return;
-      }
-      if (state.kind === "starting") {
-        idleTicks = 0;
-        (_k = options.onState) == null ? void 0 : _k.call(options, state);
-        return;
-      }
-      if (state.kind === "hyperlink") {
-        idleTicks = 0;
-        handled.add(state.taskKey);
-        (_l = options.onState) == null ? void 0 : _l.call(options, state);
-        return;
-      }
-      if (state.kind === "ppt-slide") {
-        idleTicks = 0;
-        const turned = (pptSteps.get(state.taskKey) ?? 0) + 1;
-        pptSteps.set(state.taskKey, turned);
-        if (turned >= Math.max(state.total, 1)) handled.add(state.taskKey);
-        (_m = options.onState) == null ? void 0 : _m.call(options, state);
-        return;
-      }
-      const tabs = adapter.navigate.tabs(documents);
-      const taskKey = state.kind === "idle" && state.taskKey ? state.taskKey : `${signatureNow}#${(tabs == null ? void 0 : tabs.activeIndex) ?? -1}`;
-      let scrolledNow = false;
-      if (state.kind === "idle" && readingTaskKey !== taskKey) {
-        const taskContext = state.taskKey != null || tabs !== null || adapter.navigate.sectionCursor(documents) !== null;
-        if (taskContext) {
-          readingTaskKey = taskKey;
-          readingSummary = adapter.simulateReading(readable);
-          scrolledNow = true;
-          if (state.taskKey) handled.add(state.taskKey);
-        }
-      }
-      if (state.kind === "idle" || state.kind === "loading") {
-        idleTicks += 1;
-        const grace = state.kind === "loading" ? LOADING_TICKS_BEFORE_ADVANCE : IDLE_TICKS_BEFORE_ADVANCE;
-        if (!tabs || idleTicks < grace) {
-          (_n = options.onState) == null ? void 0 : _n.call(options, scrolledNow && readingSummary ? {
-            kind: "reading",
-            summary: readingSummary
-          } : state);
-          return;
-        }
-      }
-      if (tabs && tryAdvanceTab(tabs)) {
-        idleTicks = 0;
-        (_o = options.onState) == null ? void 0 : _o.call(options, {
-          kind: "advancing",
-          toIndex: tabs.activeIndex + 1
-        });
-        return;
-      }
-      {
-        if (!tabs && !adapter.navigate.sectionCursor(documents)) {
-          if (state.kind !== "idle" && state.kind !== "loading") stop();
-          (_p = options.onState) == null ? void 0 : _p.call(options, state);
-          return;
-        }
-        const chapters = adapter.navigate.chapters(documents);
-        if (chapters.length > 0 && chapters.every(chapter2 => chapter2.unfinishedCount === 0)) {
-          stop();
-          (_q = options.onState) == null ? void 0 : _q.call(options, {
-            kind: "course-done"
-          });
-          return;
-        }
-        if (pendingAdvanceFrom !== null) {
-          if (signatureNow === pendingAdvanceFrom) {
-            const chapter2 = adapter.navigate.nextUnfinishedChapter(chapters);
-            if (chapter2 && adapter.navigate.jumpToChapter(documents, chapter2)) {
-              pendingAdvanceFrom = null;
-              idleTicks = 0;
-              (_r = options.onState) == null ? void 0 : _r.call(options, {
-                kind: "advancing-chapter",
-                name: adapter.navigate.chapterLabel(chapter2)
-              });
-              return;
-            }
-            stop();
-            (_s = options.onState) == null ? void 0 : _s.call(options, {
-              kind: "blocked",
-              reason: adapter.navigate.isSpecialMode(documents) ? "locked" : "advance-failed"
-            });
-            return;
-          }
-          pendingAdvanceFrom = null;
-        }
-        if (adapter.navigate.advanceSection(documents)) {
-          sectionsDone += 1;
-          idleTicks = 0;
-          pendingAdvanceFrom = signatureNow;
-          (_t = options.onState) == null ? void 0 : _t.call(options, {
-            kind: "advancing-section",
-            sectionsDone: sectionsDone
-          });
-          return;
-        }
-        const chapter = adapter.navigate.nextUnfinishedChapter(chapters);
-        if (chapter && adapter.navigate.jumpToChapter(documents, chapter)) {
-          idleTicks = 0;
-          (_u = options.onState) == null ? void 0 : _u.call(options, {
-            kind: "advancing-chapter",
-            name: adapter.navigate.chapterLabel(chapter)
-          });
-          return;
-        }
-        stop();
-        (_v = options.onState) == null ? void 0 : _v.call(options, {
-          kind: "section-done"
-        });
-        return;
-      }
-    }, intervalMs);
-    return {
-      stop: stop
-    };
   }
 
   const PAGED_PATH = "/exam-ans/exam/test/reVersionTestStartNew";
@@ -5383,7 +4780,7 @@
 
   const RULE_EXPRESSION_SERVICES = createRuleExpressionServices();
 
-  const RULE_ENGINE_VERSION = "1.7.0";
+  const RULE_ENGINE_VERSION = "1.8.0";
 
   const RULE_LIMITS = Object.freeze({
     maxSteps: 5e4,
@@ -5427,9 +4824,14 @@
     packageId: "hubu-zkw-question-bank",
     hosts: Object.freeze([ "ctapp.hubuzkw.com" ]),
     policy: GENERIC_DOM_RULE_POLICY
+  }), Object.freeze({
+    platform: "wenhua",
+    packageId: "wenhua-homework-online",
+    hosts: Object.freeze([ "xuexi.jsou.cn" ]),
+    policy: GENERIC_DOM_RULE_POLICY
   }) ]);
 
-  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com)$/u;
+  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn)$/u;
 
   function trustedRemoteRulePlatformFor(hostname) {
     const host = normalizedHost(hostname);
@@ -5591,6 +4993,609 @@
     return packageId ? [ () => createChaoxingRuleAdapter(packageId, store, typr, table, services, walkGate) ] : [];
   }
 
+  const ALL_KINDS = [ "media", "chapter-test", "document", "ppt-audio", "timed-read", "hyperlink", "flash", "unknown" ];
+
+  const isTaskKind = value => ALL_KINDS.includes(value);
+
+  const TASK_TOGGLES = [ "media", "chapter-test", "reading", "hyperlink" ];
+
+  const TOGGLE_LABEL = {
+    media: "\u89c6\u9891\u4e0e\u97f3\u9891",
+    "chapter-test": "\u7ae0\u8282\u6d4b\u9a8c",
+    reading: "PPT / \u6587\u6863 / \u4e66\u7c4d",
+    hyperlink: "\u94fe\u63a5"
+  };
+
+  const KIND_TOGGLE = {
+    media: "media",
+    "chapter-test": "chapter-test",
+    document: "reading",
+    "ppt-audio": "reading",
+    "timed-read": "reading",
+    flash: "reading",
+    hyperlink: "hyperlink",
+    unknown: null
+  };
+
+  const toggleForKind = kind => KIND_TOGGLE[kind];
+
+  const KIND_LABEL = {
+    media: "\u89c6\u9891\u4e0e\u97f3\u9891",
+    "chapter-test": "\u7ae0\u8282\u6d4b\u9a8c",
+    document: "\u6587\u6863\u4e0e\u4e66\u7c4d",
+    "ppt-audio": "\u5e26\u97f3\u9891\u8bfe\u4ef6",
+    "timed-read": "\u957f\u65f6\u9605\u8bfb",
+    hyperlink: "\u94fe\u63a5",
+    flash: "Flash \u52a8\u753b",
+    unknown: "\u672a\u77e5\u7c7b\u578b"
+  };
+
+  const TASK_SKIP_LABEL = {
+    passed: "\u7ad9\u70b9\u6807\u8bb0\u5df2\u64ad\u5b8c",
+    "not-a-job": "\u7ad9\u70b9\u672a\u8ba1\u4e3a\u4efb\u52a1\u70b9",
+    "test-done": "\u9875\u9762\u6807\u8bb0\u6d4b\u9a8c\u5df2\u5b8c\u6210",
+    "section-clear": "\u7ad9\u70b9\u6e05\u5355\u5df2\u65e0\u5f85\u529e",
+    "marked-done": "\u4efb\u52a1\u70b9\u5df2\u5b8c\u6210\u6807\u8bb0",
+    "kind-off": "\u8be5\u7c7b\u578b\u5df2\u88ab\u4f60\u5173\u95ed",
+    handled: "\u672c\u8282\u5185\u5df2\u5904\u7406\u8fc7"
+  };
+
+  const isPendingTask = task => task.skip === null;
+
+  const DEFAULT_COURSE_CONFIG = Object.freeze({
+    probes: Object.freeze([ Object.freeze([ "media", "#video, #audio" ]), Object.freeze([ "chapter-test", ".TiMu" ]), Object.freeze([ "timed-read", 'iframe[name="bookifame"][src*="timing"]' ]), Object.freeze([ "ppt-audio", ".swiper-container" ]), Object.freeze([ "document", "#img.imglook" ]), Object.freeze([ "hyperlink", "#hyperlink" ]), Object.freeze([ "media", "video, audio" ]) ]),
+    moduleKind: Object.freeze({
+      insertvideo: "media",
+      insertaudio: "media",
+      insertdoc: "document",
+      insertbook: "document",
+      insertflash: "flash",
+      work: "chapter-test",
+      insertimage: "document"
+    }),
+    faceLegacy: "#fcqrimg",
+    faceMask: ".chapterVideoFaceMaskDiv",
+    videoQuiz: "#videoquiz-submit",
+    playerError: ".vjs-modal-dialog-content",
+    playerErrorTexts: Object.freeze([ "\u89c6\u9891\u6587\u4ef6\u635f\u574f", "\u7f51\u7edc\u9519\u8bef\u5bfc\u81f4\u89c6\u9891\u4e0b\u8f7d\u4e2d\u9014\u5931\u8d25", "\u89c6\u9891\u56e0\u683c\u5f0f\u4e0d\u652f\u6301", "\u7f51\u7edc\u7684\u95ee\u9898\u65e0\u6cd5\u52a0\u8f7d" ]),
+    taskDoneText: "\u4efb\u52a1\u70b9\u5df2\u5b8c\u6210",
+    chapterTestAnswerable: '.TiMu input[name^="answertype"]',
+    chapterTestStatus: ".testTit_status",
+    chapterTestDoneClass: "testTit_status_complete",
+    chapterTestDoneText: "\u5df2\u5b8c\u6210",
+    chapterTestSubmittedTexts: Object.freeze([ "\u5f85\u6279\u9605", "\u5df2\u63d0\u4ea4" ]),
+    taskTab: ".prev_ul li",
+    chapter: '[onclick^="getTeacherAjax"]',
+    jobUnfinishCount: ".jobUnfinishCount",
+    chapterName: ".posCatalog_name",
+    specialMode: ".catalog_points_sa, .catalog_points_er",
+    cursorCourseId: "#curCourseId",
+    cursorChapterId: "#curChapterId",
+    cursorClazzId: "#curClazzId",
+    sectionTabs: "#prev_tab .prev_ul li",
+    nextSectionFallback: ".nodeItem.r i",
+    bigPlay: ".vjs-big-play-button",
+    bigPlayLabel: "\u64ad\u653e\u89c6\u9891",
+    readerPager: ".readerPager",
+    activePagerZIndex: "101",
+    pptSlide: ".swiper-container .swiper-slide",
+    timedReadFrame: 'iframe[name="bookifame"][src*="timing"]'
+  });
+
+  const SELECTOR_KEYS = Object.freeze({
+    "course.gate.faceLegacy": "faceLegacy",
+    "course.gate.faceMask": "faceMask",
+    "course.gate.videoQuiz": "videoQuiz",
+    "course.gate.playerError": "playerError",
+    "course.marker.taskDone": "taskDoneText",
+    "course.probe.chapterTestAnswerable": "chapterTestAnswerable",
+    "course.marker.chapterTestStatus": "chapterTestStatus",
+    "course.marker.chapterTestDoneClass": "chapterTestDoneClass",
+    "course.marker.chapterTestDoneText": "chapterTestDoneText",
+    "course.nav.taskTab": "taskTab",
+    "course.nav.chapter": "chapter",
+    "course.nav.jobUnfinishCount": "jobUnfinishCount",
+    "course.nav.chapterName": "chapterName",
+    "course.nav.specialMode": "specialMode",
+    "course.nav.cursorCourseId": "cursorCourseId",
+    "course.nav.cursorChapterId": "cursorChapterId",
+    "course.nav.cursorClazzId": "cursorClazzId",
+    "course.nav.sectionTabs": "sectionTabs",
+    "course.nav.nextSectionFallback": "nextSectionFallback",
+    "course.action.bigPlay": "bigPlay",
+    "course.action.bigPlayLabel": "bigPlayLabel",
+    "course.reader.pager": "readerPager",
+    "course.reader.pagerZIndex": "activePagerZIndex",
+    "course.reader.pptSlide": "pptSlide",
+    "course.reader.timedReadFrame": "timedReadFrame"
+  });
+
+  const PROBE_PREFIX = "course.probe.";
+
+  const MODULE_PREFIX = "course.module.";
+
+  const SUBMITTED_TEXTS_KEY = "course.marker.chapterTestSubmittedTexts";
+
+  const ERROR_TEXTS_KEY = "course.gate.playerErrorTexts";
+
+  const usableSelector = (value, probe2) => {
+    try {
+      probe2.createDocumentFragment().querySelector(value);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const firstString = value => typeof value === "string" && value.trim() ? value : null;
+
+  function resolveCourseConfig(remote, probe2 = globalThis.document) {
+    if (!remote || typeof remote !== "object" || !probe2) return DEFAULT_COURSE_CONFIG;
+    const table = remote;
+    const next = {
+      ...DEFAULT_COURSE_CONFIG
+    };
+    for (const [key, field] of Object.entries(SELECTOR_KEYS)) {
+      const value = firstString(table[key]);
+      if (value === null) continue;
+      const isSelector = field !== "taskDoneText" && field !== "bigPlayLabel" && field !== "activePagerZIndex" && field !== "chapterTestDoneClass" && field !== "chapterTestDoneText";
+      if (isSelector && !usableSelector(value, probe2)) continue;
+      next[field] = value;
+    }
+    const errorTexts = table[ERROR_TEXTS_KEY];
+    if (Array.isArray(errorTexts)) {
+      const texts = errorTexts.filter(item => typeof item === "string" && !!item.trim());
+      if (texts.length > 0) next.playerErrorTexts = Object.freeze(texts);
+    }
+    const submittedTexts = table[SUBMITTED_TEXTS_KEY];
+    if (Array.isArray(submittedTexts)) {
+      const texts = submittedTexts.filter(item => typeof item === "string" && !!item.trim());
+      if (texts.length > 0) next.chapterTestSubmittedTexts = Object.freeze(texts);
+    }
+    next.probes = Object.freeze(DEFAULT_COURSE_CONFIG.probes.map(([kind, selector], index) => {
+      const override = firstString(table[`${PROBE_PREFIX}${kind}.${index}`]);
+      return Object.freeze([ kind, override && usableSelector(override, probe2) ? override : selector ]);
+    }));
+    const moduleKind = {
+      ...DEFAULT_COURSE_CONFIG.moduleKind
+    };
+    for (const [key, value] of Object.entries(table)) {
+      if (!key.startsWith(MODULE_PREFIX)) continue;
+      const name = key.slice(MODULE_PREFIX.length);
+      const kind = firstString(value);
+      if (!name || !kind || !isTaskKind(kind)) continue;
+      moduleKind[name] = kind;
+    }
+    next.moduleKind = Object.freeze(moduleKind);
+    return Object.freeze(next);
+  }
+
+  let active = DEFAULT_COURSE_CONFIG;
+
+  const courseConfig = () => active;
+
+  function applyCourseConfig(remote, probe2) {
+    active = resolveCourseConfig(remote, probe2);
+    return active;
+  }
+
+  function activeMedia(documents) {
+    for (const doc of documents) for (const candidate of doc.querySelectorAll("video, audio")) {
+      const media = candidate;
+      if (!media.paused && media.readyState > 0) return media;
+    }
+    return null;
+  }
+
+  function mediaPosition(media) {
+    return {
+      currentSeconds: media.currentTime,
+      totalSeconds: Number.isFinite(media.duration) ? media.duration : null,
+      rate: media.playbackRate
+    };
+  }
+
+  const WILL_NOT_BE_DONE = new Set([ "kind-off", "not-a-job" ]);
+
+  function sectionLayer(survey, skipped) {
+    if (!survey.authoritative) return null;
+    const offCount = skipped.filter(item => item.reason === "kind-off").length;
+    const total = Math.max(0, survey.declared - offCount);
+    const pending = Math.max(0, survey.tasks.filter(isPendingTask).length - offCount);
+    return {
+      done: Math.max(0, total - pending),
+      total: total,
+      skipped: skipped.filter(item => WILL_NOT_BE_DONE.has(item.reason)).map(item => ({
+        name: item.name,
+        kind: item.kind,
+        reason: item.reason
+      }))
+    };
+  }
+
+  function courseProgress(documents, survey, skipped, activeTask, course) {
+    const media = activeMedia(documents);
+    return {
+      task: activeTask ? {
+        name: activeTask.name,
+        kind: activeTask.kind,
+        position: media ? mediaPosition(media) : null
+      } : null,
+      section: sectionLayer(survey, skipped),
+      course: course
+    };
+  }
+
+  const MAX_READ_FRAMES = 64;
+
+  const MAX_READ_DEPTH = 8;
+
+  function readableDocuments(root) {
+    const out = [ root ];
+    const seen = new Set([ root ]);
+    const queue = [ {
+      doc: root,
+      depth: 0
+    } ];
+    let frames = 0;
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current || current.depth >= MAX_READ_DEPTH) continue;
+      let list = [];
+      try {
+        list = [ ...current.doc.querySelectorAll("iframe, frame") ];
+      } catch {
+        continue;
+      }
+      for (const el of list) {
+        if (++frames > MAX_READ_FRAMES) return out;
+        let child = null;
+        try {
+          child = el.contentDocument;
+        } catch {
+          child = null;
+        }
+        if (!child || seen.has(child)) continue;
+        seen.add(child);
+        out.push(child);
+        queue.push({
+          doc: child,
+          depth: current.depth + 1
+        });
+      }
+    }
+    return out;
+  }
+
+  const playableSource = media => !!(media.currentSrc || media.getAttribute("src") || media.querySelector("source[src]") || media.readyState >= 1);
+
+  const playableMediaList = documents => {
+    const found = [];
+    for (const doc of documents) for (const candidate of doc.querySelectorAll("video, audio")) {
+      const media = candidate;
+      if (playableSource(media)) found.push(media);
+    }
+    return found;
+  };
+
+  const allMediaEnded = document2 => {
+    const media = playableMediaList([ document2 ]);
+    return media.length > 0 && media.every(item => item.ended);
+  };
+
+  function skippedTasks(survey, options) {
+    const handled = options.isHandled ?? (() => false);
+    const kindEnabled = options.isKindEnabled ?? (() => true);
+    const out = [];
+    for (const task of survey.tasks) {
+      const reason = task.skip ? task.skip : !kindEnabled(task.kind) ? "kind-off" : task.kind === "media" ? allMediaEnded(task.document) ? "media-ended" : null : handled(task.key) ? "handled" : null;
+      if (reason) out.push({
+        name: task.name,
+        kind: task.kind,
+        reason: reason,
+        key: task.key
+      });
+    }
+    return out;
+  }
+
+  function pauseAllMedia(documents) {
+    let paused = false;
+    for (const doc of documents) for (const el of doc.querySelectorAll("video, audio")) {
+      const media = el;
+      if (media.paused) continue;
+      try {
+        media.pause();
+        paused = true;
+      } catch {}
+    }
+    return paused;
+  }
+
+  function pauseCourseMedia(document2) {
+    return pauseAllMedia(readableDocuments(document2));
+  }
+
+  const STOPPING_BLOCK_REASONS = [ "budget-exhausted", "advance-failed", "locked" ];
+
+  const isStoppingBlockReason = reason => STOPPING_BLOCK_REASONS.includes(reason);
+
+  function courseStopReason(state) {
+    switch (state.kind) {
+     case "course-done":
+     case "section-done":
+     case "finished":
+     case "section-stalled":
+      return state.kind;
+
+     case "blocked":
+      return isStoppingBlockReason(state.reason) ? state.reason : null;
+
+     default:
+      return null;
+    }
+  }
+
+  const DEFAULT_INTERVAL_MS = 3e3;
+
+  const IDLE_TICKS_BEFORE_ADVANCE = 2;
+
+  const LOADING_TICKS_BEFORE_ADVANCE = 10;
+
+  const DEFAULT_MAX_DURATION_MS = 3 * 60 * 60 * 1e3;
+
+  const ANSWERING_TICKS_BUDGET = 60;
+
+  function runMediaTask(document2, options) {
+    const adapter = options.adapter;
+    const view = document2.defaultView;
+    if (!view) throw new Error("media task document has no window");
+    const intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
+    const maxDurationMs = options.maxDurationMs ?? DEFAULT_MAX_DURATION_MS;
+    let elapsed = 0;
+    let idleTicks = 0;
+    let sectionsDone = 0;
+    let pendingAdvanceFrom = null;
+    let pendingTabFrom = null;
+    let readingTaskKey = null;
+    let readingSummary = null;
+    let lastSignature = null;
+    let lastSurveyKey = null;
+    const handled = new Set;
+    const pptSteps = new Map;
+    const answeringTicks = new Map;
+    let dwellUntil = 0;
+    let dwellState = null;
+    let timer = null;
+    const stop = () => {
+      if (timer != null) view.clearInterval(timer);
+      timer = null;
+    };
+    const stepOptions = Object.create(options, {
+      isHandled: {
+        value: key => handled.has(key)
+      }
+    });
+    timer = view.setInterval(() => {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
+      const memoryPressure = (_a = options.memoryGuard) == null ? void 0 : _a.check();
+      if (memoryPressure != null) {
+        stop();
+        (_b = options.onMemoryPressure) == null ? void 0 : _b.call(options, memoryPressure);
+        return;
+      }
+      elapsed += intervalMs;
+      if (elapsed > maxDurationMs) {
+        stop();
+        (_c = options.onState) == null ? void 0 : _c.call(options, {
+          kind: "blocked",
+          reason: "budget-exhausted"
+        });
+        return;
+      }
+      const documents = ((_d = options.documents) == null ? void 0 : _d.call(options)) ?? readableDocuments(document2);
+      const readable = documents;
+      const signatureNow = adapter.navigate.sectionSignature(documents);
+      if (signatureNow !== lastSignature) {
+        lastSignature = signatureNow;
+        handled.clear();
+        pptSteps.clear();
+        answeringTicks.clear();
+        readingTaskKey = null;
+      }
+      if (options.onSurvey || options.onProgress) {
+        const survey = adapter.survey(documents);
+        const skipped = skippedTasks(survey, stepOptions);
+        if (options.onSurvey) {
+          const kinds = survey.tasks.map(task => task.kind);
+          const key = `${kinds.join(",")}#${skipped.map(item => `${item.name}:${item.reason}`).join("|")}`;
+          if (key !== lastSurveyKey) {
+            lastSurveyKey = key;
+            options.onSurvey({
+              frames: documents.length,
+              authoritative: survey.authoritative,
+              declared: survey.declared,
+              kinds: kinds,
+              pending: survey.tasks.filter(isPendingTask).length,
+              skipped: skipped
+            });
+          }
+        }
+        if (options.onProgress) {
+          const skippedKeys = new Set(skipped.map(item => item.key));
+          const actionable = survey.tasks.find(item => isPendingTask(item) && !skippedKeys.has(item.key));
+          options.onProgress(courseProgress(documents, survey, skipped, actionable ?? null, adapter.courseCounter(documents)));
+        }
+      }
+      const tryAdvanceTab = tabs2 => {
+        const tabKey = `${adapter.navigate.sectionSignature(documents)}#${tabs2.activeIndex}`;
+        if (pendingTabFrom === tabKey) {
+          pendingTabFrom = null;
+          return false;
+        }
+        if (!adapter.navigate.advanceTab(documents)) return false;
+        pendingTabFrom = tabKey;
+        return true;
+      };
+      if (dwellState && dwellUntil > elapsed) {
+        (_e = options.onState) == null ? void 0 : _e.call(options, {
+          ...dwellState,
+          remainingMs: dwellUntil - elapsed
+        });
+        return;
+      }
+      dwellState = null;
+      const state = adapter.step(documents, stepOptions);
+      if (state.kind === "playing" || state.kind === "blocked") {
+        idleTicks = 0;
+        (_f = options.onState) == null ? void 0 : _f.call(options, state);
+        return;
+      }
+      if (state.kind === "dwelling") {
+        idleTicks = 0;
+        handled.add(state.taskKey);
+        dwellState = state;
+        dwellUntil = elapsed + state.remainingMs;
+        (_g = options.onState) == null ? void 0 : _g.call(options, state);
+        return;
+      }
+      if (state.kind === "answering") {
+        idleTicks = 0;
+        const spent = (answeringTicks.get(state.taskKey) ?? 0) + 1;
+        answeringTicks.set(state.taskKey, spent);
+        if (spent >= ANSWERING_TICKS_BUDGET || ((_h = options.isAnsweringDone) == null ? void 0 : _h.call(options, state.taskKey))) handled.add(state.taskKey);
+        if (!state.frameLoaded) {
+          const tabs2 = adapter.navigate.tabs(documents);
+          if (tabs2 && tryAdvanceTab(tabs2)) {
+            (_i = options.onState) == null ? void 0 : _i.call(options, {
+              kind: "advancing",
+              toIndex: tabs2.activeIndex + 1
+            });
+            return;
+          }
+        }
+        (_j = options.onState) == null ? void 0 : _j.call(options, {
+          ...state,
+          ticks: spent
+        });
+        return;
+      }
+      if (state.kind === "starting") {
+        idleTicks = 0;
+        (_k = options.onState) == null ? void 0 : _k.call(options, state);
+        return;
+      }
+      if (state.kind === "hyperlink") {
+        idleTicks = 0;
+        handled.add(state.taskKey);
+        (_l = options.onState) == null ? void 0 : _l.call(options, state);
+        return;
+      }
+      if (state.kind === "ppt-slide") {
+        idleTicks = 0;
+        const turned = (pptSteps.get(state.taskKey) ?? 0) + 1;
+        pptSteps.set(state.taskKey, turned);
+        if (turned >= Math.max(state.total, 1)) handled.add(state.taskKey);
+        (_m = options.onState) == null ? void 0 : _m.call(options, state);
+        return;
+      }
+      const tabs = adapter.navigate.tabs(documents);
+      const taskKey = state.kind === "idle" && state.taskKey ? state.taskKey : `${signatureNow}#${(tabs == null ? void 0 : tabs.activeIndex) ?? -1}`;
+      let scrolledNow = false;
+      if (state.kind === "idle" && readingTaskKey !== taskKey) {
+        const taskContext = state.taskKey != null || tabs !== null || adapter.navigate.sectionCursor(documents) !== null;
+        if (taskContext) {
+          readingTaskKey = taskKey;
+          readingSummary = adapter.simulateReading(readable);
+          scrolledNow = true;
+          if (state.taskKey) handled.add(state.taskKey);
+        }
+      }
+      if (state.kind === "idle" || state.kind === "loading") {
+        idleTicks += 1;
+        const grace = state.kind === "loading" ? LOADING_TICKS_BEFORE_ADVANCE : IDLE_TICKS_BEFORE_ADVANCE;
+        if (idleTicks < grace) {
+          (_n = options.onState) == null ? void 0 : _n.call(options, scrolledNow && readingSummary ? {
+            kind: "reading",
+            summary: readingSummary
+          } : state);
+          return;
+        }
+      }
+      if (tabs && tryAdvanceTab(tabs)) {
+        idleTicks = 0;
+        (_o = options.onState) == null ? void 0 : _o.call(options, {
+          kind: "advancing",
+          toIndex: tabs.activeIndex + 1
+        });
+        return;
+      }
+      {
+        if (!tabs && !adapter.navigate.sectionCursor(documents)) {
+          if (state.kind !== "idle" && state.kind !== "loading") stop();
+          (_p = options.onState) == null ? void 0 : _p.call(options, state);
+          return;
+        }
+        const chapters = adapter.navigate.chapters(documents);
+        if (chapters.length > 0 && chapters.every(chapter2 => chapter2.unfinishedCount === 0)) {
+          stop();
+          (_q = options.onState) == null ? void 0 : _q.call(options, {
+            kind: "course-done"
+          });
+          return;
+        }
+        if (pendingAdvanceFrom !== null) {
+          if (signatureNow === pendingAdvanceFrom) {
+            const chapter2 = adapter.navigate.nextUnfinishedChapter(chapters);
+            if (chapter2 && adapter.navigate.jumpToChapter(documents, chapter2)) {
+              pendingAdvanceFrom = null;
+              idleTicks = 0;
+              (_r = options.onState) == null ? void 0 : _r.call(options, {
+                kind: "advancing-chapter",
+                name: adapter.navigate.chapterLabel(chapter2)
+              });
+              return;
+            }
+            stop();
+            (_s = options.onState) == null ? void 0 : _s.call(options, {
+              kind: "blocked",
+              reason: adapter.navigate.isSpecialMode(documents) ? "locked" : "advance-failed"
+            });
+            return;
+          }
+          pendingAdvanceFrom = null;
+        }
+        if (adapter.navigate.advanceSection(documents)) {
+          sectionsDone += 1;
+          idleTicks = 0;
+          pendingAdvanceFrom = signatureNow;
+          (_t = options.onState) == null ? void 0 : _t.call(options, {
+            kind: "advancing-section",
+            sectionsDone: sectionsDone
+          });
+          return;
+        }
+        const chapter = adapter.navigate.nextUnfinishedChapter(chapters);
+        if (chapter && adapter.navigate.jumpToChapter(documents, chapter)) {
+          idleTicks = 0;
+          (_u = options.onState) == null ? void 0 : _u.call(options, {
+            kind: "advancing-chapter",
+            name: adapter.navigate.chapterLabel(chapter)
+          });
+          return;
+        }
+        stop();
+        (_v = options.onState) == null ? void 0 : _v.call(options, {
+          kind: "section-done"
+        });
+        return;
+      }
+    }, intervalMs);
+    return {
+      stop: stop
+    };
+  }
+
   const TIMED_READ_ROUNDS = 3;
 
   const TIMED_READ_SLACK_SECONDS = 3;
@@ -5735,7 +5740,7 @@
     return done ? "test-done" : null;
   };
 
-  function surveyTasks(documents) {
+  function surveyTasks$1(documents) {
     const attachments = courseAttachments(documents);
     const framesByJobId = new Map;
     for (const document2 of documents) {
@@ -5802,7 +5807,7 @@
     return element.getAttribute("value") ?? "";
   };
 
-  function sectionCursor(documents) {
+  function sectionCursor$1(documents) {
     for (const document2 of documents) {
       const courseId = inputValue(document2, courseConfig().cursorCourseId);
       const chapterId = inputValue(document2, courseConfig().cursorChapterId);
@@ -5820,7 +5825,7 @@
   }
 
   function advanceSectionViaSite(documents) {
-    const cursor = sectionCursor(documents);
+    const cursor = sectionCursor$1(documents);
     if (!cursor) return false;
     const pageWindow = courseWindow(cursor.document);
     const counter = pageWindow == null ? void 0 : pageWindow.PCount;
@@ -5835,7 +5840,7 @@
 
   const CHAPTER_ID_PATTERN = /\('(.*)','(.*)','(.*)'\)/u;
 
-  function chapterInfos(documents) {
+  function chapterInfos$1(documents) {
     for (const document2 of documents) {
       const elements = [ ...document2.querySelectorAll(courseConfig().chapter) ];
       if (elements.length === 0) continue;
@@ -5856,14 +5861,14 @@
     return [];
   }
 
-  function nextUnfinishedChapter(chapters) {
+  function nextUnfinishedChapter$1(chapters) {
     const pending = chapters.filter(chapter => chapter.unfinishedCount > 0 && !chapter.active);
     if (pending.length === 0) return null;
     const activeIndex = chapters.findIndex(chapter => chapter.active);
     return pending.find(chapter => chapters.indexOf(chapter) > activeIndex) ?? pending[0] ?? null;
   }
 
-  function jumpToChapter(documents, chapter) {
+  function jumpToChapter$1(documents, chapter) {
     var _a;
     const entry = (_a = chapter.element.parentElement) == null ? void 0 : _a.querySelector(courseConfig().chapterName);
     if (entry) {
@@ -5872,7 +5877,7 @@
         return true;
       } catch {}
     }
-    const cursor = sectionCursor(documents);
+    const cursor = sectionCursor$1(documents);
     if (!cursor || !chapter.chapterId) return false;
     const pageWindow = courseWindow(cursor.document);
     const jump = pageWindow == null ? void 0 : pageWindow.getTeacherAjax;
@@ -5932,7 +5937,7 @@
     }
   }
 
-  const MAX_PLAYBACK_RATE = 2;
+  const MAX_PLAYBACK_RATE$1 = 2;
 
   const hasFaceRecognition = doc => {
     for (const img of doc.querySelectorAll(courseConfig().faceLegacy)) if (img.getAttribute("src")) return true;
@@ -5969,9 +5974,9 @@
 
   const hasLoadingMedia = documents => documents.some(doc => [ ...doc.querySelectorAll("video, audio") ].some(el => isLoadingMedia(el)));
 
-  function playMedia(pending, options) {
+  function playMedia$1(pending, options) {
     var _a;
-    const rate = Math.min(Math.max(options.playbackRate ?? 1, 1), MAX_PLAYBACK_RATE);
+    const rate = Math.min(Math.max(options.playbackRate ?? 1, 1), MAX_PLAYBACK_RATE$1);
     pending.volume = options.volume ?? 0;
     pending.playbackRate = rate;
     void ((_a = pending.play()) == null ? void 0 : _a.catch(() => {}));
@@ -6016,7 +6021,7 @@
             taskKey: task.key
           };
         }
-        return playMedia(pending, options);
+        return playMedia$1(pending, options);
       }
 
      case "chapter-test":
@@ -6079,7 +6084,7 @@
         reason: "video-quiz"
       };
     }
-    const survey = surveyTasks(documents);
+    const survey = surveyTasks$1(documents);
     if (survey.authoritative) return stepSurveyedTask(survey, documents, options);
     const media = playableMediaList(documents);
     const markerDone = documents.slice(1).some(taskAlreadyDone);
@@ -6095,7 +6100,7 @@
         kind: hasLoadingMedia(documents) ? "loading" : "idle"
       };
     }
-    return playMedia(pending, options);
+    return playMedia$1(pending, options);
   }
 
   function taskTabs(documents) {
@@ -6134,14 +6139,14 @@
     return null;
   }
 
-  function advanceSection(documents) {
+  function advanceSection$1(documents) {
     const target = nextSectionTarget(documents);
     if (!target) return false;
     target.click();
     return true;
   }
 
-  function sectionSignature(documents) {
+  function sectionSignature$1(documents) {
     var _a, _b;
     const href = ((_b = (_a = documents[0]) == null ? void 0 : _a.location) == null ? void 0 : _b.href) ?? "";
     const tabs = taskTabs(documents);
@@ -6153,7 +6158,7 @@
 
   const MAX_SCROLL_TARGETS = 2e3;
 
-  function simulateReading(documents) {
+  function simulateReading$1(documents) {
     var _a, _b, _c;
     const summary = {
       frames: documents.length,
@@ -6187,7 +6192,7 @@
     return summary;
   }
 
-  const chapterLabel = chapter => {
+  const chapterLabel$1 = chapter => {
     var _a, _b;
     const name = ((_b = (_a = chapter.element.parentElement) == null ? void 0 : _a.querySelector(courseConfig().chapterName)) == null ? void 0 : _b.textContent) ?? chapter.element.textContent;
     return (name ?? "").trim() || "\u4e0b\u4e00\u4e2a\u672a\u5b8c\u6210\u7ae0\u8282";
@@ -6202,7 +6207,7 @@
   }
 
   function courseCounter(documents) {
-    const chapters = chapterInfos(documents);
+    const chapters = chapterInfos$1(documents);
     if (chapters.length === 0) return null;
     if (counterElementCount(documents) === 0) return null;
     return {
@@ -6213,27 +6218,345 @@
   function createChaoxingCourseAdapter() {
     return {
       step: stepMediaTask,
-      survey: surveyTasks,
+      survey: surveyTasks$1,
       courseCounter: courseCounter,
-      simulateReading: simulateReading,
+      simulateReading: simulateReading$1,
       navigate: {
         tabs: taskTabs,
         advanceTab: advanceTaskTab,
+        sectionSignature: sectionSignature$1,
+        sectionCursor: sectionCursor$1,
+        chapters: chapterInfos$1,
+        nextUnfinishedChapter: nextUnfinishedChapter$1,
+        jumpToChapter: jumpToChapter$1,
+        isSpecialMode: isSpecialMode,
+        advanceSection: documents => advanceSectionViaSite(documents) || advanceSection$1(documents),
+        chapterLabel: chapterLabel$1
+      }
+    };
+  }
+
+  const COURSE_PATH = "/student/courseuser/courseContent";
+
+  const ACTIVITY_PATH = "/student/activity/display";
+
+  const KIND_BY_NODETYPE = {
+    2: "media",
+    7: "media",
+    3: "document",
+    4: "chapter-test",
+    5: "chapter-test"
+  };
+
+  const isDoneState = state => state.classList.contains("finished");
+
+  const DOCUMENT_DWELL_MS = 7e4;
+
+  const dwelled = new Set;
+
+  const ATTEMPTED_KEY = "aiask.wenhua.attempted";
+
+  const attemptedIds = doc => {
+    var _a, _b;
+    try {
+      const raw = (_b = (_a = doc.defaultView) == null ? void 0 : _a.sessionStorage) == null ? void 0 : _b.getItem(ATTEMPTED_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+    } catch {
+      return new Set;
+    }
+  };
+
+  const markAttempted = (doc, id) => {
+    var _a, _b;
+    if (!id) return;
+    try {
+      const ids = attemptedIds(doc);
+      ids.add(id);
+      (_b = (_a = doc.defaultView) == null ? void 0 : _a.sessionStorage) == null ? void 0 : _b.setItem(ATTEMPTED_KEY, JSON.stringify([ ...ids ]));
+    } catch {}
+  };
+
+  const pageUrl = doc => {
+    var _a;
+    try {
+      return new URL(((_a = doc == null ? void 0 : doc.location) == null ? void 0 : _a.href) ?? "");
+    } catch {
+      return null;
+    }
+  };
+
+  const isCoursePage = url => (url == null ? void 0 : url.pathname.endsWith(COURSE_PATH)) ?? false;
+
+  const isActivityPage = url => (url == null ? void 0 : url.pathname.endsWith(ACTIVITY_PATH)) ?? false;
+
+  const courseVersionId = url => (url == null ? void 0 : url.searchParams.get("courseVersionId")) ?? "";
+
+  const activityId = url => (url == null ? void 0 : url.searchParams.get("activityId")) ?? "";
+
+  const firstDocument = documents => documents[0] ?? null;
+
+  const activityElements = doc => Array.from(doc.querySelectorAll(".activity[nodetype]"));
+
+  const isDone = element => {
+    const state = element.querySelector(".activity-state");
+    return state != null && isDoneState(state);
+  };
+
+  const taskName = element => {
+    var _a, _b;
+    return ((_b = (_a = element.querySelector(".activity-name .name")) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim()) ?? "\u4efb\u52a1\u70b9";
+  };
+
+  const toTask = (doc, element) => {
+    const nodetype = element.getAttribute("nodetype") ?? "";
+    const kind = KIND_BY_NODETYPE[nodetype];
+    if (!kind) return null;
+    const id = element.id || "";
+    if (!id) return null;
+    const name = taskName(element);
+    const skip = isDone(element) ? "passed" : attemptedIds(doc).has(id) ? "handled" : null;
+    return {
+      document: doc,
+      kind: kind,
+      jobId: id,
+      name: name,
+      skip: skip,
+      dwellSeconds: 0,
+      key: id
+    };
+  };
+
+  function surveyTasks(documents) {
+    const doc = firstDocument(documents);
+    const url = pageUrl(doc);
+    if (!doc) return {
+      authoritative: false,
+      declared: 0,
+      tasks: []
+    };
+    if (isCoursePage(url)) {
+      const tasks = activityElements(doc).map(element => toTask(doc, element)).filter(task => task !== null);
+      return {
+        authoritative: true,
+        declared: tasks.length,
+        tasks: tasks
+      };
+    }
+    if (isActivityPage(url)) {
+      const id = activityId(url);
+      const kind = doc.querySelector("video,audio") ? "media" : "document";
+      return {
+        authoritative: false,
+        declared: 1,
+        tasks: [ {
+          document: doc,
+          kind: kind,
+          jobId: id || null,
+          name: doc.title || "\u4efb\u52a1\u70b9",
+          skip: dwelled.has(id) ? "handled" : null,
+          dwellSeconds: 0,
+          key: id
+        } ]
+      };
+    }
+    return {
+      authoritative: false,
+      declared: 0,
+      tasks: []
+    };
+  }
+
+  const MAX_PLAYBACK_RATE = 2;
+
+  function playMedia(media, options) {
+    var _a;
+    const rate = Math.min(Math.max(options.playbackRate ?? 1, 1), MAX_PLAYBACK_RATE);
+    media.volume = options.volume ?? 0;
+    media.playbackRate = rate;
+    void ((_a = media.play()) == null ? void 0 : _a.catch(() => {}));
+    if (media.paused) return {
+      kind: "blocked",
+      reason: "not-playing"
+    };
+    return {
+      kind: "playing",
+      rate: rate
+    };
+  }
+
+  const mediaEnded = media => {
+    if (media.ended) return true;
+    const total = media.duration;
+    return Number.isFinite(total) && total > 0 && media.currentTime >= total - 1;
+  };
+
+  function stepTask(documents, options) {
+    var _a;
+    const doc = firstDocument(documents);
+    const url = pageUrl(doc);
+    if (!doc || !isActivityPage(url)) return {
+      kind: "idle"
+    };
+    const id = activityId(url);
+    const key = id || (url == null ? void 0 : url.pathname) || "activity";
+    if (dwelled.has(key) || ((_a = options.isHandled) == null ? void 0 : _a.call(options, key))) return {
+      kind: "idle",
+      taskKey: key
+    };
+    const media = doc.querySelector("video,audio");
+    if (media) {
+      if (mediaEnded(media)) {
+        dwelled.add(key);
+        markAttempted(doc, key);
+        return {
+          kind: "idle",
+          taskKey: key
+        };
+      }
+      return playMedia(media, options);
+    }
+    dwelled.add(key);
+    markAttempted(doc, key);
+    return {
+      kind: "dwelling",
+      name: doc.title || "\u4efb\u52a1\u70b9",
+      remainingMs: DOCUMENT_DWELL_MS,
+      taskKey: key
+    };
+  }
+
+  const simulateReading = () => ({
+    frames: 0,
+    scrolled: 0,
+    pagers: 0
+  });
+
+  function sectionCursor(documents) {
+    const doc = firstDocument(documents);
+    const url = pageUrl(doc);
+    if (!doc || !isCoursePage(url) && !isActivityPage(url)) return null;
+    const courseId = courseVersionId(url);
+    if (!courseId) return null;
+    return {
+      courseId: courseId,
+      chapterId: activityId(url),
+      clazzId: "",
+      tabCount: 1,
+      document: doc
+    };
+  }
+
+  function chapterInfos(documents) {
+    const doc = firstDocument(documents);
+    const url = pageUrl(doc);
+    if (!doc || !isCoursePage(url)) return [];
+    return activityElements(doc).filter(element => KIND_BY_NODETYPE[element.getAttribute("nodetype") ?? ""]).map(element => ({
+      element: element,
+      chapterId: element.id || null,
+      unfinishedCount: isDone(element) ? 0 : 1,
+      active: false
+    }));
+  }
+
+  const nextUnfinishedChapter = chapters => chapters.find(chapter => {
+    if (chapter.unfinishedCount <= 0) return false;
+    const doc = chapter.element.ownerDocument;
+    return !(chapter.chapterId && attemptedIds(doc).has(chapter.chapterId));
+  }) ?? null;
+
+  function activityUrlFrom(url, activityIdValue) {
+    const courseId = courseVersionId(url);
+    if (!url || !courseId || !activityIdValue) return null;
+    const target = new URL(url.href);
+    target.pathname = url.pathname.replace(COURSE_PATH, ACTIVITY_PATH);
+    target.search = "";
+    target.searchParams.set("courseVersionId", courseId);
+    target.searchParams.set("activityId", activityIdValue);
+    return target.href;
+  }
+
+  function jumpToChapter(documents, chapter) {
+    const doc = firstDocument(documents);
+    const href = activityUrlFrom(pageUrl(doc), chapter.chapterId);
+    if (!doc || !href) return false;
+    markAttempted(doc, chapter.chapterId ?? "");
+    doc.location.href = href;
+    return true;
+  }
+
+  function courseUrlFrom(url) {
+    const courseId = courseVersionId(url);
+    if (!url || !courseId) return null;
+    const target = new URL(url.href);
+    target.pathname = url.pathname.replace(ACTIVITY_PATH, COURSE_PATH);
+    target.search = "";
+    target.searchParams.set("courseVersionId", courseId);
+    return target.href;
+  }
+
+  function hasDwelled(url) {
+    if (!url) return false;
+    return dwelled.has(activityId(url) || url.pathname);
+  }
+
+  function advanceSection(documents) {
+    const doc = firstDocument(documents);
+    const url = pageUrl(doc);
+    if (!doc || !url || !isActivityPage(url) || !hasDwelled(url)) return false;
+    const href = courseUrlFrom(url);
+    if (!href) return false;
+    doc.location.href = href;
+    return true;
+  }
+
+  const sectionSignature = documents => {
+    const url = pageUrl(firstDocument(documents));
+    return url ? `${url.pathname}?${url.searchParams.toString()}` : "";
+  };
+
+  const chapterLabel = chapter => taskName(chapter.element);
+
+  function createWenhuaCourseAdapter() {
+    return {
+      step: stepTask,
+      survey: surveyTasks,
+      courseCounter: () => null,
+      simulateReading: simulateReading,
+      navigate: {
+        tabs: () => null,
+        advanceTab: () => false,
         sectionSignature: sectionSignature,
         sectionCursor: sectionCursor,
         chapters: chapterInfos,
         nextUnfinishedChapter: nextUnfinishedChapter,
         jumpToChapter: jumpToChapter,
-        isSpecialMode: isSpecialMode,
-        advanceSection: documents => advanceSectionViaSite(documents) || advanceSection(documents),
+        isSpecialMode: () => false,
+        advanceSection: advanceSection,
         chapterLabel: chapterLabel
       }
     };
   }
 
+  function isWenhuaCourseStudyUrl(location2) {
+    try {
+      const url = new URL(location2.href);
+      return isCoursePage(url) || isActivityPage(url);
+    } catch {
+      return false;
+    }
+  }
+
   function courseAdapterFor(platform) {
     if (platform === "chaoxing") return createChaoxingCourseAdapter();
+    if (platform === "wenhua") return createWenhuaCourseAdapter();
     return null;
+  }
+
+  function isCourseStudyUrl(platform, location2) {
+    if (platform === "chaoxing") return isNewCourseStudyUrl(location2);
+    if (platform === "wenhua") return isWenhuaCourseStudyUrl(location2);
+    return false;
   }
 
   const SUBMIT_CLASSES = [ "btnBlueSubmit" ];
@@ -6858,7 +7181,7 @@
         url: __privateGet(this, _deps).baseUrl + protocol.EVENTS_PATH,
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID()
+          "Idempotency-Key": protocol.randomUuid()
         },
         body: JSON.stringify(__privateMethod(this, _EventQueue_instances, envelope_fn).call(this, events)),
         timeoutMs: EVENT_QUEUE_LIMITS.timeoutMs
@@ -6909,6 +7232,8 @@
 
   const SENSITIVE_ATTR_PATTERN = /token|session|cookie|passwd|password|secret|sign|auth|uid|userid|studentid|ticket|jwt|enc$|^key$|^fid$/i;
 
+  const PERSONAL_TEXT_HOST_PATTERN = /realname|truename|stuname|studentname|nickname|username|loginname/i;
+
   const MASK = "[\u5df2\u906e\u76d6]";
 
   const NUMBER_MASK = "[\u6570\u5b57]";
@@ -6944,6 +7269,7 @@
     const doc = (new DOMParser).parseFromString(html, "text/html");
     const stripped = new Map;
     const redactRoot = (root, depth) => {
+      var _a;
       const owner = root.ownerDocument ?? doc;
       const commentWalker = owner.createTreeWalker(root, NodeFilter.SHOW_COMMENT);
       const comments = [];
@@ -6980,6 +7306,17 @@
         });
         const inputType = tag === "input" ? (el.getAttribute("type") ?? "").toLowerCase() : "";
         const typedSecret = inputType === "password" || mode === "evidence" && inputType === "hidden";
+        if ([ "id", "name", "class" ].some(key => {
+          const v = el.getAttribute(key);
+          return !!v && PERSONAL_TEXT_HOST_PATTERN.test(v);
+        })) {
+          for (const node of Array.from(el.childNodes)) {
+            if (node.nodeType === 3 && ((_a = node.nodeValue) == null ? void 0 : _a.trim())) {
+              node.nodeValue = MASK;
+              redactions += 1;
+            }
+          }
+        }
         for (const attr of Array.from(el.attributes)) {
           if ((namedSecret || typedSecret) && attr.name.toLowerCase() === "value") {
             if (attr.value) {
@@ -7438,7 +7775,7 @@
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID()
+        "Idempotency-Key": protocol.randomUuid()
       },
       body: JSON.stringify({
         platform: platform,
@@ -7561,7 +7898,7 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID()
+          "Idempotency-Key": protocol.randomUuid()
         },
         body: JSON.stringify({}),
         timeoutMs: 8e3
@@ -7594,7 +7931,7 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID()
+          "Idempotency-Key": protocol.randomUuid()
         },
         body: JSON.stringify({
           code: code
@@ -7804,7 +8141,7 @@
         url: baseUrl + protocol.REPORT_PATH,
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID()
+          "Idempotency-Key": protocol.randomUuid()
         },
         body: JSON.stringify(req),
         timeoutMs: 5e3
@@ -7820,7 +8157,8 @@
     chaoxing: "\u8d85\u661f",
     wangxiao: "168 \u7f51\u6821",
     aopeng: "\u5965\u9e4f\u6559\u80b2",
-    hubu: "\u6e56\u5317\u81ea\u8003"
+    hubu: "\u6e56\u5317\u81ea\u8003",
+    wenhua: "\u6587\u534e\u5728\u7ebf"
   });
 
   const platformLabelFor = platform => PLATFORM_LABEL[platform] ?? platform;
@@ -7829,7 +8167,8 @@
     chaoxing: Object.freeze([ "answer", "harvest", "course-automation" ]),
     wangxiao: Object.freeze([ "answer", "harvest" ]),
     aopeng: Object.freeze([ "harvest" ]),
-    hubu: Object.freeze([ "answer", "harvest" ])
+    hubu: Object.freeze([ "answer", "harvest" ]),
+    wenhua: Object.freeze([ "answer", "harvest", "course-automation" ])
   });
 
   const FALLBACK_FEATURES = Object.freeze([ "answer", "harvest" ]);
@@ -10264,7 +10603,7 @@
       }
       function requestRegistrationCaptcha() {
         if (captchaPending) return Promise.reject(new Error("challenge-busy"));
-        captchaState.value = crypto.randomUUID();
+        captchaState.value = protocol.randomUuid();
         captchaOpen.value = true;
         return new Promise((resolve, reject) => {
           captchaPending = {
@@ -10497,7 +10836,7 @@
         return ((_b = (_a2 = courseProgress2.value) == null ? void 0 : _a2.section) == null ? void 0 : _b.skipped) ?? [];
       });
       const legacyCourseUrl = legacyStudentstudyUpgradeUrl(location);
-      const onCourseStudyPage = isNewCourseStudyUrl(location);
+      const onCourseStudyPage = vue.computed(() => isCourseStudyUrl(platform.value, location));
       const switchToNewCoursePage = () => {
         if (legacyCourseUrl) location.href = legacyCourseUrl;
       };
@@ -10520,7 +10859,7 @@
         pageChangeScheduler == null ? void 0 : pageChangeScheduler.notify();
       }
       const syncMediaTask = () => {
-        if (!settings.courseAuto || !hasFeature("course-automation") || !onCourseStudyPage || !courseAdapter) {
+        if (!settings.courseAuto || !hasFeature("course-automation") || !onCourseStudyPage.value || !courseAdapter) {
           mediaRunner == null ? void 0 : mediaRunner.stop();
           mediaRunner = null;
           mediaState.value = null;
@@ -11497,7 +11836,7 @@
             url: BACKEND_BASE_URL + protocol.EVIDENCE_PATH,
             headers: {
               "Content-Type": "application/json",
-              "Idempotency-Key": crypto.randomUUID()
+              "Idempotency-Key": protocol.randomUuid()
             },
             body: JSON.stringify(bundle),
             timeoutMs: 2e4
@@ -11865,7 +12204,7 @@
           class: "btn ghost sm",
           onClick: openCourseSettings,
           "aria-label": "\u8bfe\u7a0b\u5b66\u4e60\u8bbe\u7f6e"
-        }, "\u8bbe\u7f6e"), vue.unref(onCourseStudyPage) ? (vue.openBlock(), vue.createElementBlock("button", {
+        }, "\u8bbe\u7f6e"), onCourseStudyPage.value ? (vue.openBlock(), vue.createElementBlock("button", {
           key: 0,
           class: "btn ghost sm",
           onClick: _cache[0] || (_cache[0] = (...args) => vue.unref(toggleCourseAuto) && vue.unref(toggleCourseAuto)(...args))
@@ -11879,7 +12218,7 @@
         }, "\u8d85\u661f\u540c\u4e00\u7ae0\u8282\u6709\u65b0\u65e7\u4e24\u79cd\u9875\u9762\uff0c\u5207\u6362\u540e\u8d26\u53f7\u4e0e\u8fdb\u5ea6\u4e0d\u53d8\u3002", -1)), vue.createElementVNode("button", {
           class: "btn ghost sm",
           onClick: switchToNewCoursePage
-        }, "\u5207\u6362\u65b0\u7248") ], 64)) : !vue.unref(onCourseStudyPage) ? (vue.openBlock(), 
+        }, "\u5207\u6362\u65b0\u7248") ], 64)) : !onCourseStudyPage.value ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
         }, [ _cache[47] || (_cache[47] = vue.createElementVNode("div", {
