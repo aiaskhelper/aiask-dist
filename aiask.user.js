@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.3.2
+// @version      3.3.3
 // @author       爱问答
 // @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
@@ -136,7 +136,7 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.3.2";
+  const SCRIPT_VERSION = "3.3.3";
 
   const ENGINE_ID = "52539fd9fa208db4";
 
@@ -954,6 +954,24 @@
       note(`${reply.kind} \u2192 ${event.origin}`);
     });
     note(`\u5df2\u5c31\u7eea v${SCRIPT_VERSION} \xb7 ${cache ? "\u5b8c\u6574\u6863" : "\u7248\u672c\u6863"} \xb7 ${location.origin}`);
+  }
+
+  const LINE_ATTR = "data-aiask-line";
+
+  const LINE_NEW = "new";
+
+  function claimPageForNewLine(doc = document) {
+    const mark = () => {
+      var _a;
+      (_a = doc.documentElement) == null ? void 0 : _a.setAttribute(LINE_ATTR, LINE_NEW);
+    };
+    if (doc.documentElement) {
+      mark();
+      return;
+    }
+    doc.addEventListener("DOMContentLoaded", mark, {
+      once: true
+    });
   }
 
   const FRAME_READY_EVENT = "aiask:frame-ready";
@@ -13151,6 +13169,7 @@
   if (bridgeMode) installImportBridge(bridgeMode === "full" ? localAnswerCache : null);
 
   if (SUPPORTED_HOST_PATTERN.test(location.hostname)) {
+    claimPageForNewLine();
     const highest = findHighestSameOriginWindow(window);
     const isTop = window === window.top;
     const isHighestSameOrigin = highest === window;
