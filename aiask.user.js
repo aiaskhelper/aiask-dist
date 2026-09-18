@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.3.4
+// @version      3.3.5
 // @author       爱问答
 // @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
@@ -136,7 +136,7 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.3.4";
+  const SCRIPT_VERSION = "3.3.5";
 
   const ENGINE_ID = "65a8d0a901b7bd4d";
 
@@ -4512,6 +4512,22 @@
     host: "ctapp.hubuzkw.com",
     pathIncludes: "/exam.index/get_knows_question_ids",
     slot: "question-bank"
+  }), Object.freeze({
+    host: "ctapp.hubuzkw.com",
+    pathIncludes: "/exam.practice/get_today_practice",
+    slot: "daily-practice"
+  }), Object.freeze({
+    host: "ctapp.hubuzkw.com",
+    pathIncludes: "/exam.exam_wrong/get_wrong_question",
+    slot: "wrong-question"
+  }), Object.freeze({
+    host: "ctapp.hubuzkw.com",
+    pathIncludes: "/exam.exam_favors/get_favor_question",
+    slot: "favor-question"
+  }), Object.freeze({
+    host: "ctapp.hubuzkw.com",
+    pathIncludes: "/exam.exampaper/get_paper_ids",
+    slot: "exam-paper"
   }) ]);
 
   function slotsForHosts(hosts) {
@@ -6748,7 +6764,7 @@
     return views;
   }
 
-  async function pollFor(probe2, timeoutMs, stepMs) {
+  async function pollFor$1(probe2, timeoutMs, stepMs) {
     for (let waited = 0; waited <= timeoutMs; waited += stepMs) {
       const hit = probe2();
       if (hit) return hit;
@@ -6770,7 +6786,7 @@
 
   const CONFIRM_OK_ID = "popok";
 
-  function visible(element) {
+  function visible$1(element) {
     var _a;
     const view = (_a = element.ownerDocument) == null ? void 0 : _a.defaultView;
     if (!view) return false;
@@ -6795,7 +6811,7 @@
       } catch {
         continue;
       }
-      if (element && visible(element)) return element;
+      if (element && visible$1(element)) return element;
     }
     return null;
   }
@@ -6821,7 +6837,7 @@
         (_b = state.onConfirmProbe) == null ? void 0 : _b.call(state, `\u70b9\u51fb\u63d0\u4ea4\u5165\u53e3\u629b ${String((error == null ? void 0 : error.message) ?? error).slice(0, 160)}`);
         return "click-failed";
       }
-      const confirmButton = await pollFor(() => findConfirmButton(getDocuments()), state.confirmTimeoutMs ?? DEFAULT_CONFIRM_TIMEOUT_MS, state.pollMs ?? POLL_MS);
+      const confirmButton = await pollFor$1(() => findConfirmButton(getDocuments()), state.confirmTimeoutMs ?? DEFAULT_CONFIRM_TIMEOUT_MS, state.pollMs ?? POLL_MS);
       if (!confirmButton) {
         (_c = state.onConfirmProbe) == null ? void 0 : _c.call(state, `\u70b9\u4e86\u5165\u53e3\u4f46\u6ca1\u7b49\u5230\u786e\u8ba4\u6846 #${CONFIRM_OK_ID} \xb7 ${describeViews([ frame.win ])}`);
         return "clicked-entry";
@@ -6847,7 +6863,7 @@
       if (confirmStuck) (_h = state.onConfirmProbe) == null ? void 0 : _h.call(state, `\u70b9\u5b8c #${CONFIRM_OK_ID} \u540e\u6846\u4ecd\u5728 \xb7 \u5904\u7406\u5668\u6ca1\u63a5\u4f4f\u8fd9\u4e00\u4e0b`);
       const settled = () => clicked && !confirmStuck && !siteMessage.message() ? "confirm-accepted" : "confirm-unverified";
       if (!state.isSubmitted) return settled();
-      const done = await pollFor(() => {
+      const done = await pollFor$1(() => {
         var _a2;
         return ((_a2 = state.isSubmitted) == null ? void 0 : _a2.call(state)) ? "submitted" : siteMessage.message() ? "refused" : null;
       }, state.verifyTimeoutMs ?? DEFAULT_VERIFY_TIMEOUT_MS, state.pollMs ?? POLL_MS);
@@ -7337,6 +7353,118 @@
     return {
       queued: queued
     };
+  }
+
+  const EXAM_PAPER_HREF = /#\/examPage\?(?:[^#]*&)?practiceType=2(?:&|$)/u;
+
+  const SUBMIT_DIALOG_TEXT = "\u63d0\u4ea4\u8bd5\u5377";
+
+  const visible = element => {
+    var _a;
+    const rect = (_a = element.getBoundingClientRect) == null ? void 0 : _a.call(element);
+    return !!rect && rect.width > 0 && rect.height > 0;
+  };
+
+  const textOf = element => (element.innerText ?? element.textContent ?? "").replace(/\s+/gu, " ").trim();
+
+  async function pollFor(read, timeoutMs, stepMs = 250) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const found = read();
+      if (found) return found;
+      if (Date.now() >= deadline) return null;
+      await new Promise(resolve => setTimeout(resolve, stepMs));
+    }
+  }
+
+  function hubuSubmitEntry(doc) {
+    let found;
+    try {
+      found = [ ...doc.querySelectorAll("*") ].filter(node => node.children.length === 0 && textOf(node) === "\u63d0\u4ea4" && visible(node));
+    } catch {
+      return null;
+    }
+    if (found.length !== 1) return null;
+    const leaf = found[0];
+    if (!leaf) return null;
+    return leaf.closest("button,.el-button,div") ?? leaf;
+  }
+
+  function hubuSubmitConfirm(doc) {
+    let overlays;
+    try {
+      overlays = [ ...doc.querySelectorAll(".el-overlay") ];
+    } catch {
+      return null;
+    }
+    const dialogs = overlays.filter(overlay => visible(overlay) && textOf(overlay).includes(SUBMIT_DIALOG_TEXT));
+    const dialog = dialogs[dialogs.length - 1];
+    if (!dialog) return null;
+    const buttons = [ ...dialog.querySelectorAll("button") ].filter(button => textOf(button) === "\u786e\u8ba4" && visible(button));
+    if (buttons.length !== 1) return null;
+    return buttons[0] ?? null;
+  }
+
+  function hubuPaperComplete(doc) {
+    var _a, _b;
+    let text;
+    try {
+      text = (((_a = doc.body) == null ? void 0 : _a.innerText) ?? ((_b = doc.body) == null ? void 0 : _b.textContent) ?? "").replace(/\s+/gu, "");
+    } catch {
+      return false;
+    }
+    const done = text.match(/\u5df2\u5b8c\u6210(\d+)\u9898/u);
+    const total = text.match(/\u5171(\d+)\u9898/u);
+    if (!done || !total) return false;
+    const answered = Number(done[1]);
+    const all = Number(total[1]);
+    return all > 0 && answered === all;
+  }
+
+  const isHubuExamPaper = doc => {
+    var _a, _b;
+    try {
+      return EXAM_PAPER_HREF.test(((_b = (_a = doc.defaultView) == null ? void 0 : _a.location) == null ? void 0 : _b.href) ?? "");
+    } catch {
+      return false;
+    }
+  };
+
+  async function hubuAutoSubmitRound(getDocuments, state) {
+    var _a, _b, _c, _d, _e;
+    if (!state.enabled) return "off";
+    if (state.items.length === 0) return "no-items";
+    if (!shouldAutoSubmit(state)) return hasUnrecognizedQuestions(state) ? "unrecognized-questions" : "below-threshold";
+    const paper = getDocuments().find(doc => isHubuExamPaper(doc));
+    if (!paper) return "no-entry";
+    if (!hubuPaperComplete(paper)) return "below-threshold";
+    const entry = hubuSubmitEntry(paper);
+    if (!entry) return "no-entry";
+    (_a = state.onEntry) == null ? void 0 : _a.call(state, "click", "");
+    try {
+      entry.click();
+    } catch (error) {
+      (_b = state.onConfirmProbe) == null ? void 0 : _b.call(state, `\u70b9\u51fb\u63d0\u4ea4\u5165\u53e3\u629b ${String((error == null ? void 0 : error.message) ?? error).slice(0, 160)}`);
+      return "click-failed";
+    }
+    const confirm = await pollFor(() => hubuSubmitConfirm(paper), 8e3);
+    if (!confirm) {
+      (_c = state.onConfirmProbe) == null ? void 0 : _c.call(state, "\u6ca1\u7b49\u5230\u300c\u662f\u5426\u63d0\u4ea4\u8bd5\u5377\u300d\u786e\u8ba4\u6846");
+      return "clicked-entry";
+    }
+    (_d = state.onConfirmProbe) == null ? void 0 : _d.call(state, `\u786e\u8ba4\u6846\u5df2\u51fa\u73b0\uff0c\u6309\u94ae\u6587\u6848\u300c${textOf(confirm)}\u300d`);
+    try {
+      confirm.click();
+    } catch (error) {
+      (_e = state.onConfirmProbe) == null ? void 0 : _e.call(state, `\u70b9\u51fb\u786e\u8ba4\u629b ${String((error == null ? void 0 : error.message) ?? error).slice(0, 160)}`);
+      return "click-failed";
+    }
+    if (!state.isSubmitted) return "confirm-unverified";
+    const done = await pollFor(() => {
+      var _a2;
+      return ((_a2 = state.isSubmitted) == null ? void 0 : _a2.call(state)) === true ? true : null;
+    }, 12e3);
+    return done ? "submitted" : "confirm-unverified";
   }
 
   function formatTime(d = new Date) {
@@ -10965,13 +11093,16 @@
         const ratio = Math.round(trustedRatio(active2.list, answerableCount) * 100);
         const submitDocs = () => readableDocuments(document);
         let outcome;
+        const onHubuPaper = submitDocs().some(doc => isHubuExamPaper(doc));
+        const submitRound = onHubuPaper ? hubuAutoSubmitRound : autoSubmitRound;
+        const isSubmittedProbe = onHubuPaper ? () => !readableDocuments(document).some(doc => isHubuExamPaper(doc)) : () => readableDocuments(document).some(doc => chapterTestDone(doc) === true);
         try {
-          outcome = await autoSubmitRound(submitDocs, {
+          outcome = await submitRound(submitDocs, {
             enabled: settings.autoSubmit,
             items: active2.list,
             answerableCount: answerableCount,
             threshold: settings.autoSubmitThreshold,
-            isSubmitted: () => readableDocuments(document).some(doc => chapterTestDone(doc) === true),
+            isSubmitted: isSubmittedProbe,
             onEntry: (how, source) => {
               pushLog(how === "call" ? "\u63d0\u4ea4\u5165\u53e3 \xb7 \u76f4\u63a5\u8c03\u7528\u9875\u9762\u51fd\u6570 btnBlueSubmit()" : "\u63d0\u4ea4\u5165\u53e3 \xb7 \u5df2\u70b9\u51fb\uff08\u8d70\u7ad9\u70b9\u81ea\u5df1\u7684\u70b9\u51fb\u94fe\uff0c\u76f4\u8c03\u7b97\u4e0d\u51fa pos\uff09", how === "call" ? "warning" : "info");
               if (source) pushLog(`\u5165\u53e3\u51fd\u6570\u6e90\u7801 \xb7 ${source}`, "info");
