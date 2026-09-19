@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.3.5
+// @version      3.4.0
 // @author       爱问答
-// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学】，更多平台持续适配中...
+// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
 // @homepage     https://www.aiask.site/
 // @supportURL   https://www.aiask.site/contact.html
@@ -11,12 +11,13 @@
 // @match        *://xatu.168wangxiao.com/*
 // @match        *://ctapp.hubuzkw.com/*
 // @match        *://xuexi.jsou.cn/*
+// @match        *://lms.ouchn.cn/*
 // @match        https://www.aiask.site/import.html
 // @match        https://www.aiask.site/import
 // @match        https://www.aiask.site/feedback.html
 // @match        https://www.aiask.site/feedback
 // @require      https://registry.npmmirror.com/vue/3.5.39/files/dist/vue.global.prod.js
-// @require      https://www.aiask.site/engine/aiask-engine-65a8d0a901b7bd4d.js#sha256=65a8d0a901b7bd4d88784e7ec974ea7741f75e7bd4bb7d8fa8bff3c1c908fda7
+// @require      https://www.aiask.site/engine/aiask-engine-705a45450ff9c908.js#sha256=705a45450ff9c9085276b32ffc95adb4fde7ee93c38002303f0d54ecbe20ec58
 // @resource     chaoxingFontTable  https://www.aiask.site/assets/chaoxing-font-table.json
 // @connect      www.aiask.site
 // @connect      cx.icodef.com
@@ -136,9 +137,9 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.3.5";
+  const SCRIPT_VERSION = "3.4.0";
 
-  const ENGINE_ID = "65a8d0a901b7bd4d";
+  const ENGINE_ID = "705a45450ff9c908";
 
   const DEFAULT_ROOT_PUBLIC_JWK = protocol.PRODUCTION_ROOT_PUBLIC_JWK;
 
@@ -4528,6 +4529,11 @@
     host: "ctapp.hubuzkw.com",
     pathIncludes: "/exam.exampaper/get_paper_ids",
     slot: "exam-paper"
+  }), Object.freeze({
+    host: "lms.ouchn.cn",
+    pathIncludes: "/submissions/",
+    pathExcludes: "/summary",
+    slot: "exam-submission"
   }) ]);
 
   function slotsForHosts(hosts) {
@@ -4540,7 +4546,10 @@
     return XHR_CAPTURE_TABLE.filter(entry => entry.host === target).map(entry => Object.freeze({
       slot: entry.slot,
       host: entry.host,
-      pathIncludes: entry.pathIncludes
+      pathIncludes: entry.pathIncludes,
+      ...entry.pathExcludes ? {
+        pathExcludes: entry.pathExcludes
+      } : {}
     }));
   }
 
@@ -4575,7 +4584,7 @@
         return null;
       }
       const host = url.hostname.toLowerCase();
-      const match = rules.find(rule => rule.host === host && url.pathname.includes(rule.pathIncludes));
+      const match = rules.find(rule => rule.host === host && url.pathname.includes(rule.pathIncludes) && !(rule.pathExcludes && url.pathname.includes(rule.pathExcludes)));
       return (match == null ? void 0 : match.slot) ?? null;
     };
     const consume = xhr => {
@@ -4762,7 +4771,7 @@
 
   const RULE_EXPRESSION_SERVICES = createRuleExpressionServices();
 
-  const RULE_ENGINE_VERSION = "1.8.0";
+  const RULE_ENGINE_VERSION = "1.9.0";
 
   const RULE_LIMITS = Object.freeze({
     maxSteps: 5e4,
@@ -4811,9 +4820,14 @@
     packageId: "wenhua-homework-online",
     hosts: Object.freeze([ "xuexi.jsou.cn" ]),
     policy: GENERIC_DOM_RULE_POLICY
+  }), Object.freeze({
+    platform: "guokai",
+    packageId: "guokai-lms-exam",
+    hosts: Object.freeze([ "lms.ouchn.cn" ]),
+    policy: GENERIC_DOM_RULE_POLICY
   }) ]);
 
-  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn)$/u;
+  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn)$/u;
 
   function trustedRemoteRulePlatformFor(hostname) {
     const host = normalizedHost(hostname);
@@ -5722,7 +5736,7 @@
     return done ? "test-done" : null;
   };
 
-  function surveyTasks$1(documents) {
+  function surveyTasks$2(documents) {
     const attachments = courseAttachments(documents);
     const framesByJobId = new Map;
     for (const document2 of documents) {
@@ -5789,7 +5803,7 @@
     return element.getAttribute("value") ?? "";
   };
 
-  function sectionCursor$1(documents) {
+  function sectionCursor$2(documents) {
     for (const document2 of documents) {
       const courseId = inputValue(document2, courseConfig().cursorCourseId);
       const chapterId = inputValue(document2, courseConfig().cursorChapterId);
@@ -5807,7 +5821,7 @@
   }
 
   function advanceSectionViaSite(documents) {
-    const cursor = sectionCursor$1(documents);
+    const cursor = sectionCursor$2(documents);
     if (!cursor) return false;
     const pageWindow = courseWindow(cursor.document);
     const counter = pageWindow == null ? void 0 : pageWindow.PCount;
@@ -5822,7 +5836,7 @@
 
   const CHAPTER_ID_PATTERN = /\('(.*)','(.*)','(.*)'\)/u;
 
-  function chapterInfos$1(documents) {
+  function chapterInfos$2(documents) {
     for (const document2 of documents) {
       const elements = [ ...document2.querySelectorAll(courseConfig().chapter) ];
       if (elements.length === 0) continue;
@@ -5843,14 +5857,14 @@
     return [];
   }
 
-  function nextUnfinishedChapter$1(chapters) {
+  function nextUnfinishedChapter$2(chapters) {
     const pending = chapters.filter(chapter => chapter.unfinishedCount > 0 && !chapter.active);
     if (pending.length === 0) return null;
     const activeIndex = chapters.findIndex(chapter => chapter.active);
     return pending.find(chapter => chapters.indexOf(chapter) > activeIndex) ?? pending[0] ?? null;
   }
 
-  function jumpToChapter$1(documents, chapter) {
+  function jumpToChapter$2(documents, chapter) {
     var _a;
     const entry = (_a = chapter.element.parentElement) == null ? void 0 : _a.querySelector(courseConfig().chapterName);
     if (entry) {
@@ -5859,7 +5873,7 @@
         return true;
       } catch {}
     }
-    const cursor = sectionCursor$1(documents);
+    const cursor = sectionCursor$2(documents);
     if (!cursor || !chapter.chapterId) return false;
     const pageWindow = courseWindow(cursor.document);
     const jump = pageWindow == null ? void 0 : pageWindow.getTeacherAjax;
@@ -5919,7 +5933,7 @@
     }
   }
 
-  const MAX_PLAYBACK_RATE$1 = 2;
+  const MAX_PLAYBACK_RATE$2 = 2;
 
   const hasFaceRecognition = doc => {
     for (const img of doc.querySelectorAll(courseConfig().faceLegacy)) if (img.getAttribute("src")) return true;
@@ -5956,9 +5970,9 @@
 
   const hasLoadingMedia = documents => documents.some(doc => [ ...doc.querySelectorAll("video, audio") ].some(el => isLoadingMedia(el)));
 
-  function playMedia$1(pending, options) {
+  function playMedia$2(pending, options) {
     var _a;
-    const rate = Math.min(Math.max(options.playbackRate ?? 1, 1), MAX_PLAYBACK_RATE$1);
+    const rate = Math.min(Math.max(options.playbackRate ?? 1, 1), MAX_PLAYBACK_RATE$2);
     pending.volume = options.volume ?? 0;
     pending.playbackRate = rate;
     void ((_a = pending.play()) == null ? void 0 : _a.catch(() => {}));
@@ -6003,7 +6017,7 @@
             taskKey: task.key
           };
         }
-        return playMedia$1(pending, options);
+        return playMedia$2(pending, options);
       }
 
      case "chapter-test":
@@ -6066,7 +6080,7 @@
         reason: "video-quiz"
       };
     }
-    const survey = surveyTasks$1(documents);
+    const survey = surveyTasks$2(documents);
     if (survey.authoritative) return stepSurveyedTask(survey, documents, options);
     const media = playableMediaList(documents);
     const markerDone = documents.slice(1).some(taskAlreadyDone);
@@ -6082,7 +6096,7 @@
         kind: hasLoadingMedia(documents) ? "loading" : "idle"
       };
     }
-    return playMedia$1(pending, options);
+    return playMedia$2(pending, options);
   }
 
   function taskTabs(documents) {
@@ -6121,14 +6135,14 @@
     return null;
   }
 
-  function advanceSection$1(documents) {
+  function advanceSection$2(documents) {
     const target = nextSectionTarget(documents);
     if (!target) return false;
     target.click();
     return true;
   }
 
-  function sectionSignature$1(documents) {
+  function sectionSignature$2(documents) {
     var _a, _b;
     const href = ((_b = (_a = documents[0]) == null ? void 0 : _a.location) == null ? void 0 : _b.href) ?? "";
     const tabs = taskTabs(documents);
@@ -6140,7 +6154,7 @@
 
   const MAX_SCROLL_TARGETS = 2e3;
 
-  function simulateReading$1(documents) {
+  function simulateReading$2(documents) {
     var _a, _b, _c;
     const summary = {
       frames: documents.length,
@@ -6174,7 +6188,7 @@
     return summary;
   }
 
-  const chapterLabel$1 = chapter => {
+  const chapterLabel$2 = chapter => {
     var _a, _b;
     const name = ((_b = (_a = chapter.element.parentElement) == null ? void 0 : _a.querySelector(courseConfig().chapterName)) == null ? void 0 : _b.textContent) ?? chapter.element.textContent;
     return (name ?? "").trim() || "\u4e0b\u4e00\u4e2a\u672a\u5b8c\u6210\u7ae0\u8282";
@@ -6189,7 +6203,7 @@
   }
 
   function courseCounter(documents) {
-    const chapters = chapterInfos$1(documents);
+    const chapters = chapterInfos$2(documents);
     if (chapters.length === 0) return null;
     if (counterElementCount(documents) === 0) return null;
     return {
@@ -6200,22 +6214,369 @@
   function createChaoxingCourseAdapter() {
     return {
       step: stepMediaTask,
-      survey: surveyTasks$1,
+      survey: surveyTasks$2,
       courseCounter: courseCounter,
-      simulateReading: simulateReading$1,
+      simulateReading: simulateReading$2,
       navigate: {
         tabs: taskTabs,
         advanceTab: advanceTaskTab,
+        sectionSignature: sectionSignature$2,
+        sectionCursor: sectionCursor$2,
+        chapters: chapterInfos$2,
+        nextUnfinishedChapter: nextUnfinishedChapter$2,
+        jumpToChapter: jumpToChapter$2,
+        isSpecialMode: isSpecialMode,
+        advanceSection: documents => advanceSectionViaSite(documents) || advanceSection$2(documents),
+        chapterLabel: chapterLabel$2
+      }
+    };
+  }
+
+  const COURSE_PATH_SUFFIX = "/ng";
+
+  const ACTIVITY_PATH_SUFFIX = "/learning-activity";
+
+  const KIND_BY_ACTIVITY_TYPE = {
+    "online-video": "media",
+    material: "document",
+    page: "document",
+    exam: "chapter-test"
+  };
+
+  const SITE_PLAY_TOGGLE = ".mvp-toggle-play";
+
+  const VIDEO_END_SLACK_SECONDS = 1;
+
+  const MAX_PLAYBACK_RATE$1 = 2;
+
+  const DOCUMENT_DWELL_MS$1 = 8e3;
+
+  const ATTEMPTED_KEY$1 = "aiask.guokai.attempted";
+
+  const attemptedIds$1 = doc => {
+    var _a, _b;
+    try {
+      const raw = (_b = (_a = doc.defaultView) == null ? void 0 : _a.sessionStorage) == null ? void 0 : _b.getItem(ATTEMPTED_KEY$1);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+    } catch {
+      return new Set;
+    }
+  };
+
+  const markAttempted$1 = (doc, id) => {
+    var _a, _b;
+    if (!id) return;
+    try {
+      const ids = attemptedIds$1(doc);
+      ids.add(id);
+      (_b = (_a = doc.defaultView) == null ? void 0 : _a.sessionStorage) == null ? void 0 : _b.setItem(ATTEMPTED_KEY$1, JSON.stringify([ ...ids ]));
+    } catch {}
+  };
+
+  const dwelled$1 = new Set;
+
+  const pageUrl$1 = doc => {
+    var _a;
+    try {
+      return new URL(((_a = doc == null ? void 0 : doc.location) == null ? void 0 : _a.href) ?? "");
+    } catch {
+      return null;
+    }
+  };
+
+  const courseIdFrom = url => {
+    var _a;
+    return ((_a = /\/course\/(\d+)\//u.exec((url == null ? void 0 : url.pathname) ?? "")) == null ? void 0 : _a[1]) ?? "";
+  };
+
+  const isCoursePage$1 = url => courseIdFrom(url) !== "" && ((url == null ? void 0 : url.pathname.endsWith(COURSE_PATH_SUFFIX)) ?? false);
+
+  const isActivityPage$1 = url => courseIdFrom(url) !== "" && ((url == null ? void 0 : url.pathname.includes(ACTIVITY_PATH_SUFFIX)) ?? false);
+
+  const activityIdFrom = url => {
+    var _a;
+    return ((_a = /^#\/(\d+)/u.exec((url == null ? void 0 : url.hash) ?? "")) == null ? void 0 : _a[1]) ?? "";
+  };
+
+  const firstDocument$1 = documents => documents[0] ?? null;
+
+  const activityRows = doc => Array.from(doc.querySelectorAll('div.learning-activity[id^="learning-activity-"]'));
+
+  const rowActivityId = row => {
+    var _a;
+    return ((_a = /^learning-activity-(\d+)$/u.exec(row.id)) == null ? void 0 : _a[1]) ?? "";
+  };
+
+  const rowActivityType = row => {
+    var _a, _b;
+    return ((_b = /font-syllabus-([a-z-]+)/u.exec(((_a = row.querySelector("i.activity-type-icon, i.font")) == null ? void 0 : _a.className) ?? "")) == null ? void 0 : _b[1]) ?? "";
+  };
+
+  const rowIsDone = row => row.querySelector(".completeness.full") !== null;
+
+  const rowName = row => {
+    var _a, _b;
+    return ((_b = (_a = row.querySelector(".activity-title .title")) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim()) ?? "\u4efb\u52a1\u70b9";
+  };
+
+  const toTask$1 = (doc, row) => {
+    const kind = KIND_BY_ACTIVITY_TYPE[rowActivityType(row)];
+    if (!kind) return null;
+    const id = rowActivityId(row);
+    if (!id) return null;
+    return {
+      document: doc,
+      kind: kind,
+      jobId: id,
+      name: rowName(row),
+      skip: rowIsDone(row) ? "passed" : attemptedIds$1(doc).has(id) ? "handled" : null,
+      dwellSeconds: 0,
+      key: id
+    };
+  };
+
+  function surveyTasks$1(documents) {
+    const doc = firstDocument$1(documents);
+    const url = pageUrl$1(doc);
+    if (!doc) return {
+      authoritative: false,
+      declared: 0,
+      tasks: []
+    };
+    if (isCoursePage$1(url)) {
+      const tasks = activityRows(doc).map(row => toTask$1(doc, row)).filter(task => task !== null);
+      return {
+        authoritative: true,
+        declared: tasks.length,
+        tasks: tasks
+      };
+    }
+    if (isActivityPage$1(url)) {
+      const id = activityIdFrom(url);
+      const kind = doc.querySelector("video,audio") ? "media" : "document";
+      return {
+        authoritative: false,
+        declared: 1,
+        tasks: [ {
+          document: doc,
+          kind: kind,
+          jobId: id || null,
+          name: doc.title || "\u4efb\u52a1\u70b9",
+          skip: dwelled$1.has(id) ? "handled" : null,
+          dwellSeconds: 0,
+          key: id
+        } ]
+      };
+    }
+    return {
+      authoritative: false,
+      declared: 0,
+      tasks: []
+    };
+  }
+
+  function mediaSatisfied(media) {
+    if (media.ended) return true;
+    const total = media.duration;
+    if (!Number.isFinite(total) || total <= 0) return false;
+    return media.currentTime >= total - VIDEO_END_SLACK_SECONDS;
+  }
+
+  function pressSitePlay(doc) {
+    const toggle = doc.querySelector(SITE_PLAY_TOGGLE);
+    if (!toggle) return false;
+    const view = doc.defaultView;
+    if (!view) return false;
+    const box = toggle.getBoundingClientRect();
+    const init = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: view,
+      button: 0,
+      clientX: box.left + box.width / 2,
+      clientY: box.top + box.height / 2
+    };
+    for (const type of [ "pointerdown", "mousedown", "pointerup", "mouseup", "click" ]) {
+      const Ctor = type.startsWith("pointer") && "PointerEvent" in view ? view.PointerEvent : view.MouseEvent;
+      toggle.dispatchEvent(new Ctor(type, init));
+    }
+    return true;
+  }
+
+  function playMedia$1(doc, media, options) {
+    var _a;
+    const rate = Math.min(Math.max(options.playbackRate ?? 1, 1), MAX_PLAYBACK_RATE$1);
+    media.volume = options.volume ?? 0;
+    media.playbackRate = rate;
+    if (media.paused) {
+      if (!pressSitePlay(doc)) void ((_a = media.play()) == null ? void 0 : _a.catch(() => {}));
+    }
+    if (media.paused) return {
+      kind: "blocked",
+      reason: "not-playing"
+    };
+    return {
+      kind: "playing",
+      rate: rate
+    };
+  }
+
+  function stepTask$1(documents, options) {
+    var _a;
+    const doc = firstDocument$1(documents);
+    const url = pageUrl$1(doc);
+    if (!doc || !isActivityPage$1(url)) return {
+      kind: "idle"
+    };
+    const id = activityIdFrom(url);
+    const key = id || (url == null ? void 0 : url.pathname) || "activity";
+    if (dwelled$1.has(key) || ((_a = options.isHandled) == null ? void 0 : _a.call(options, key))) return {
+      kind: "idle",
+      taskKey: key
+    };
+    const media = doc.querySelector("video,audio");
+    if (media) {
+      if (mediaSatisfied(media)) {
+        if (!media.paused) media.pause();
+        dwelled$1.add(key);
+        markAttempted$1(doc, key);
+        return {
+          kind: "idle",
+          taskKey: key
+        };
+      }
+      return playMedia$1(doc, media, options);
+    }
+    dwelled$1.add(key);
+    markAttempted$1(doc, key);
+    return {
+      kind: "dwelling",
+      name: doc.title || "\u4efb\u52a1\u70b9",
+      remainingMs: DOCUMENT_DWELL_MS$1,
+      taskKey: key
+    };
+  }
+
+  const simulateReading$1 = () => ({
+    frames: 0,
+    scrolled: 0,
+    pagers: 0
+  });
+
+  function sectionCursor$1(documents) {
+    const doc = firstDocument$1(documents);
+    const url = pageUrl$1(doc);
+    if (!doc || !isCoursePage$1(url) && !isActivityPage$1(url)) return null;
+    const courseId = courseIdFrom(url);
+    if (!courseId) return null;
+    return {
+      courseId: courseId,
+      chapterId: activityIdFrom(url),
+      clazzId: "",
+      tabCount: 1,
+      document: doc
+    };
+  }
+
+  function chapterInfos$1(documents) {
+    const doc = firstDocument$1(documents);
+    const url = pageUrl$1(doc);
+    if (!doc || !isCoursePage$1(url)) return [];
+    return activityRows(doc).filter(row => KIND_BY_ACTIVITY_TYPE[rowActivityType(row)]).map(row => ({
+      element: row,
+      chapterId: rowActivityId(row) || null,
+      unfinishedCount: rowIsDone(row) ? 0 : 1,
+      active: false
+    }));
+  }
+
+  const nextUnfinishedChapter$1 = chapters => chapters.find(chapter => {
+    if (chapter.unfinishedCount <= 0) return false;
+    const doc = chapter.element.ownerDocument;
+    return !(chapter.chapterId && attemptedIds$1(doc).has(chapter.chapterId));
+  }) ?? null;
+
+  function activityUrlFrom$1(url, activityId2) {
+    const courseId = courseIdFrom(url);
+    if (!url || !courseId || !activityId2) return null;
+    const target = new URL(url.href);
+    target.pathname = `/course/${courseId}${ACTIVITY_PATH_SUFFIX}`;
+    target.search = "";
+    target.hash = `#/${activityId2}`;
+    return target.href;
+  }
+
+  function courseUrlFrom$1(url) {
+    const courseId = courseIdFrom(url);
+    if (!url || !courseId) return null;
+    const target = new URL(url.href);
+    target.pathname = `/course/${courseId}${COURSE_PATH_SUFFIX}`;
+    target.search = "";
+    target.hash = "#/";
+    return target.href;
+  }
+
+  function jumpToChapter$1(documents, chapter) {
+    const doc = firstDocument$1(documents);
+    const href = activityUrlFrom$1(pageUrl$1(doc), chapter.chapterId);
+    if (!doc || !href) return false;
+    markAttempted$1(doc, chapter.chapterId ?? "");
+    doc.location.href = href;
+    return true;
+  }
+
+  function hasDwelled$1(url) {
+    if (!url) return false;
+    return dwelled$1.has(activityIdFrom(url) || url.pathname);
+  }
+
+  function advanceSection$1(documents) {
+    const doc = firstDocument$1(documents);
+    const url = pageUrl$1(doc);
+    if (!doc || !url || !isActivityPage$1(url) || !hasDwelled$1(url)) return false;
+    const href = courseUrlFrom$1(url);
+    if (!href) return false;
+    doc.location.href = href;
+    return true;
+  }
+
+  const sectionSignature$1 = documents => {
+    const url = pageUrl$1(firstDocument$1(documents));
+    return url ? `${url.pathname}${url.hash}` : "";
+  };
+
+  const chapterLabel$1 = chapter => rowName(chapter.element);
+
+  function createGuokaiCourseAdapter() {
+    return {
+      step: stepTask$1,
+      survey: surveyTasks$1,
+      courseCounter: () => null,
+      simulateReading: simulateReading$1,
+      navigate: {
+        tabs: () => null,
+        advanceTab: () => false,
         sectionSignature: sectionSignature$1,
         sectionCursor: sectionCursor$1,
         chapters: chapterInfos$1,
         nextUnfinishedChapter: nextUnfinishedChapter$1,
         jumpToChapter: jumpToChapter$1,
-        isSpecialMode: isSpecialMode,
-        advanceSection: documents => advanceSectionViaSite(documents) || advanceSection$1(documents),
+        isSpecialMode: () => false,
+        advanceSection: advanceSection$1,
         chapterLabel: chapterLabel$1
       }
     };
+  }
+
+  function isGuokaiCourseStudyUrl(location2) {
+    try {
+      const url = new URL(location2.href);
+      return isCoursePage$1(url) || isActivityPage$1(url);
+    } catch {
+      return false;
+    }
   }
 
   const COURSE_PATH = "/student/courseuser/courseContent";
@@ -6532,12 +6893,14 @@
   function courseAdapterFor(platform) {
     if (platform === "chaoxing") return createChaoxingCourseAdapter();
     if (platform === "wenhua") return createWenhuaCourseAdapter();
+    if (platform === "guokai") return createGuokaiCourseAdapter();
     return null;
   }
 
   function isCourseStudyUrl(platform, location2) {
     if (platform === "chaoxing") return isNewCourseStudyUrl(location2);
     if (platform === "wenhua") return isWenhuaCourseStudyUrl(location2);
+    if (platform === "guokai") return isGuokaiCourseStudyUrl(location2);
     return false;
   }
 
@@ -7534,7 +7897,13 @@
 
   const SENSITIVE_ATTR_PATTERN = /token|session|cookie|passwd|password|secret|sign|auth|uid|userid|studentid|ticket|jwt|enc$|^key$|^fid$/i;
 
-  const PERSONAL_TEXT_HOST_PATTERN = /realname|truename|stuname|studentname|nickname|username|loginname/i;
+  const PERSONAL_TEXT_HOST_PATTERN = /realname|truename|stuname|studentname|nickname|username|loginname|user\w{0,12}name/i;
+
+  const INLINE_CODE_ATTR = /^(?:ng-init|data-init|on[a-z]+)$/iu;
+
+  const PERSONAL_ASSIGNMENT = /\b(\w*(?:user|student|stu|nick|login|real)\w*)(\s*=\s*)(?:'[^']*'|"[^"]*"|[^;]*)/giu;
+
+  const SECRET_HOST_VALUE_ATTR = /^(?:value|content|title|original-title|alt|placeholder|data-[\w-]+)$/iu;
 
   const MASK = "[\u5df2\u906e\u76d6]";
 
@@ -7567,6 +7936,13 @@
       const templates = [];
       for (const el of Array.from(root.querySelectorAll("*"))) {
         const tag = el.tagName.toLowerCase();
+        if (tag === "symbol") {
+          if (el.childNodes.length > 0) {
+            el.replaceChildren();
+            redactions += 1;
+          }
+          continue;
+        }
         const isInlineAsset = tag === "script" || tag === "style" || tag === "noscript";
         if (isInlineAsset) {
           if (el.textContent) {
@@ -7582,10 +7958,11 @@
         });
         const inputType = tag === "input" ? (el.getAttribute("type") ?? "").toLowerCase() : "";
         const typedSecret = inputType === "password";
-        if ([ "id", "name", "class" ].some(key => {
+        const personalHost = [ "id", "name", "class" ].some(key => {
           const v = el.getAttribute(key);
           return !!v && PERSONAL_TEXT_HOST_PATTERN.test(v);
-        })) {
+        });
+        if (personalHost) {
           for (const node of Array.from(el.childNodes)) {
             if (node.nodeType === 3 && ((_a = node.nodeValue) == null ? void 0 : _a.trim())) {
               node.nodeValue = MASK;
@@ -7594,7 +7971,15 @@
           }
         }
         for (const attr of Array.from(el.attributes)) {
-          if ((namedSecret || typedSecret) && attr.name.toLowerCase() === "value") {
+          if (INLINE_CODE_ATTR.test(attr.name) && attr.value) {
+            const masked = attr.value.replace(PERSONAL_ASSIGNMENT, (_match, key, eq) => `${key}${eq}${MASK}`);
+            if (masked !== attr.value) {
+              el.setAttribute(attr.name, masked);
+              redactions += 1;
+            }
+            continue;
+          }
+          if ((namedSecret || typedSecret || personalHost) && SECRET_HOST_VALUE_ATTR.test(attr.name)) {
             if (attr.value) {
               el.setAttribute(attr.name, MASK);
               redactions += 1;
@@ -7747,7 +8132,8 @@
     wangxiao: "168 \u7f51\u6821",
     aopeng: "\u5965\u9e4f\u6559\u80b2",
     hubu: "\u6e56\u5317\u81ea\u8003",
-    wenhua: "\u6c5f\u82cf\u5f00\u653e\u5927\u5b66"
+    wenhua: "\u6c5f\u82cf\u5f00\u653e\u5927\u5b66",
+    guokai: "\u56fd\u5bb6\u5f00\u653e\u5927\u5b66"
   });
 
   const platformLabelFor = platform => PLATFORM_LABEL[platform] ?? platform;
@@ -7757,7 +8143,8 @@
     wangxiao: Object.freeze([ "answer", "harvest" ]),
     aopeng: Object.freeze([ "harvest" ]),
     hubu: Object.freeze([ "answer", "harvest" ]),
-    wenhua: Object.freeze([ "answer", "harvest", "course-automation" ])
+    wenhua: Object.freeze([ "answer", "harvest", "course-automation" ]),
+    guokai: Object.freeze([ "answer", "harvest", "course-automation" ])
   });
 
   const FALLBACK_FEATURES = Object.freeze([ "answer", "harvest" ]);
