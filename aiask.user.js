@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.4.0
+// @version      3.4.1
 // @author       爱问答
-// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学】，更多平台持续适配中...
+// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
 // @homepage     https://www.aiask.site/
 // @supportURL   https://www.aiask.site/contact.html
@@ -17,10 +17,14 @@
 // @match        https://www.aiask.site/feedback.html
 // @match        https://www.aiask.site/feedback
 // @require      https://registry.npmmirror.com/vue/3.5.39/files/dist/vue.global.prod.js
-// @require      https://www.aiask.site/engine/aiask-engine-705a45450ff9c908.js#sha256=705a45450ff9c9085276b32ffc95adb4fde7ee93c38002303f0d54ecbe20ec58
+// @require      https://www.aiask.site/engine/aiask-engine-a2a02cfdd2472db6.js#sha256=a2a02cfdd2472db68c72624e347aa04d9096f67a8863da41586b15e9dd55ebc0
 // @resource     chaoxingFontTable  https://www.aiask.site/assets/chaoxing-font-table.json
 // @connect      www.aiask.site
 // @connect      cx.icodef.com
+// @connect      scriptcat.org
+// @connect      greasyfork.org
+// @connect      update.greasyfork.org
+// @connect      api.github.com
 // @grant        GM_deleteValue
 // @grant        GM_getResourceText
 // @grant        GM_getValue
@@ -28,8 +32,8 @@
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @run-at       document-start
-// @antifeature  payment   部分答案需消耗积分
-// @antifeature  tracking  匿名使用统计，可关闭
+// @antifeature  payment   题库命中扣积分，AI 需自备 Key
+// @antifeature  tracking  使用统计，可关闭
 // ==/UserScript==
 
 (function (protocol, core, vue) {
@@ -137,9 +141,9 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.4.0";
+  const SCRIPT_VERSION = "3.4.1";
 
-  const ENGINE_ID = "705a45450ff9c908";
+  const ENGINE_ID = "a2a02cfdd2472db6";
 
   const DEFAULT_ROOT_PUBLIC_JWK = protocol.PRODUCTION_ROOT_PUBLIC_JWK;
 
@@ -215,7 +219,8 @@
       options: parseOptions(raw.options),
       savedAt: stamp("savedAt"),
       importedAt: stamp("importedAt"),
-      lastHitAt: stamp("lastHitAt")
+      lastHitAt: stamp("lastHitAt"),
+      aiGenerated: raw.aiGenerated === true ? true : void 0
     };
   }
 
@@ -293,6 +298,9 @@
         values: [ ...stored.values ],
         ...stored.itemType ? {
           itemType: stored.itemType
+        } : {},
+        ...stored.aiGenerated ? {
+          aiGenerated: true
         } : {}
       };
     }
@@ -513,6 +521,11 @@
 
   const PANEL_VIEWPORT_MARGIN = 16;
 
+  const PANEL_MIN_SIZE = {
+    width: 340,
+    height: 400
+  };
+
   function parsePanelPositionSnapshot(input) {
     if (input === null || typeof input !== "object" || Array.isArray(input)) {
       return null;
@@ -534,12 +547,41 @@
     };
   }
 
-  function createPanelPositionSnapshot(position) {
+  function parsePanelSizeSnapshot(input) {
+    if (input === null || typeof input !== "object" || Array.isArray(input)) {
+      return null;
+    }
+    const record = input;
+    if (record.schemaVersion !== 1) {
+      return null;
+    }
+    const {w: w, h: h} = record;
+    if (typeof w !== "number" || typeof h !== "number") {
+      return null;
+    }
+    if (!Number.isFinite(w) || !Number.isFinite(h)) {
+      return null;
+    }
+    if (w <= 0 || h <= 0) {
+      return null;
+    }
     return {
+      width: Math.round(w),
+      height: Math.round(h)
+    };
+  }
+
+  function createPanelPositionSnapshot(position, size = null) {
+    const snapshot = {
       schemaVersion: 1,
       x: Math.round(position.x),
       y: Math.round(position.y)
     };
+    if (size) {
+      snapshot.w = Math.round(size.width);
+      snapshot.h = Math.round(size.height);
+    }
+    return snapshot;
   }
 
   function loadPanelPosition(storage) {
@@ -552,8 +594,23 @@
     return parsed;
   }
 
+  function loadPanelSize(storage) {
+    const parsed = parsePanelSizeSnapshot(storage.get(PANEL_POSITION_KEY));
+    if (parsed === null) return null;
+    return {
+      width: Math.max(parsed.width, PANEL_MIN_SIZE.width),
+      height: Math.max(parsed.height, PANEL_MIN_SIZE.height)
+    };
+  }
+
   function savePanelPosition(storage, position) {
-    storage.set(PANEL_POSITION_KEY, createPanelPositionSnapshot(position));
+    storage.set(PANEL_POSITION_KEY, createPanelPositionSnapshot(position, loadPanelSize(storage)));
+  }
+
+  function savePanelSize(storage, size) {
+    const position = parsePanelPositionSnapshot(storage.get(PANEL_POSITION_KEY));
+    if (position === null) return;
+    storage.set(PANEL_POSITION_KEY, createPanelPositionSnapshot(position, size));
   }
 
   function axisRange(free, margin) {
@@ -579,6 +636,21 @@
     return {
       x: clampAxis(position.x, freeX, margin),
       y: clampAxis(position.y, freeY, margin)
+    };
+  }
+
+  function clampSizeAxis(value, free, min) {
+    const limit = Math.max(min, free);
+    const rounded = Math.round(value);
+    if (rounded < min) return min;
+    if (rounded > limit) return Math.round(limit);
+    return rounded;
+  }
+
+  function clampPanelSize(size, viewport, origin, margin = PANEL_VIEWPORT_MARGIN) {
+    return {
+      width: clampSizeAxis(size.width, viewport.width - margin - origin.x, PANEL_MIN_SIZE.width),
+      height: clampSizeAxis(size.height, viewport.height - margin - origin.y, PANEL_MIN_SIZE.height)
     };
   }
 
@@ -711,6 +783,10 @@
 
   const setPanelPosition = position => savePanelPosition(panelPositionStorage, position);
 
+  const getPanelSize = () => loadPanelSize(panelPositionStorage);
+
+  const setPanelSize = size => savePanelSize(panelPositionStorage, size);
+
   const localAnswerCache = new LocalAnswerCache({
     get: key => _GM_getValue(key, null),
     set: (key, value) => _GM_setValue(key, value)
@@ -746,7 +822,15 @@
     autoStart: true,
     autoSubmit: true,
     autoSubmitThreshold: .8,
-    randomFallback: false
+    randomFallback: false,
+    ai: {
+      enabled: false,
+      channelId: "",
+      modelId: "",
+      countTowardSubmit: true,
+      cache: true
+    },
+    checkUpdate: true
   };
 
   const getSettings = () => {
@@ -759,13 +843,25 @@
         ...DEFAULT_SETTINGS.courseTaskToggles,
         ...raw.courseTaskToggles ?? {}
       },
-      reportUsage: raw.reportUsage ?? raw.reportHealth ?? DEFAULT_SETTINGS.reportUsage
+      reportUsage: raw.reportUsage ?? raw.reportHealth ?? DEFAULT_SETTINGS.reportUsage,
+      ai: {
+        ...DEFAULT_SETTINGS.ai,
+        ...raw.ai ?? {}
+      }
     } : {
       ...DEFAULT_SETTINGS
     };
   };
 
   const setSettings = s => _GM_setValue(SETTINGS_KEY, s);
+
+  const AI_CREDENTIAL_KEY = "aiask_ai_credential";
+
+  const getAiCredential = () => _GM_getValue(AI_CREDENTIAL_KEY, "") || "";
+
+  const setAiCredential = value => _GM_setValue(AI_CREDENTIAL_KEY, value);
+
+  const clearAiCredential = () => _GM_deleteValue(AI_CREDENTIAL_KEY);
 
   const BALANCE_KEY = "aiask_last_balance";
 
@@ -794,6 +890,48 @@
   const getAnnouncementAutoOpenedSeq = () => readAnnouncementSeq(ANNOUNCEMENT_AUTO_OPENED_SEQ_KEY);
 
   const setAnnouncementAutoOpenedSeq = n => _GM_setValue(ANNOUNCEMENT_AUTO_OPENED_SEQ_KEY, n);
+
+  const UPDATE_LAST_CHECK_KEY = "aiask_update_last_check";
+
+  const UPDATE_LATEST_KEY = "aiask_update_latest";
+
+  const UPDATE_DISMISSED_KEY = "aiask_update_dismissed";
+
+  const getUpdateLastCheckAt = () => {
+    const raw = _GM_getValue(UPDATE_LAST_CHECK_KEY, 0);
+    return typeof raw === "number" && Number.isSafeInteger(raw) && raw >= 0 ? raw : 0;
+  };
+
+  const setUpdateLastCheckAt = n => _GM_setValue(UPDATE_LAST_CHECK_KEY, n);
+
+  const isSnapshotSource = value => {
+    if (typeof value !== "object" || value === null) return false;
+    const item = value;
+    return typeof item.channel === "string" && typeof item.name === "string" && typeof item.homeUrl === "string";
+  };
+
+  const getUpdateSnapshot = () => {
+    const raw = _GM_getValue(UPDATE_LATEST_KEY, null);
+    if (typeof raw !== "object" || raw === null) return null;
+    const value = raw;
+    if (typeof value.version !== "string" || !value.version) return null;
+    if (typeof value.checkedAt !== "number" || !Number.isFinite(value.checkedAt)) return null;
+    if (!Array.isArray(value.sources) || !value.sources.every(isSnapshotSource)) return null;
+    return {
+      version: value.version,
+      sources: value.sources,
+      checkedAt: value.checkedAt
+    };
+  };
+
+  const setUpdateSnapshot = v => _GM_setValue(UPDATE_LATEST_KEY, v);
+
+  const getUpdateDismissed = () => {
+    const raw = _GM_getValue(UPDATE_DISMISSED_KEY, "");
+    return typeof raw === "string" ? raw : "";
+  };
+
+  const setUpdateDismissed = v => _GM_setValue(UPDATE_DISMISSED_KEY, v);
 
   const gmSecurityStorage = {
     get: key => _GM_getValue(key, void 0),
@@ -3504,6 +3642,248 @@
   var typr_js = Typr;
 
   const Typr$1 = getDefaultExportFromCjs(typr_js);
+
+  const AI_ANSWER_TIMEOUT_MS = 6e4;
+
+  const PROBE_TIMEOUT_MS$1 = 2e4;
+
+  const BUSY = {
+    code: protocol.AiAskCode.Busy,
+    results: []
+  };
+
+  async function aiAnswerBatch(transport, baseUrl, cfg, batch) {
+    try {
+      const response = await transport.send({
+        url: baseUrl + protocol.AI_ANSWER_PATH,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": protocol.randomUuid()
+        },
+        body: JSON.stringify({
+          requestSchemaVersion: 1,
+          channelId: cfg.channelId,
+          modelId: cfg.modelId,
+          credential: cfg.credential,
+          cache: batch.cache,
+          trees: batch.trees
+        }),
+        timeoutMs: AI_ANSWER_TIMEOUT_MS
+      });
+      if (response.status < 200 || response.status >= 300) return BUSY;
+      const parsed = protocol.AiAnswerResponseSchema.safeParse(JSON.parse(response.body));
+      return parsed.success ? parsed.data : BUSY;
+    } catch {
+      return BUSY;
+    }
+  }
+
+  async function aiProbe(transport, baseUrl, cfg) {
+    try {
+      const response = await transport.send({
+        url: baseUrl + protocol.AI_PROBE_PATH,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": protocol.randomUuid()
+        },
+        body: JSON.stringify({
+          requestSchemaVersion: 1,
+          channelId: cfg.channelId,
+          modelId: cfg.modelId,
+          credential: cfg.credential
+        }),
+        timeoutMs: PROBE_TIMEOUT_MS$1
+      });
+      if (response.status < 200 || response.status >= 300) return {
+        ok: false,
+        reason: "unavailable"
+      };
+      const parsed = protocol.AiProbeResponseSchema.safeParse(JSON.parse(response.body));
+      if (!parsed.success) return {
+        ok: false,
+        reason: "unavailable"
+      };
+      const data = parsed.data;
+      if (data.code === protocol.AiAskCode.Unauthorized) return {
+        ok: false,
+        reason: "unauthorized"
+      };
+      if (data.code === protocol.AiAskCode.RateLimited) return {
+        ok: false,
+        reason: "rate-limited"
+      };
+      if (data.code !== protocol.AiAskCode.Ok) return {
+        ok: false,
+        reason: "unavailable"
+      };
+      if (data.ok) return {
+        ok: true
+      };
+      return {
+        ok: false,
+        reason: data.reason ?? "unavailable"
+      };
+    } catch {
+      return {
+        ok: false,
+        reason: "unavailable"
+      };
+    }
+  }
+
+  const isRecord = value => !!value && typeof value === "object";
+
+  const isHttpsUrl = value => {
+    if (typeof value !== "string") return false;
+    try {
+      return new URL(value).protocol === "https:";
+    } catch {
+      return false;
+    }
+  };
+
+  function toPublicChannel(raw) {
+    if (!isRecord(raw)) return null;
+    const {id: id, name: name, status: status, models: models, defaultModelId: defaultModelId, recommended: recommended, order: order, promoText: promoText, signupUrl: signupUrl, docUrl: docUrl, keyHelp: keyHelp} = raw;
+    if (typeof id !== "string" || typeof name !== "string") return null;
+    if (status !== "active" && status !== "deprecated" && status !== "hidden") return null;
+    if (!Array.isArray(models) || typeof defaultModelId !== "string") return null;
+    const parsedModels = [];
+    for (const model of models) {
+      if (!isRecord(model) || typeof model.id !== "string" || !isRecord(model.capabilities)) return null;
+      parsedModels.push({
+        id: model.id,
+        ...typeof model.label === "string" ? {
+          label: model.label
+        } : {},
+        capabilities: {
+          text: model.capabilities.text === true,
+          image: model.capabilities.image === true
+        }
+      });
+    }
+    if (!isHttpsUrl(signupUrl) || !isHttpsUrl(docUrl) || typeof keyHelp !== "string") return null;
+    return {
+      id: id,
+      name: name,
+      status: status,
+      models: parsedModels,
+      defaultModelId: defaultModelId,
+      recommended: recommended === true,
+      order: typeof order === "number" ? order : 0,
+      ...typeof promoText === "string" ? {
+        promoText: promoText
+      } : {},
+      signupUrl: signupUrl,
+      docUrl: docUrl,
+      keyHelp: keyHelp
+    };
+  }
+
+  async function fetchAiChannels(transport, baseUrl) {
+    try {
+      const response = await transport.send({
+        url: `${baseUrl}/ai/channels`,
+        method: "GET",
+        timeoutMs: 8e3
+      });
+      if (response.status < 200 || response.status >= 300) return [];
+      const payload = JSON.parse(response.body);
+      if (!Array.isArray(payload.channels)) return [];
+      return payload.channels.map(toPublicChannel).filter(channel => channel !== null).sort((left, right) => left.order - right.order);
+    } catch {
+      return [];
+    }
+  }
+
+  const AI_SKIP_LABEL = {
+    "no-answer": "AI \u8868\u793a\u4e0d\u786e\u5b9a",
+    "parse-failed": "AI \u8f93\u51fa\u65e0\u6cd5\u89e3\u6790",
+    unusable: "AI \u7b54\u6848\u6ca1\u901a\u8fc7\u5b89\u5168\u95f8",
+    "upstream-error": "AI \u670d\u52a1\u5546\u51fa\u9519",
+    "upstream-timeout": "AI \u670d\u52a1\u5546\u8d85\u65f6",
+    "image-unsupported": "\u56fe\u7247\u9898\u6682\u4e0d\u9001 AI",
+    budget: "\u8d85\u51fa\u672c\u8f6e AI \u9898\u6570\u4e0a\u9650",
+    "tree-mismatch": "\u9898\u76ee\u5df2\u53d8\u5316"
+  };
+
+  const AI_PROBE_LABEL = {
+    unauthorized: "\u767b\u5f55\u5df2\u5931\u6548",
+    "rate-limited": "\u6d4b\u8bd5\u592a\u9891\u7e41\uff0c\u7a0d\u540e\u518d\u8bd5",
+    "channel-unknown": "\u8be5\u670d\u52a1\u5546\u5df2\u4e0b\u7ebf\uff0c\u8bf7\u91cd\u65b0\u9009\u62e9",
+    "model-rejected": "\u6240\u9009\u6a21\u578b\u4e0d\u53ef\u7528",
+    "upstream-rejected": "\u670d\u52a1\u5546\u62d2\u7edd\u4e86\u8fd9\u4e2a Key",
+    "upstream-empty": "\u670d\u52a1\u5546\u6ca1\u8fd4\u56de\u5185\u5bb9 \xb7 \u6362\u4e2a\u6a21\u578b\u518d\u8bd5",
+    "upstream-unreachable": "\u8fde\u4e0d\u4e0a\u670d\u52a1\u5546",
+    unavailable: "\u7231\u95ee\u7b54\u670d\u52a1\u6682\u4e0d\u53ef\u7528"
+  };
+
+  const AI_FAILURE_LABEL = {
+    unauthorized: "\u767b\u5f55\u5df2\u5931\u6548",
+    rate_limited: "\u8bf7\u6c42\u592a\u9891\u7e41\uff0c\u7a0d\u540e\u81ea\u52a8\u6062\u590d",
+    unavailable: "AI \u8865\u7b54\u670d\u52a1\u6682\u4e0d\u53ef\u7528"
+  };
+
+  function skippedText(summary) {
+    const entries = Object.entries(summary.skipped);
+    const total = entries.reduce((n, [, count]) => n + count, 0);
+    if (total === 0) return "";
+    const detail = entries.map(([reason, count]) => `${AI_SKIP_LABEL[reason]} ${count}`).join(" / ");
+    return ` \xb7 \u8df3\u8fc7 ${total}\uff08${detail}\uff09`;
+  }
+
+  async function runAiRound(deps) {
+    if (!deps.enabled) return {
+      ran: false,
+      why: "disabled"
+    };
+    if (!deps.hasCredential) {
+      deps.log("AI \u8865\u7b54\u5df2\u5f00\u542f\u4f46\u8fd8\u6ca1\u586b\u5199 Key \xb7 \u5230\u300c\u7cfb\u7edf \xb7 \u901a\u7528\u300d\u914d\u7f6e", "warning");
+      return {
+        ran: false,
+        why: "no-credential"
+      };
+    }
+    if (!deps.loggedIn) {
+      deps.log("\u767b\u5f55\u540e\u624d\u80fd\u7528 AI \u8865\u7b54", "info");
+      return {
+        ran: false,
+        why: "not-logged-in"
+      };
+    }
+    const summary = await deps.session.aiPass({
+      cache: deps.cache
+    });
+    const skippedTotal = Object.values(summary.skipped).reduce((n, count) => n + (count ?? 0), 0);
+    if (summary.requested === 0 && skippedTotal === 0 && !summary.failure) return {
+      ran: true,
+      summary: summary,
+      event: null
+    };
+    if (summary.failure) {
+      deps.log(`AI \u8865\u7b54\u672a\u5b8c\u6210 \xb7 ${AI_FAILURE_LABEL[summary.failure]}`, "warning");
+      return {
+        ran: true,
+        summary: summary,
+        event: {
+          outcome: summary.failure
+        }
+      };
+    }
+    deps.log(`AI \u8865\u7b54 \xb7 \u8bf7\u6c42 ${summary.requested} \u9898 \xb7 \u547d\u4e2d ${summary.hit}${skippedText(summary)}`, summary.hit > 0 ? "info" : "warning");
+    return {
+      ran: true,
+      summary: summary,
+      event: {
+        outcome: "ok",
+        ...summary.requested > 0 ? {
+          hitDecile: Math.max(0, Math.min(10, Math.round(summary.hit / summary.requested * 10)))
+        } : {}
+      }
+    };
+  }
 
   const RETRY_DELAY_MS = 500;
 
@@ -6919,10 +7299,10 @@
 
   const DEFAULT_SUBMIT_THRESHOLD = .8;
 
-  function trustedRatio(items, answerableCount) {
+  function trustedRatio(items, answerableCount, countAi = true) {
     if (items.length === 0) return 0;
     const denominator = Math.max(items.length, answerableCount ?? 0);
-    const trusted = items.filter(item => item.filled && !item.random).length;
+    const trusted = items.filter(item => item.filled && !item.random && (countAi || !item.aiGenerated)).length;
     return trusted / denominator;
   }
 
@@ -6930,7 +7310,7 @@
     if (!state.enabled) return false;
     if (state.items.length === 0) return false;
     const threshold = state.threshold ?? DEFAULT_SUBMIT_THRESHOLD;
-    return trustedRatio(state.items, state.answerableCount) >= threshold;
+    return trustedRatio(state.items, state.answerableCount, state.countAi ?? true) >= threshold;
   }
 
   const hasUnrecognizedQuestions = state => state.answerableCount != null && state.answerableCount > state.items.length;
@@ -8928,6 +9308,206 @@
     };
   }
 
+  const parseJson = body => {
+    try {
+      return JSON.parse(body);
+    } catch {
+      return null;
+    }
+  };
+
+  const META_BLOCK = /\/\/\s*==UserScript==([\s\S]*?)\/\/\s*==\/UserScript==/u;
+
+  const META_VERSION = /^[^\S\n]*\/\/[^\S\n]*@version[^\S\n]+(\S+)[^\S\n]*$/mu;
+
+  const UPDATE_CHANNELS = {
+    scriptcat: {
+      name: "\u811a\u672c\u732b",
+      idPattern: /^\d{1,12}$/u,
+      probeUrl: id => `https://scriptcat.org/api/v2/scripts/${id}`,
+      homeUrl: id => `https://scriptcat.org/zh-CN/script-show-page/${id}`,
+      parse(body) {
+        var _a, _b, _c;
+        const root = parseJson(body);
+        const raw = (_b = (_a = root == null ? void 0 : root.data) == null ? void 0 : _a.script) == null ? void 0 : _b.version;
+        const version = typeof raw === "string" ? protocol.parseVersionString(raw) : null;
+        if (!version) return null;
+        const seconds = (_c = root == null ? void 0 : root.data) == null ? void 0 : _c.updatetime;
+        return {
+          version: version,
+          updatedAt: typeof seconds === "number" && Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1e3).toISOString() : null
+        };
+      }
+    },
+    greasyfork: {
+      name: "Greasy Fork",
+      idPattern: /^\d{1,12}$/u,
+      probeUrl: id => `https://update.greasyfork.org/scripts/${id}.meta.js`,
+      homeUrl: id => `https://greasyfork.org/zh-CN/scripts/${id}`,
+      parse(body) {
+        var _a, _b;
+        const block = (_a = META_BLOCK.exec(body)) == null ? void 0 : _a[1];
+        if (!block) return null;
+        const raw = (_b = META_VERSION.exec(block)) == null ? void 0 : _b[1];
+        if (!raw) return null;
+        const version = protocol.parseVersionString(raw);
+        if (!version) return null;
+        return {
+          version: version,
+          updatedAt: null
+        };
+      }
+    },
+    dist: {
+      name: "GitHub",
+      idPattern: /^[A-Za-z0-9._-]{1,39}\/[A-Za-z0-9._-]{1,100}$/u,
+      probeUrl: id => `https://api.github.com/repos/${id}/releases/latest`,
+      homeUrl: id => `https://github.com/${id}/releases/latest`,
+      parse(body) {
+        const root = parseJson(body);
+        const raw = root == null ? void 0 : root.tag_name;
+        const version = typeof raw === "string" ? protocol.parseVersionString(raw) : null;
+        if (!version) return null;
+        const at = root == null ? void 0 : root.published_at;
+        return {
+          version: version,
+          updatedAt: typeof at === "string" && at ? at : null
+        };
+      }
+    }
+  };
+
+  function resolveSource(ref2) {
+    const spec = UPDATE_CHANNELS[ref2.channel];
+    if (!spec || !spec.idPattern.test(ref2.id)) return null;
+    return {
+      channel: ref2.channel,
+      name: spec.name,
+      probeUrl: spec.probeUrl(ref2.id),
+      homeUrl: spec.homeUrl(ref2.id),
+      parse: spec.parse
+    };
+  }
+
+  const FALLBACK_SOURCES = [ {
+    channel: "scriptcat",
+    id: "7766"
+  }, {
+    channel: "greasyfork",
+    id: "593758"
+  }, {
+    channel: "dist",
+    id: "aiaskhelper/aiask-dist"
+  } ];
+
+  const CHECK_INTERVAL_MS = 864e5;
+
+  const PROBE_TIMEOUT_MS = 6e3;
+
+  const TOTAL_BUDGET_MS = 1e4;
+
+  const MAX_BODY_BYTES = 262144;
+
+  async function askBackend(deps) {
+    var _a;
+    const fallback = () => ({
+      latestVersion: null,
+      sources: FALLBACK_SOURCES.map(resolveSource).filter(item => item !== null)
+    });
+    let body;
+    try {
+      const response = await deps.transport.send({
+        url: deps.baseUrl + protocol.VERSION_PATH,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({}),
+        timeoutMs: PROBE_TIMEOUT_MS
+      });
+      body = response.body;
+    } catch {
+      return fallback();
+    }
+    let parsed;
+    try {
+      parsed = protocol.VersionResponseSchema.safeParse(JSON.parse(body));
+    } catch {
+      return fallback();
+    }
+    if (!parsed.success || parsed.data.code !== protocol.AiAskCode.Ok) return fallback();
+    return {
+      latestVersion: ((_a = parsed.data.latest) == null ? void 0 : _a.version) ?? null,
+      sources: parsed.data.sources.map(resolveSource).filter(item => item !== null)
+    };
+  }
+
+  async function probeOne(deps, source) {
+    try {
+      const body = await deps.probe(source.probeUrl, PROBE_TIMEOUT_MS);
+      if (body.length > MAX_BODY_BYTES) return null;
+      const outcome = source.parse(body);
+      return outcome ? {
+        source: source,
+        version: outcome.version
+      } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function checkForUpdate(deps, options = {}) {
+    const manual = options.manual === true;
+    const cached = deps.storage.snapshot();
+    if (!manual && !deps.storage.enabled()) return {
+      kind: "disabled",
+      snapshot: null,
+      probed: 0,
+      reachable: 0
+    };
+    const now = deps.now();
+    if (!manual && now - deps.storage.lastCheckAt() < CHECK_INTERVAL_MS) return {
+      kind: "cooling",
+      snapshot: cached,
+      probed: 0,
+      reachable: 0
+    };
+    const answer = await askBackend(deps);
+    let budgetTimer;
+    const budget = new Promise(resolve => {
+      budgetTimer = setTimeout(() => resolve(answer.sources.map(() => null)), TOTAL_BUDGET_MS);
+    });
+    const results = await Promise.race([ Promise.all(answer.sources.map(source => probeOne(deps, source))), budget ]);
+    clearTimeout(budgetTimer);
+    const reached = results.filter(item => item !== null);
+    const versions = [ ...answer.latestVersion ? [ answer.latestVersion ] : [], ...reached.map(item => item.version) ];
+    if (versions.length === 0) return {
+      kind: "failed",
+      snapshot: null,
+      probed: answer.sources.length,
+      reachable: 0
+    };
+    const latestVersion = versions.reduce((best, item) => protocol.compareVersionOrder(item, best) > 0 ? item : best);
+    const sources = answer.sources.map(source => reached.find(item => item.source === source)).filter(item => item !== void 0 && protocol.compareVersionOrder(item.version, latestVersion) === 0).map(item => ({
+      channel: item.source.channel,
+      name: item.source.name,
+      homeUrl: item.source.homeUrl
+    }));
+    const snapshot = {
+      version: latestVersion,
+      sources: sources,
+      checkedAt: now
+    };
+    deps.storage.setSnapshot(snapshot);
+    deps.storage.setLastCheckAt(now);
+    return {
+      kind: "checked",
+      snapshot: snapshot,
+      probed: answer.sources.length,
+      reachable: reached.length
+    };
+  }
+
   const _hoisted_1$1 = {
     class: "question-content"
   };
@@ -9106,6 +9686,52 @@
     return position;
   }
 
+  function createPanelResizeState() {
+    return {
+      pointerId: null,
+      origin: {
+        x: 0,
+        y: 0
+      },
+      offsetX: 0,
+      offsetY: 0
+    };
+  }
+
+  function beginPanelResize(state, input) {
+    if (state.pointerId !== null) return false;
+    if (!input.isPrimary) return false;
+    if (input.pointerType === "mouse" && input.button !== 0) return false;
+    state.pointerId = input.pointerId;
+    state.origin = {
+      x: Math.round(input.rect.left),
+      y: Math.round(input.rect.top)
+    };
+    state.offsetX = input.clientX - (input.rect.left + input.rect.width);
+    state.offsetY = input.clientY - (input.rect.top + input.rect.height);
+    return true;
+  }
+
+  function movePanelResize(state, input, viewport) {
+    if (state.pointerId === null || input.pointerId !== state.pointerId) {
+      return null;
+    }
+    return clampPanelSize({
+      width: input.clientX - state.offsetX - state.origin.x,
+      height: input.clientY - state.offsetY - state.origin.y
+    }, viewport, state.origin);
+  }
+
+  function endPanelResize(state, pointerId) {
+    if (state.pointerId === null || state.pointerId !== pointerId) return false;
+    const reset = createPanelResizeState();
+    state.pointerId = reset.pointerId;
+    state.origin = reset.origin;
+    state.offsetX = reset.offsetX;
+    state.offsetY = reset.offsetY;
+    return true;
+  }
+
   function endPanelDrag(state, pointerId) {
     if (state.pointerId === null || state.pointerId !== pointerId) {
       return null;
@@ -9196,6 +9822,59 @@
 
   const pageShell = (heading, meta, sections) => `<!doctype html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<title>\u7231\u95ee\u7b54 \xb7 ${esc(heading)}</title>\n<style>\nbody { max-width: 760px; margin: 24px auto; padding: 0 16px; font: 15px/1.7 system-ui, sans-serif; color: #222; }\n.meta, .mute { color: #888; font-size: 13px; }\n.q { border-bottom: 1px solid #eee; padding: 12px 0; }\n.q h3 { margin: 0 0 6px; font-size: 15px; }\n.opts { list-style: none; padding-left: 8px; margin: 6px 0; }\n.opts .hit { font-weight: 600; }\n.opts .hit::after { content: " \u2713"; }\n.ans { margin: 6px 0 0; }\nimg { max-height: 180px; vertical-align: middle; }\n</style>\n</head>\n<body>\n<h1>${esc(heading)}</h1>\n<p class="meta">${esc(meta.platformLabel)} \xb7 ${esc(meta.exportedAt)}</p>\n${sections}\n<p class="meta">\u7231\u95ee\u7b54 \xb7 \u7b54\u6848\u4ec5\u4f9b\u53c2\u8003\uff0c\u81ea\u884c\u6838\u5bf9\u3002</p>\n</body>\n</html>`;
 
+  const NONE = {
+    kind: "none",
+    version: "",
+    sourceNames: [],
+    homeUrl: ""
+  };
+
+  function updateBannerState(args) {
+    if (args.announcementUnread) return NONE;
+    const snapshot = args.snapshot;
+    if (!snapshot) return NONE;
+    if (!protocol.compareVersions(args.scriptVersion, snapshot.version)) return NONE;
+    if (args.dismissed === snapshot.version) return NONE;
+    const sourceNames = snapshot.sources.map(item => item.name);
+    const first = snapshot.sources[0];
+    return first ? {
+      kind: "actionable",
+      version: snapshot.version,
+      sourceNames: sourceNames,
+      homeUrl: first.homeUrl
+    } : {
+      kind: "syncing",
+      version: snapshot.version,
+      sourceNames: [],
+      homeUrl: ""
+    };
+  }
+
+  function manualCheckNote(outcome, scriptVersion) {
+    if (outcome.kind === "disabled") return {
+      text: "\u81ea\u52a8\u68c0\u6d4b\u5df2\u5173\u95ed",
+      level: "info"
+    };
+    if (outcome.kind === "cooling") return {
+      text: "\u8ddd\u4e0a\u6b21\u68c0\u6d4b\u4e0d\u8db3 24 \u5c0f\u65f6",
+      level: "info"
+    };
+    if (outcome.kind === "failed" || !outcome.snapshot) return {
+      text: "\u6240\u6709\u66f4\u65b0\u6e90\u68c0\u6d4b\u5931\u8d25",
+      level: "warning"
+    };
+    const snapshot = outcome.snapshot;
+    if (!protocol.compareVersions(scriptVersion, snapshot.version)) return {
+      text: `\u5df2\u662f\u6700\u65b0\u7248 ${snapshot.version}\uff08\u68c0\u6d4b ${outcome.probed} \u4e2a\u6765\u6e90\uff0c${outcome.reachable} \u4e2a\u53ef\u8fbe\uff09`,
+      level: "info"
+    };
+    const names = snapshot.sources.map(item => item.name);
+    return {
+      text: names.length ? `\u68c0\u6d4b\u5230\u65b0\u7248 ${snapshot.version} \xb7 \u53ef\u7528\u6765\u6e90\uff1a${names.join("\u3001")}` : `\u68c0\u6d4b\u5230\u65b0\u7248 ${snapshot.version} \xb7 \u5546\u5e97\u540c\u6b65\u4e2d\uff0c\u6682\u65e0\u53ef\u7528\u6765\u6e90`,
+      level: "warning"
+    };
+  }
+
   const _hoisted_1 = {
     key: 0,
     class: "tip"
@@ -9237,75 +9916,77 @@
 
   const _hoisted_9 = {
     key: 1,
-    class: "subbar"
+    class: "anb update"
   };
 
-  const _hoisted_10 = [ "onClick" ];
+  const _hoisted_10 = {
+    key: 0,
+    class: "t"
+  };
 
   const _hoisted_11 = {
-    class: "body"
+    key: 1,
+    class: "t"
   };
 
   const _hoisted_12 = {
-    key: 0,
-    class: "card"
+    key: 2,
+    class: "subbar"
   };
 
-  const _hoisted_13 = {
-    class: "row"
-  };
+  const _hoisted_13 = [ "onClick" ];
 
   const _hoisted_14 = {
-    class: "tag neutral mono"
+    key: 0,
+    class: "card"
   };
 
   const _hoisted_15 = {
+    class: "row"
+  };
+
+  const _hoisted_16 = {
+    class: "tag neutral mono"
+  };
+
+  const _hoisted_17 = {
     class: "gate-h"
   };
 
-  const _hoisted_16 = [ "innerHTML" ];
+  const _hoisted_18 = [ "innerHTML" ];
 
-  const _hoisted_17 = {
+  const _hoisted_19 = {
     key: 1,
     class: "card"
   };
 
-  const _hoisted_18 = {
+  const _hoisted_20 = {
     class: "row"
   };
 
-  const _hoisted_19 = {
+  const _hoisted_21 = {
     class: "toolbar"
   };
 
-  const _hoisted_20 = [ "title" ];
+  const _hoisted_22 = [ "title" ];
 
-  const _hoisted_21 = {
+  const _hoisted_23 = {
     key: 0,
     class: "row"
   };
 
-  const _hoisted_22 = {
-    class: "mono cap-mute"
-  };
-
-  const _hoisted_23 = {
-    key: 1,
-    class: "mono cap-mute"
-  };
-
   const _hoisted_24 = {
-    key: 2,
-    class: "skip"
+    class: "mono cap-mute"
   };
 
   const _hoisted_25 = {
-    class: "cap-mute"
+    key: 1,
+    class: "mono cap-mute"
   };
 
   const _hoisted_26 = {
     key: 2,
-    class: "standby"
+    class: "skip"
   };
 
   const _hoisted_27 = {
@@ -9313,76 +9994,76 @@
   };
 
   const _hoisted_28 = {
+    key: 2,
+    class: "standby"
+  };
+
+  const _hoisted_29 = {
+    class: "cap-mute"
+  };
+
+  const _hoisted_30 = {
     key: 3,
     class: "card"
   };
 
-  const _hoisted_29 = {
-    class: "row"
-  };
-
-  const _hoisted_30 = {
-    class: "tag neutral"
-  };
-
   const _hoisted_31 = {
-    class: "gate-h"
+    class: "row"
   };
 
   const _hoisted_32 = {
-    class: "cap-mute"
+    class: "tag neutral"
   };
 
   const _hoisted_33 = {
-    class: "toolbar"
+    class: "gate-h"
   };
 
   const _hoisted_34 = {
-    class: "grp"
+    class: "cap-mute"
   };
 
   const _hoisted_35 = {
-    class: "row"
-  };
-
-  const _hoisted_36 = {
-    class: "locator"
-  };
-
-  const _hoisted_37 = {
     class: "toolbar"
   };
 
+  const _hoisted_36 = {
+    class: "grp"
+  };
+
+  const _hoisted_37 = {
+    class: "row"
+  };
+
   const _hoisted_38 = {
-    key: 0,
-    class: "tag acc"
+    class: "locator"
   };
 
   const _hoisted_39 = {
-    class: "cap-mute"
+    class: "toolbar"
   };
 
   const _hoisted_40 = {
     key: 0,
-    class: "banner"
+    class: "tag acc"
   };
 
   const _hoisted_41 = {
-    class: "spacer"
+    class: "cap-mute"
   };
 
   const _hoisted_42 = {
-    key: 1,
-    class: "card done"
+    key: 0,
+    class: "banner"
   };
 
   const _hoisted_43 = {
-    class: "prow"
+    class: "spacer"
   };
 
   const _hoisted_44 = {
-    key: 0,
-    class: "cap-mute"
+    key: 1,
+    class: "card done"
   };
 
   const _hoisted_45 = {
@@ -9390,78 +10071,79 @@
   };
 
   const _hoisted_46 = {
-    class: "prow"
+    key: 0,
+    class: "cap-mute"
   };
 
   const _hoisted_47 = {
-    key: 0,
     class: "prow"
   };
 
   const _hoisted_48 = {
-    key: 1,
     class: "prow"
   };
 
   const _hoisted_49 = {
-    key: 2,
+    key: 0,
     class: "prow"
   };
 
   const _hoisted_50 = {
-    key: 3,
+    key: 1,
     class: "prow"
   };
 
   const _hoisted_51 = {
-    class: "cap-mute"
+    key: 2,
+    class: "prow"
   };
 
   const _hoisted_52 = {
-    class: "grp"
+    key: 3,
+    class: "prow"
   };
 
   const _hoisted_53 = {
-    key: 0,
     class: "cap-mute"
   };
 
   const _hoisted_54 = {
+    class: "grp"
+  };
+
+  const _hoisted_55 = {
+    key: 0,
+    class: "cap-mute"
+  };
+
+  const _hoisted_56 = {
     key: 1,
     class: "row"
   };
 
-  const _hoisted_55 = {
+  const _hoisted_57 = {
     class: "tag acc"
   };
 
-  const _hoisted_56 = {
+  const _hoisted_58 = {
     key: 2,
     class: "cap-mute"
   };
 
-  const _hoisted_57 = {
+  const _hoisted_59 = {
     key: 2,
     class: "grp"
   };
 
-  const _hoisted_58 = {
+  const _hoisted_60 = {
     class: "grid"
   };
 
-  const _hoisted_59 = [ "onClick" ];
-
-  const _hoisted_60 = {
-    key: 3,
-    class: "card"
-  };
-
-  const _hoisted_61 = {
-    class: "row"
-  };
+  const _hoisted_61 = [ "onClick" ];
 
   const _hoisted_62 = {
-    class: "locator"
+    key: 3,
+    class: "card"
   };
 
   const _hoisted_63 = {
@@ -9473,7 +10155,7 @@
   };
 
   const _hoisted_65 = {
-    class: "row question-head"
+    class: "row"
   };
 
   const _hoisted_66 = {
@@ -9481,78 +10163,75 @@
   };
 
   const _hoisted_67 = {
-    class: "toolbar"
+    class: "row question-head"
   };
 
   const _hoisted_68 = {
-    key: 0,
-    class: "tag neutral"
+    class: "locator"
   };
 
-  const _hoisted_69 = [ "disabled" ];
-
-  const _hoisted_70 = {
-    class: "stem"
-  };
-
-  const _hoisted_71 = {
-    class: "stem-type"
-  };
-
-  const _hoisted_72 = {
-    class: "opts"
-  };
-
-  const _hoisted_73 = {
-    class: "answer-block"
-  };
-
-  const _hoisted_74 = {
-    class: "row"
-  };
-
-  const _hoisted_75 = {
+  const _hoisted_69 = {
     class: "toolbar"
   };
 
-  const _hoisted_76 = {
+  const _hoisted_70 = {
     key: 0,
     class: "tag neutral"
   };
 
+  const _hoisted_71 = [ "disabled" ];
+
+  const _hoisted_72 = [ "disabled" ];
+
+  const _hoisted_73 = {
+    class: "stem"
+  };
+
+  const _hoisted_74 = {
+    class: "stem-type"
+  };
+
+  const _hoisted_75 = {
+    class: "opts"
+  };
+
+  const _hoisted_76 = {
+    class: "answer-block"
+  };
+
   const _hoisted_77 = {
+    class: "row"
+  };
+
+  const _hoisted_78 = {
+    class: "toolbar"
+  };
+
+  const _hoisted_79 = {
+    key: 0,
+    class: "tag neutral"
+  };
+
+  const _hoisted_80 = {
     key: 1,
     class: "tag neutral"
   };
 
-  const _hoisted_78 = {
+  const _hoisted_81 = {
+    key: 2,
+    class: "tag neutral"
+  };
+
+  const _hoisted_82 = {
     key: 0,
     class: "answer-list"
   };
 
-  const _hoisted_79 = {
+  const _hoisted_83 = {
     class: "answer-key"
   };
 
-  const _hoisted_80 = {
-    class: "answer-value"
-  };
-
-  const _hoisted_81 = {
-    key: 0
-  };
-
-  const _hoisted_82 = {
-    key: 1,
-    class: "answer-item"
-  };
-
-  const _hoisted_83 = {
-    class: "answer-value"
-  };
-
   const _hoisted_84 = {
-    key: 2,
     class: "answer-value"
   };
 
@@ -9561,569 +10240,567 @@
   };
 
   const _hoisted_86 = {
+    key: 1,
+    class: "answer-item"
+  };
+
+  const _hoisted_87 = {
+    class: "answer-value"
+  };
+
+  const _hoisted_88 = {
+    key: 2,
+    class: "answer-value"
+  };
+
+  const _hoisted_89 = {
+    key: 0
+  };
+
+  const _hoisted_90 = {
     key: 3,
     class: "cap-mute"
   };
 
-  const _hoisted_87 = {
+  const _hoisted_91 = {
     class: "grp"
   };
 
-  const _hoisted_88 = {
+  const _hoisted_92 = {
     class: "row"
   };
 
-  const _hoisted_89 = {
+  const _hoisted_93 = {
     class: "toolbar"
   };
 
-  const _hoisted_90 = {
+  const _hoisted_94 = {
     class: "tag acc"
   };
 
-  const _hoisted_91 = {
+  const _hoisted_95 = {
     class: "ent-top"
   };
 
-  const _hoisted_92 = {
+  const _hoisted_96 = {
     class: "ent-ty"
   };
 
-  const _hoisted_93 = {
+  const _hoisted_97 = {
     class: "ent-tm mono"
   };
 
-  const _hoisted_94 = {
-    key: 0,
-    class: "cap-mute"
-  };
-
-  const _hoisted_95 = {
-    class: "ent-a"
-  };
-
-  const _hoisted_96 = {
-    key: 0,
-    class: "ent-ops"
-  };
-
-  const _hoisted_97 = {
-    class: "cap-mute"
-  };
-
   const _hoisted_98 = {
-    class: "standby"
+    key: 0,
+    class: "cap-mute"
   };
 
   const _hoisted_99 = {
-    class: "cap-mute"
+    class: "ent-a"
   };
 
   const _hoisted_100 = {
     key: 0,
-    class: "grp"
+    class: "ent-ops"
   };
 
   const _hoisted_101 = {
-    class: "row"
+    class: "cap-mute"
   };
 
   const _hoisted_102 = {
-    class: "mono cap-mute"
+    class: "standby"
   };
 
   const _hoisted_103 = {
+    class: "cap-mute"
+  };
+
+  const _hoisted_104 = {
+    key: 0,
+    class: "grp"
+  };
+
+  const _hoisted_105 = {
+    class: "row"
+  };
+
+  const _hoisted_106 = {
+    class: "mono cap-mute"
+  };
+
+  const _hoisted_107 = {
     class: "switch-row"
   };
 
-  const _hoisted_104 = [ "onClick", "aria-label" ];
+  const _hoisted_108 = [ "onClick", "aria-label" ];
 
-  const _hoisted_105 = {
+  const _hoisted_109 = {
     class: "lbl",
     style: {
       flex: "1"
     }
   };
 
-  const _hoisted_106 = {
-    class: "cap-mute"
-  };
-
-  const _hoisted_107 = {
-    class: "row"
-  };
-
-  const _hoisted_108 = {
-    class: "mono cap-mute"
-  };
-
-  const _hoisted_109 = {
-    class: "grp"
-  };
-
   const _hoisted_110 = {
-    class: "switch-row"
+    class: "cap-mute"
   };
 
   const _hoisted_111 = {
-    class: "grp"
-  };
-
-  const _hoisted_112 = {
     class: "row"
   };
 
+  const _hoisted_112 = {
+    class: "mono cap-mute"
+  };
+
   const _hoisted_113 = {
-    class: "cap-mute"
+    class: "grp"
   };
 
   const _hoisted_114 = {
+    class: "switch-row"
+  };
+
+  const _hoisted_115 = {
+    class: "grp"
+  };
+
+  const _hoisted_116 = {
+    class: "switch-row"
+  };
+
+  const _hoisted_117 = {
+    class: "grp"
+  };
+
+  const _hoisted_118 = {
+    class: "row"
+  };
+
+  const _hoisted_119 = {
+    class: "cap-mute"
+  };
+
+  const _hoisted_120 = {
     key: 0,
     class: "alert"
   };
 
-  const _hoisted_115 = {
+  const _hoisted_121 = {
     key: 1,
     class: "alert"
   };
 
-  const _hoisted_116 = {
-    class: "row"
-  };
-
-  const _hoisted_117 = [ "disabled" ];
-
-  const _hoisted_118 = {
-    key: 2,
-    class: "cap-mute"
-  };
-
-  const _hoisted_119 = {
-    class: "grp"
-  };
-
-  const _hoisted_120 = {
-    class: "switch-row"
-  };
-
-  const _hoisted_121 = {
-    class: "row"
-  };
-
   const _hoisted_122 = {
-    class: "mono cap-mute"
-  };
-
-  const _hoisted_123 = {
     class: "row"
   };
+
+  const _hoisted_123 = [ "disabled" ];
 
   const _hoisted_124 = {
+    key: 2,
     class: "cap-mute"
   };
 
   const _hoisted_125 = {
+    key: 4,
     class: "grp"
   };
 
-  const _hoisted_126 = [ "onClick", "aria-label" ];
+  const _hoisted_126 = {
+    class: "switch-row"
+  };
 
   const _hoisted_127 = {
+    class: "row"
+  };
+
+  const _hoisted_128 = [ "value" ];
+
+  const _hoisted_129 = [ "value" ];
+
+  const _hoisted_130 = {
+    key: 0,
+    class: "row"
+  };
+
+  const _hoisted_131 = [ "value" ];
+
+  const _hoisted_132 = [ "value" ];
+
+  const _hoisted_133 = {
+    key: 1,
+    class: "cap-mute"
+  };
+
+  const _hoisted_134 = [ "href" ];
+
+  const _hoisted_135 = {
+    class: "row"
+  };
+
+  const _hoisted_136 = [ "placeholder" ];
+
+  const _hoisted_137 = [ "disabled" ];
+
+  const _hoisted_138 = {
+    class: "row"
+  };
+
+  const _hoisted_139 = [ "disabled" ];
+
+  const _hoisted_140 = {
+    class: "cap-mute"
+  };
+
+  const _hoisted_141 = {
+    class: "switch-row"
+  };
+
+  const _hoisted_142 = {
+    class: "switch-row"
+  };
+
+  const _hoisted_143 = {
+    class: "grp"
+  };
+
+  const _hoisted_144 = {
+    class: "switch-row"
+  };
+
+  const _hoisted_145 = {
+    class: "row"
+  };
+
+  const _hoisted_146 = {
+    class: "mono cap-mute"
+  };
+
+  const _hoisted_147 = {
+    class: "row"
+  };
+
+  const _hoisted_148 = {
+    class: "cap-mute"
+  };
+
+  const _hoisted_149 = {
+    class: "grp"
+  };
+
+  const _hoisted_150 = [ "onClick", "aria-label" ];
+
+  const _hoisted_151 = {
     class: "lbl",
     style: {
       flex: "1"
     }
   };
 
-  const _hoisted_128 = {
-    class: "prev"
-  };
-
-  const _hoisted_129 = {
-    class: "prow"
-  };
-
-  const _hoisted_130 = {
-    class: "prow"
-  };
-
-  const _hoisted_131 = {
-    class: "prow"
-  };
-
-  const _hoisted_132 = {
-    class: "prow"
-  };
-
-  const _hoisted_133 = {
-    key: 0,
-    class: "alert"
-  };
-
-  const _hoisted_134 = {
-    class: "prev"
-  };
-
-  const _hoisted_135 = {
-    class: "prow"
-  };
-
-  const _hoisted_136 = {
-    class: "toolbar"
-  };
-
-  const _hoisted_137 = {
-    class: "cap-mute mono"
-  };
-
-  const _hoisted_138 = {
-    class: "meter"
-  };
-
-  const _hoisted_139 = {
-    key: 0,
-    class: "alert"
-  };
-
-  const _hoisted_140 = {
-    key: 1,
-    class: "alert"
-  };
-
-  const _hoisted_141 = {
-    key: 2,
-    class: "cap-mute"
-  };
-
-  const _hoisted_142 = {
-    key: 0,
-    class: "alert"
-  };
-
-  const _hoisted_143 = {
-    key: 1,
-    class: "cap-mute"
-  };
-
-  const _hoisted_144 = {
-    key: 4,
-    class: "cap-mute"
-  };
-
-  const _hoisted_145 = {
-    key: 5,
-    class: "cap-mute"
-  };
-
-  const _hoisted_146 = {
-    class: "ent-top"
-  };
-
-  const _hoisted_147 = {
-    class: "ent-ty"
-  };
-
-  const _hoisted_148 = {
-    key: 0,
-    class: "ent-ty"
-  };
-
-  const _hoisted_149 = {
-    key: 1,
-    class: "ent-ty"
-  };
-
-  const _hoisted_150 = {
-    class: "ent-tm"
-  };
-
-  const _hoisted_151 = [ "aria-label", "onClick" ];
-
   const _hoisted_152 = {
-    class: "ent-a"
+    class: "prev"
   };
 
   const _hoisted_153 = {
-    key: 0,
-    class: "ent-ops"
+    class: "prow"
   };
 
   const _hoisted_154 = {
-    class: "cap-mute"
+    class: "prow"
   };
 
   const _hoisted_155 = {
-    key: 6,
-    class: "cap-mute"
+    class: "prow"
   };
 
   const _hoisted_156 = {
-    class: "statcard"
+    class: "prow"
   };
 
   const _hoisted_157 = {
-    class: "row"
+    key: 0,
+    class: "alert"
   };
 
   const _hoisted_158 = {
-    key: 0,
-    class: "statgrid"
+    class: "prev"
   };
 
   const _hoisted_159 = {
-    key: 0
+    class: "prow"
   };
 
   const _hoisted_160 = {
-    key: 1
+    class: "toolbar"
   };
 
   const _hoisted_161 = {
-    key: 1,
-    class: "cap-mute"
+    class: "cap-mute mono"
   };
 
   const _hoisted_162 = {
-    key: 2,
-    class: "cap-mute"
+    class: "meter"
   };
 
   const _hoisted_163 = {
-    key: 3,
-    class: "cap-mute"
+    key: 0,
+    class: "alert"
   };
 
   const _hoisted_164 = {
-    key: 4,
-    class: "cap-mute"
+    key: 1,
+    class: "alert"
   };
 
   const _hoisted_165 = {
+    key: 2,
     class: "cap-mute"
   };
 
   const _hoisted_166 = {
-    key: 5,
+    key: 0,
     class: "alert"
   };
 
   const _hoisted_167 = {
-    class: "grp"
+    key: 1,
+    class: "cap-mute"
   };
 
   const _hoisted_168 = {
+    key: 4,
+    class: "cap-mute"
+  };
+
+  const _hoisted_169 = {
+    key: 5,
+    class: "cap-mute"
+  };
+
+  const _hoisted_170 = {
+    class: "ent-top"
+  };
+
+  const _hoisted_171 = {
+    class: "ent-ty"
+  };
+
+  const _hoisted_172 = {
+    key: 0,
+    class: "ent-ty"
+  };
+
+  const _hoisted_173 = {
+    key: 1,
+    class: "ent-ty"
+  };
+
+  const _hoisted_174 = {
+    class: "ent-tm"
+  };
+
+  const _hoisted_175 = [ "aria-label", "onClick" ];
+
+  const _hoisted_176 = {
+    class: "ent-a"
+  };
+
+  const _hoisted_177 = {
+    key: 0,
+    class: "ent-ops"
+  };
+
+  const _hoisted_178 = {
+    class: "cap-mute"
+  };
+
+  const _hoisted_179 = {
+    key: 6,
+    class: "cap-mute"
+  };
+
+  const _hoisted_180 = {
+    class: "statcard"
+  };
+
+  const _hoisted_181 = {
+    class: "row"
+  };
+
+  const _hoisted_182 = {
+    key: 0,
+    class: "statgrid"
+  };
+
+  const _hoisted_183 = {
+    key: 0
+  };
+
+  const _hoisted_184 = {
+    key: 1
+  };
+
+  const _hoisted_185 = {
+    key: 1,
+    class: "cap-mute"
+  };
+
+  const _hoisted_186 = {
+    key: 2,
+    class: "cap-mute"
+  };
+
+  const _hoisted_187 = {
+    key: 3,
+    class: "cap-mute"
+  };
+
+  const _hoisted_188 = {
+    key: 4,
+    class: "cap-mute"
+  };
+
+  const _hoisted_189 = {
+    class: "cap-mute"
+  };
+
+  const _hoisted_190 = {
+    class: "row"
+  };
+
+  const _hoisted_191 = [ "disabled" ];
+
+  const _hoisted_192 = {
+    key: 0,
+    class: "cap-mute"
+  };
+
+  const _hoisted_193 = {
+    key: 5,
+    class: "alert"
+  };
+
+  const _hoisted_194 = {
+    class: "grp"
+  };
+
+  const _hoisted_195 = {
     class: "log-filter"
   };
 
-  const _hoisted_169 = [ "onClick" ];
+  const _hoisted_196 = [ "onClick" ];
 
-  const _hoisted_170 = {
+  const _hoisted_197 = {
     key: 0,
     class: "log-list"
   };
 
-  const _hoisted_171 = {
+  const _hoisted_198 = {
     class: "log-time mono"
   };
 
-  const _hoisted_172 = {
+  const _hoisted_199 = {
     class: "log-msg"
   };
 
-  const _hoisted_173 = {
+  const _hoisted_200 = {
     key: 0,
     class: "log-repeat mono"
   };
 
-  const _hoisted_174 = {
+  const _hoisted_201 = {
     key: 1,
     class: "cap-mute"
   };
 
-  const _hoisted_175 = {
+  const _hoisted_202 = {
     class: "grp"
   };
 
-  const _hoisted_176 = [ "disabled" ];
+  const _hoisted_203 = [ "disabled" ];
 
-  const _hoisted_177 = {
+  const _hoisted_204 = {
     key: 0,
     class: "cap-mute"
   };
 
-  const _hoisted_178 = {
+  const _hoisted_205 = {
     key: 0,
     class: "mono"
   };
 
-  const _hoisted_179 = {
+  const _hoisted_206 = {
     key: 1,
     class: "mono"
   };
 
-  const _hoisted_180 = {
+  const _hoisted_207 = {
     key: 1,
     class: "cap-mute"
   };
 
-  const _hoisted_181 = {
+  const _hoisted_208 = {
     key: 1,
     class: "rule-meta"
   };
 
-  const _hoisted_182 = {
+  const _hoisted_209 = {
     class: "rule-row"
   };
 
-  const _hoisted_183 = {
+  const _hoisted_210 = {
     class: "rule-value"
   };
 
-  const _hoisted_184 = {
+  const _hoisted_211 = {
     key: 0,
     class: "rule-row"
   };
 
-  const _hoisted_185 = {
+  const _hoisted_212 = {
     class: "rule-value"
   };
 
-  const _hoisted_186 = {
+  const _hoisted_213 = {
     key: 1,
     class: "rule-row"
   };
 
-  const _hoisted_187 = {
+  const _hoisted_214 = {
     class: "rule-value"
   };
 
-  const _hoisted_188 = {
+  const _hoisted_215 = {
     key: 2,
     class: "rule-row"
   };
 
-  const _hoisted_189 = {
+  const _hoisted_216 = {
     class: "rule-value"
   };
 
-  const _hoisted_190 = {
+  const _hoisted_217 = {
     key: 2,
     class: "cap-mute"
   };
 
-  const _hoisted_191 = {
+  const _hoisted_218 = {
     class: "actbar"
   };
 
-  const _hoisted_192 = {
+  const _hoisted_219 = {
     key: 0,
     class: "prev"
   };
 
-  const _hoisted_193 = {
-    class: "prow"
-  };
-
-  const _hoisted_194 = {
-    class: "prow"
-  };
-
-  const _hoisted_195 = [ "disabled" ];
-
-  const _hoisted_196 = [ "disabled" ];
-
-  const _hoisted_197 = {
-    key: 0,
-    class: "prog"
-  };
-
-  const _hoisted_198 = {
-    class: "stat"
-  };
-
-  const _hoisted_199 = {
-    class: "ticks"
-  };
-
-  const _hoisted_200 = {
-    key: 1,
-    class: "toolbar"
-  };
-
-  const _hoisted_201 = [ "disabled" ];
-
-  const _hoisted_202 = {
-    key: 0,
-    class: "toolbar"
-  };
-
-  const _hoisted_203 = {
-    key: 1,
-    class: "toolbar"
-  };
-
-  const _hoisted_204 = {
-    key: 2,
-    class: "toolbar"
-  };
-
-  const _hoisted_205 = [ "disabled" ];
-
-  const _hoisted_206 = {
-    class: "actbar-foot"
-  };
-
-  const _hoisted_207 = {
-    class: "cap-mute mono"
-  };
-
-  const _hoisted_208 = {
-    key: 3,
-    class: "pop"
-  };
-
-  const _hoisted_209 = {
-    class: "toolbar"
-  };
-
-  const _hoisted_210 = [ "disabled" ];
-
-  const _hoisted_211 = [ "disabled" ];
-
-  const _hoisted_212 = [ "disabled" ];
-
-  const _hoisted_213 = {
-    class: "toolbar"
-  };
-
-  const _hoisted_214 = [ "disabled" ];
-
-  const _hoisted_215 = [ "disabled" ];
-
-  const _hoisted_216 = {
-    key: 2,
-    class: "cap-mute"
-  };
-
-  const _hoisted_217 = {
-    class: "home-user"
-  };
-
-  const _hoisted_218 = {
-    class: "ava lg"
-  };
-
-  const _hoisted_219 = {
-    class: "home-meta"
-  };
-
   const _hoisted_220 = {
-    class: "ctitle"
+    class: "prow"
   };
 
   const _hoisted_221 = {
-    key: 0,
-    class: "cap-mute"
+    class: "prow"
   };
 
   const _hoisted_222 = [ "disabled" ];
@@ -10131,67 +10808,165 @@
   const _hoisted_223 = [ "disabled" ];
 
   const _hoisted_224 = {
-    key: 2,
-    class: "cap-mute"
+    key: 0,
+    class: "prog"
   };
 
   const _hoisted_225 = {
-    class: "row"
+    class: "stat"
   };
 
   const _hoisted_226 = {
+    class: "ticks"
+  };
+
+  const _hoisted_227 = {
+    key: 1,
+    class: "toolbar"
+  };
+
+  const _hoisted_228 = [ "disabled" ];
+
+  const _hoisted_229 = {
     key: 0,
     class: "toolbar"
   };
 
-  const _hoisted_227 = {
-    class: "balance"
-  };
-
-  const _hoisted_228 = {
-    key: 1,
-    class: "cap-mute"
-  };
-
-  const _hoisted_229 = {
-    key: 1,
-    class: "cap-mute"
-  };
-
   const _hoisted_230 = {
+    key: 1,
+    class: "toolbar"
+  };
+
+  const _hoisted_231 = {
     key: 2,
     class: "toolbar"
   };
 
-  const _hoisted_231 = [ "disabled" ];
+  const _hoisted_232 = [ "disabled" ];
 
-  const _hoisted_232 = {
+  const _hoisted_233 = {
+    class: "actbar-foot"
+  };
+
+  const _hoisted_234 = {
+    class: "cap-mute mono"
+  };
+
+  const _hoisted_235 = {
+    key: 4,
+    class: "pop"
+  };
+
+  const _hoisted_236 = {
+    class: "toolbar"
+  };
+
+  const _hoisted_237 = [ "disabled" ];
+
+  const _hoisted_238 = [ "disabled" ];
+
+  const _hoisted_239 = [ "disabled" ];
+
+  const _hoisted_240 = {
+    class: "toolbar"
+  };
+
+  const _hoisted_241 = [ "disabled" ];
+
+  const _hoisted_242 = [ "disabled" ];
+
+  const _hoisted_243 = {
+    key: 2,
+    class: "cap-mute"
+  };
+
+  const _hoisted_244 = {
+    class: "home-user"
+  };
+
+  const _hoisted_245 = {
+    class: "ava lg"
+  };
+
+  const _hoisted_246 = {
+    class: "home-meta"
+  };
+
+  const _hoisted_247 = {
+    class: "ctitle"
+  };
+
+  const _hoisted_248 = {
+    key: 0,
+    class: "cap-mute"
+  };
+
+  const _hoisted_249 = [ "disabled" ];
+
+  const _hoisted_250 = [ "disabled" ];
+
+  const _hoisted_251 = {
+    key: 2,
+    class: "cap-mute"
+  };
+
+  const _hoisted_252 = {
+    class: "row"
+  };
+
+  const _hoisted_253 = {
+    key: 0,
+    class: "toolbar"
+  };
+
+  const _hoisted_254 = {
+    class: "balance"
+  };
+
+  const _hoisted_255 = {
+    key: 1,
+    class: "cap-mute"
+  };
+
+  const _hoisted_256 = {
+    key: 1,
+    class: "cap-mute"
+  };
+
+  const _hoisted_257 = {
+    key: 2,
+    class: "toolbar"
+  };
+
+  const _hoisted_258 = [ "disabled" ];
+
+  const _hoisted_259 = {
     key: 3,
     class: "cap-mute"
   };
 
-  const _hoisted_233 = {
+  const _hoisted_260 = {
     key: 4,
     class: "cap-mute"
   };
 
-  const _hoisted_234 = {
+  const _hoisted_261 = {
     class: "row sep-top"
   };
 
-  const _hoisted_235 = {
+  const _hoisted_262 = {
     class: "cap-mute"
   };
 
-  const _hoisted_236 = {
-    key: 4,
+  const _hoisted_263 = {
+    key: 5,
     class: "captcha-cover",
     role: "dialog",
     "aria-modal": "true",
     "aria-label": "\u5b8c\u6210\u6ce8\u518c\u4eba\u673a\u9a8c\u8bc1"
   };
 
-  const _hoisted_237 = {
+  const _hoisted_264 = {
     class: "captcha-card"
   };
 
@@ -10221,15 +10996,28 @@
       const dragHandleRef = vue.ref(null);
       const dragState = vue.reactive(createPanelDragState());
       const launcherGesture = vue.reactive(createPanelLauncherGestureState());
+      const resizeState = vue.reactive(createPanelResizeState());
       const pos = vue.ref(getPanelPosition());
+      const size = vue.ref(getPanelSize());
       let panelResizeObserver = null;
       let pendingPanelResize = null;
-      const panelStyle = vue.computed(() => pos.value ? {
-        left: `${pos.value.x}px`,
-        top: `${pos.value.y}px`,
-        right: "auto",
-        bottom: "auto"
-      } : {});
+      const panelStyle = vue.computed(() => {
+        const anchored = pos.value ? {
+          left: `${pos.value.x}px`,
+          top: `${pos.value.y}px`,
+          right: "auto",
+          bottom: "auto"
+        } : {};
+        if (collapsed.value || !size.value) return anchored;
+        return {
+          ...anchored,
+          width: `${size.value.width}px`,
+          height: `${size.value.height}px`
+        };
+      });
+      const bodyStyle = vue.computed(() => size.value ? {
+        maxHeight: "none"
+      } : void 0);
       function readViewportSize() {
         const el = document.documentElement;
         const width = el.clientWidth;
@@ -10262,11 +11050,26 @@
         collapsed.value = nextCollapsed;
         setCollapsed(nextCollapsed);
       }
+      function reconcilePanelSize() {
+        if (size.value === null) return;
+        if (resizeState.pointerId !== null) return;
+        const origin = pos.value ?? {
+          x: PANEL_VIEWPORT_MARGIN,
+          y: PANEL_VIEWPORT_MARGIN
+        };
+        const next = clampPanelSize(size.value, readViewportSize(), origin);
+        if (next.width === size.value.width && next.height === size.value.height) {
+          return;
+        }
+        size.value = next;
+        setPanelSize(next);
+      }
       function reconcilePanelPosition(options = {}) {
         if (pos.value === null) return;
         const panelEl = panelRef.value;
         if (!panelEl) return;
         if (dragState.pointerId !== null) return;
+        if (resizeState.pointerId !== null) return;
         const rect = panelEl.getBoundingClientRect();
         const viewport = readViewportSize();
         const next = clampPanelPosition(pos.value, {
@@ -10337,6 +11140,63 @@
           persist: true
         });
       }
+      function startResize(event) {
+        const panelEl = panelRef.value;
+        const handle = event.currentTarget;
+        if (!panelEl || !(handle instanceof HTMLElement)) return;
+        const rect = panelEl.getBoundingClientRect();
+        if (pos.value === null) {
+          pos.value = {
+            x: Math.round(rect.left),
+            y: Math.round(rect.top)
+          };
+        }
+        const ok = beginPanelResize(resizeState, {
+          pointerId: event.pointerId,
+          isPrimary: event.isPrimary,
+          pointerType: event.pointerType,
+          button: event.button,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          rect: {
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height
+          }
+        });
+        if (!ok) return;
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          handle.setPointerCapture(event.pointerId);
+        } catch {
+          endPanelResize(resizeState, event.pointerId);
+        }
+      }
+      function moveResize(event) {
+        const next = movePanelResize(resizeState, {
+          pointerId: event.pointerId,
+          clientX: event.clientX,
+          clientY: event.clientY
+        }, readViewportSize());
+        if (next) size.value = next;
+      }
+      function finishResize(event) {
+        var _a2;
+        const owned = endPanelResize(resizeState, event.pointerId);
+        const handle = event.currentTarget;
+        if (handle instanceof HTMLElement && ((_a2 = handle.hasPointerCapture) == null ? void 0 : _a2.call(handle, event.pointerId))) {
+          try {
+            handle.releasePointerCapture(event.pointerId);
+          } catch {}
+        }
+        if (!owned) return;
+        reconcilePanelPosition({
+          persist: true
+        });
+        if (size.value) setPanelSize(size.value);
+      }
       function activateLauncher(event) {
         if (!consumePanelLauncherActivation(launcherGesture, event.detail)) {
           event.preventDefault();
@@ -10356,6 +11216,7 @@
           pendingPanelResize = null;
           setPanelPosition(pos.value);
         }
+        reconcilePanelSize();
         reconcilePanelPosition();
         if (typeof ResizeObserver === "undefined") return;
         if (!panelResizeObserver) {
@@ -10373,6 +11234,7 @@
         }
       }
       function onWindowResize() {
+        reconcilePanelSize();
         reconcilePanelPosition();
       }
       const usageEvents = new EventQueue({
@@ -10467,6 +11329,70 @@
           expand();
         }
       }
+      const updateSnapshot = vue.ref(getUpdateSnapshot());
+      const updateDismissed = vue.ref(getUpdateDismissed());
+      const updateBanner = vue.computed(() => updateBannerState({
+        snapshot: updateSnapshot.value,
+        scriptVersion: SCRIPT_VERSION,
+        dismissed: updateDismissed.value,
+        announcementUnread: announcementUnread.value
+      }));
+      const updateDeps = () => ({
+        transport: ruleTransport,
+        baseUrl: BACKEND_BASE_URL,
+        now: () => Date.now(),
+        probe: (url, timeoutMs) => gmTransport.send({
+          url: url,
+          method: "GET",
+          headers: {},
+          timeoutMs: timeoutMs
+        }).then(response => {
+          if (response.status < 200 || response.status >= 300) throw new Error(String(response.status));
+          return response.body;
+        }),
+        storage: {
+          enabled: () => settings.checkUpdate,
+          lastCheckAt: getUpdateLastCheckAt,
+          setLastCheckAt: setUpdateLastCheckAt,
+          snapshot: getUpdateSnapshot,
+          setSnapshot: value => {
+            setUpdateSnapshot(value);
+            updateSnapshot.value = value;
+          }
+        }
+      });
+      async function loadUpdate() {
+        const outcome = await checkForUpdate(updateDeps());
+        if (outcome.kind === "cooling") updateSnapshot.value = outcome.snapshot;
+        if (outcome.kind === "failed") pushLog("\u66f4\u65b0\u68c0\u6d4b\u5931\u8d25 \xb7 \u672c\u6b21\u4e0d\u63d0\u793a", "info");
+      }
+      const updateChecking = vue.ref(false);
+      const updateManualNote = vue.ref("");
+      async function checkUpdateNow() {
+        if (updateChecking.value) return;
+        updateChecking.value = true;
+        updateManualNote.value = "\u68c0\u6d4b\u4e2d\u2026";
+        try {
+          const outcome = await checkForUpdate(updateDeps(), {
+            manual: true
+          });
+          const note22 = manualCheckNote(outcome, SCRIPT_VERSION);
+          updateManualNote.value = note22.text;
+          pushLog(`\u66f4\u65b0\u68c0\u6d4b \xb7 ${note22.text}`, note22.level);
+        } finally {
+          updateChecking.value = false;
+        }
+      }
+      const openUpdate = () => {
+        const url = updateBanner.value.homeUrl;
+        if (url) window.open(url, "_blank", "noopener");
+      };
+      const dismissUpdate = () => {
+        const version = updateBanner.value.version;
+        if (!version) return;
+        updateDismissed.value = version;
+        setUpdateDismissed(version);
+      };
       const accountOpen = vue.ref(false);
       const toggleAccount = () => {
         accountOpen.value = !accountOpen.value;
@@ -10497,6 +11423,9 @@
       const SYSTEM_SEGS = [ {
         k: "general",
         l: "\u901a\u7528"
+      }, {
+        k: "ai",
+        l: "AI"
       }, {
         k: "course",
         l: "\u8bfe\u7a0b",
@@ -10714,7 +11643,11 @@
         autoStart: settings.autoStart,
         autoSubmit: settings.autoSubmit,
         autoSubmitThreshold: settings.autoSubmitThreshold,
-        randomFallback: settings.randomFallback
+        randomFallback: settings.randomFallback,
+        ai: {
+          ...settings.ai
+        },
+        checkUpdate: settings.checkUpdate
       });
       const makeToggle = (key, msg, after) => () => {
         settings[key] = !settings[key];
@@ -10722,6 +11655,10 @@
         after == null ? void 0 : after();
         if (msg) pushLog(settings[key] ? msg.on : msg.off, settings[key] && msg.warnOn ? "warning" : "info");
       };
+      const toggleCheckUpdate = makeToggle("checkUpdate", {
+        on: "\u5df2\u5f00\u542f\u66f4\u65b0\u68c0\u6d4b",
+        off: "\u5df2\u5173\u95ed\u66f4\u65b0\u68c0\u6d4b"
+      });
       const toggleReport = () => {
         const next = !settings.reportUsage;
         settings.reportUsage = next;
@@ -10729,6 +11666,94 @@
         persist();
         if (next) usageEvents.enable(); else usageEvents.disable();
       };
+      const aiChannels = vue.ref([]);
+      const aiCredentialDraft = vue.ref("");
+      const aiHasCredential = vue.ref(!!getAiCredential());
+      const aiProbing = vue.ref(false);
+      const aiProbeNote = vue.ref("");
+      const aiChannelOptions = vue.computed(() => aiChannels.value.filter(c => c.status === "active" || c.id === settings.ai.channelId));
+      const aiSelectedChannel = vue.computed(() => aiChannels.value.find(c => c.id === settings.ai.channelId) ?? null);
+      async function loadAiChannels() {
+        if (aiChannels.value.length > 0) return;
+        aiChannels.value = await fetchAiChannels(gmTransport, BACKEND_BASE_URL);
+      }
+      vue.watch(() => tab.value === "system" && systemSub.value === "general", on => {
+        if (on) void loadAiChannels();
+      }, {
+        immediate: true
+      });
+      const aiClientConfig = () => ({
+        channelId: settings.ai.channelId,
+        modelId: settings.ai.modelId,
+        credential: getAiCredential()
+      });
+      const toggleAi = () => {
+        settings.ai.enabled = !settings.ai.enabled;
+        persist();
+        pushLog(settings.ai.enabled ? "\u5df2\u5f00\u542f AI \u8865\u7b54 \xb7 \u9898\u5e93\u6ca1\u7b54\u4e0a\u7684\u9898\u4f1a\u4ea4\u7ed9\u4f60\u914d\u7f6e\u7684 AI" : "\u5df2\u5173\u95ed AI \u8865\u7b54", settings.ai.enabled ? "warning" : "info");
+      };
+      const toggleAiCount = () => {
+        settings.ai.countTowardSubmit = !settings.ai.countTowardSubmit;
+        persist();
+        pushLog(settings.ai.countTowardSubmit ? "AI \u7b54\u6848\u8ba1\u5165\u81ea\u52a8\u63d0\u4ea4" : "AI \u7b54\u6848\u4e0d\u8ba1\u5165\u81ea\u52a8\u63d0\u4ea4 \xb7 \u53ea\u6682\u5b58", "info");
+      };
+      const toggleAiCache = () => {
+        settings.ai.cache = !settings.ai.cache;
+        persist();
+        pushLog(settings.ai.cache ? "AI \u7b54\u6848\u5b58\u5165\u7f13\u5b58" : "AI \u7b54\u6848\u4e0d\u5b58\u7f13\u5b58", "info");
+      };
+      const onAiChannelChange = id => {
+        var _a2;
+        settings.ai.channelId = id;
+        settings.ai.modelId = ((_a2 = aiChannels.value.find(c => c.id === id)) == null ? void 0 : _a2.defaultModelId) ?? "";
+        aiProbeNote.value = "";
+        persist();
+      };
+      const onAiModelChange = id => {
+        settings.ai.modelId = id;
+        aiProbeNote.value = "";
+        persist();
+      };
+      const saveAiCredential = () => {
+        const value = aiCredentialDraft.value.trim();
+        if (!value) return;
+        setAiCredential(value);
+        aiHasCredential.value = true;
+        aiCredentialDraft.value = "";
+        aiProbeNote.value = "";
+        pushLog("\u5df2\u4fdd\u5b58 AI Key \xb7 \u672c\u673a\u4fdd\u5b58\uff0c\u8865\u7b54\u65f6\u7ecf\u7231\u95ee\u7b54\u540e\u7aef\u8f6c\u53d1\u7ed9\u670d\u52a1\u5546", "info");
+      };
+      const removeAiCredential = () => {
+        clearAiCredential();
+        aiHasCredential.value = false;
+        aiProbeNote.value = "";
+        pushLog("\u5df2\u5220\u9664 AI Key", "info");
+      };
+      async function probeAi() {
+        aiProbing.value = true;
+        aiProbeNote.value = "";
+        try {
+          const result = await aiProbe(aiaskTransport, BACKEND_BASE_URL, aiClientConfig());
+          aiProbeNote.value = result.ok ? "\u8fde\u63a5\u6b63\u5e38" : `\u6d4b\u8bd5\u672a\u901a\u8fc7 \xb7 ${AI_PROBE_LABEL[result.reason]}`;
+        } finally {
+          aiProbing.value = false;
+        }
+      }
+      async function aiAnswerCurrent() {
+        const active2 = session;
+        if (!active2) return;
+        running.value = true;
+        try {
+          const summary = await active2.aiAnswerOne(curInx.value, {
+            cache: settings.ai.cache
+          });
+          if (session !== active2) return;
+          list.value = [ ...active2.list ];
+          pushLog(summary.hit > 0 ? "AI \u7b54\u8fd9\u9898 \xb7 \u5df2\u56de\u586b" : `AI \u7b54\u8fd9\u9898 \xb7 \u672a\u7b54\u4e0a${skippedText(summary)}`, summary.hit > 0 ? "info" : "warning");
+        } finally {
+          running.value = false;
+        }
+      }
       let mediaRunner = null;
       const mediaState = vue.ref(null);
       const MEDIA_STATE_TEXT = {
@@ -10847,8 +11872,8 @@
       };
       const GENERAL_SWITCHES = [ {
         key: "freeFirst",
-        label: "\u514d\u8d39\u9898\u5e93\u4f18\u5148",
-        hint: "\u5148\u67e5\u514d\u8d39\u6e90\uff0c\u672a\u547d\u4e2d\u518d\u67e5\u4ed8\u8d39\u6e90",
+        label: "\u4f7f\u7528\u514d\u8d39\u9898\u5e93",
+        hint: "\u5f00\u7740\u5148\u67e5\u514d\u8d39\u9898\u5e93\uff0c\u672a\u547d\u4e2d\u518d\u67e5\u4ed8\u8d39\u9898\u5e93\uff1b\u5173\u6389\u540e\u514d\u8d39\u9898\u5e93\u6574\u4e2a\u4e0d\u67e5\uff0c\u6bcf\u9898\u76f4\u63a5\u8d70\u4ed8\u8d39\u9898\u5e93\uff0c\u547d\u4e2d\u6263\u5206\u3002",
         toggle: makeToggle("freeFirst")
       }, {
         key: "autoStart",
@@ -11420,6 +12445,7 @@
         });
         syncMediaTask();
         void loadAnnouncement();
+        void loadUpdate();
         window.addEventListener("resize", onWindowResize);
         document.addEventListener("keydown", onPanelKeydown);
         if (settings.reportUsage) usageEvents.restore(); else usageEvents.disable();
@@ -11449,6 +12475,7 @@
         mediaRunner = null;
         void ((_a2 = adapter == null ? void 0 : adapter.dispose) == null ? void 0 : _a2.call(adapter));
         if (dragState.pointerId !== null) endPanelDrag(dragState, dragState.pointerId);
+        if (resizeState.pointerId !== null) endPanelResize(resizeState, resizeState.pointerId);
         panelResizeObserver == null ? void 0 : panelResizeObserver.disconnect();
         panelResizeObserver = null;
         window.removeEventListener("resize", onWindowResize);
@@ -11459,6 +12486,33 @@
       async function finishRound() {
         const active2 = session;
         if (!active2) return;
+        let aiOutcome = {
+          ran: false,
+          why: "disabled"
+        };
+        try {
+          aiOutcome = await runAiRound({
+            session: active2,
+            enabled: settings.ai.enabled,
+            hasCredential: !!getAiCredential(),
+            loggedIn: !!getToken(),
+            cache: settings.ai.cache,
+            log: pushLog
+          });
+        } catch (error) {
+          pushLog(`AI \u8865\u7b54\u5f02\u5e38 \xb7 ${error instanceof Error ? error.message.slice(0, 80) : String(error ?? "")}`, "error");
+        }
+        if (session !== active2) return;
+        if (aiOutcome.ran) {
+          list.value = [ ...active2.list ];
+          if (aiOutcome.event) trackUsage({
+            type: "ai_answer",
+            outcome: aiOutcome.event.outcome,
+            ...aiOutcome.event.hitDecile !== void 0 ? {
+              hitDecile: aiOutcome.event.hitDecile
+            } : {}
+          });
+        }
         if (settings.randomFallback) {
           let picked = 0;
           const skipped = [];
@@ -11477,7 +12531,7 @@
         if (session !== active2) return;
         if (stats.value.charged > 0) authStale.value = false;
         const answerableCount = countAnswerable();
-        const ratio = Math.round(trustedRatio(active2.list, answerableCount) * 100);
+        const ratio = Math.round(trustedRatio(active2.list, answerableCount, settings.ai.countTowardSubmit) * 100);
         const submitDocs = () => readableDocuments(document);
         let outcome;
         const onHubuPaper = submitDocs().some(doc => isHubuExamPaper(doc));
@@ -11488,6 +12542,7 @@
             enabled: settings.autoSubmit,
             items: active2.list,
             answerableCount: answerableCount,
+            countAi: settings.ai.countTowardSubmit,
             threshold: settings.autoSubmitThreshold,
             isSubmitted: isSubmittedProbe,
             onEntry: (how, source) => {
@@ -11536,7 +12591,7 @@
       }
       function onEvent(e) {
         if (session) list.value = [ ...session.list ];
-        if (e.kind === "question") curInx.value = e.inx; else if (e.kind === "progress") tip.value = `\u67e5\u9898\u4e2d ${e.inx + 1}/${e.total}`; else if (e.kind === "done") {
+        if (e.kind === "question") curInx.value = e.inx; else if (e.kind === "progress") tip.value = `\u67e5\u9898\u4e2d ${e.inx + 1}/${e.total}`; else if (e.kind === "ai-progress") tip.value = `AI \u8865\u7b54\u4e2d ${e.done}/${e.total}`; else if (e.kind === "ai-done" && e.requested > 0) tip.value = `AI \u8865\u7b54\u5b8c\u6210 \xb7 ${e.hit}/${e.requested} \u547d\u4e2d`; else if (e.kind === "done") {
           clearExamAutoResume();
           tip.value = e.total === 0 ? "\u672a\u8bc6\u522b\u5230\u9898\u76ee" : `\u5b8c\u6210 \xb7 ${e.hit} \u547d\u4e2d / ${e.total} \u9898`;
           running.value = false;
@@ -11566,6 +12621,8 @@
                 pageChangeScheduler == null ? void 0 : pageChangeScheduler.notify();
               }
             }
+          }).catch(error => {
+            pushLog(`\u672c\u8f6e\u6536\u5c3e\u5f02\u5e38 \xb7 ${error instanceof Error ? error.message.slice(0, 80) : String(error ?? "")}`, "error");
           });
         } else if (e.kind === "paused") {
           clearExamAutoResume();
@@ -11614,6 +12671,9 @@
           baseUrl: BACKEND_BASE_URL,
           settings: settings,
           localStore: localAnswerCache,
+          sessionDeps: {
+            aiAnswer: batch => aiAnswerBatch(aiaskTransport, BACKEND_BASE_URL, aiClientConfig(), batch)
+          },
           onHarvested: items => {
             if (!getToken()) return;
             void contributeHarvest(aiaskTransport, BACKEND_BASE_URL, platform.value || "unknown", items).catch(() => void 0);
@@ -11810,7 +12870,7 @@
           class: "launcher",
           onClick: activateLauncher,
           "aria-label": "\u5c55\u5f00\u7231\u95ee\u7b54"
-        }, [ _cache[31] || (_cache[31] = vue.createElementVNode("span", {
+        }, [ _cache[35] || (_cache[35] = vue.createElementVNode("span", {
           class: "seal s44"
         }, "\u95ee", -1)), detectedCount.value ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_2, vue.toDisplayString(detectedCount.value), 1)) : vue.createCommentVNode("", true) ]) ], 36)) : (vue.openBlock(), 
         vue.createElementBlock("div", {
@@ -11819,7 +12879,7 @@
           ref: panelRef,
           class: "panel",
           style: vue.normalizeStyle(panelStyle.value)
-        }, [ (vue.openBlock(), vue.createElementBlock("svg", _hoisted_3, [ ..._cache[32] || (_cache[32] = [ vue.createStaticVNode('<symbol id="i-chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></symbol><symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></symbol><symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h13M13 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></symbol>', 3) ]) ])), vue.createElementVNode("div", {
+        }, [ (vue.openBlock(), vue.createElementBlock("svg", _hoisted_3, [ ..._cache[36] || (_cache[36] = [ vue.createStaticVNode('<symbol id="i-chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></symbol><symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></symbol><symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h13M13 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></symbol>', 3) ]) ])), vue.createElementVNode("div", {
           ref_key: "dragHandleRef",
           ref: dragHandleRef,
           class: "head",
@@ -11828,11 +12888,11 @@
           onPointerup: finishDrag,
           onPointercancel: finishDrag,
           onLostpointercapture: finishDrag
-        }, [ _cache[35] || (_cache[35] = vue.createElementVNode("span", {
+        }, [ _cache[39] || (_cache[39] = vue.createElementVNode("span", {
           class: "seal s22"
-        }, "\u95ee", -1)), _cache[36] || (_cache[36] = vue.createElementVNode("span", {
+        }, "\u95ee", -1)), _cache[40] || (_cache[40] = vue.createElementVNode("span", {
           class: "name"
-        }, "\u7231\u95ee\u7b54", -1)), _cache[37] || (_cache[37] = vue.createElementVNode("span", {
+        }, "\u7231\u95ee\u7b54", -1)), _cache[41] || (_cache[41] = vue.createElementVNode("span", {
           class: "spacer"
         }, null, -1)), headChip.value ? (vue.openBlock(), vue.createElementBlock("span", {
           key: 0,
@@ -11848,7 +12908,7 @@
         }, [ loggedIn.value ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
         }, [ vue.createTextVNode(vue.toDisplayString(avatarInitial.value), 1) ], 64)) : (vue.openBlock(), 
-        vue.createElementBlock("svg", _hoisted_5, [ ..._cache[33] || (_cache[33] = [ vue.createElementVNode("circle", {
+        vue.createElementBlock("svg", _hoisted_5, [ ..._cache[37] || (_cache[37] = [ vue.createElementVNode("circle", {
           cx: "12",
           cy: "8",
           r: "3.4"
@@ -11859,7 +12919,7 @@
           class: "x",
           onClick: collapse,
           "aria-label": "\u6536\u8d77"
-        }, [ ..._cache[34] || (_cache[34] = [ vue.createElementVNode("svg", {
+        }, [ ..._cache[38] || (_cache[38] = [ vue.createElementVNode("svg", {
           class: "ic"
         }, [ vue.createElementVNode("use", {
           href: "#i-minus"
@@ -11873,7 +12933,7 @@
         vue.createElementBlock("div", {
           key: 0,
           class: vue.normalizeClass([ "anb", announcement.value.level ])
-        }, [ _cache[38] || (_cache[38] = vue.createElementVNode("span", {
+        }, [ _cache[42] || (_cache[42] = vue.createElementVNode("span", {
           class: "dot"
         }, null, -1)), vue.createElementVNode("span", {
           class: "t",
@@ -11884,26 +12944,40 @@
         }, "\u67e5\u770b"), vue.createElementVNode("button", {
           class: "btn ghost sm",
           onClick: dismissAnnouncement
-        }, "\u77e5\u9053\u4e86") ], 2)) : vue.createCommentVNode("", true), tab.value === "system" ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_9, [ (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(visibleSystemSegs.value, s => (vue.openBlock(), 
+        }, "\u77e5\u9053\u4e86") ], 2)) : vue.createCommentVNode("", true), updateBanner.value.kind !== "none" ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_9, [ _cache[43] || (_cache[43] = vue.createElementVNode("span", {
+          class: "dot"
+        }, null, -1)), updateBanner.value.kind === "actionable" ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_10, "\u65b0\u7248\u672c " + vue.toDisplayString(updateBanner.value.version) + " \u53ef\u7528\uff08" + vue.toDisplayString(updateBanner.value.sourceNames.join("\u3001")) + "\uff09", 1)) : (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_11, "\u65b0\u7248\u672c " + vue.toDisplayString(updateBanner.value.version) + " \u5df2\u53d1\u5e03 \xb7 \u5546\u5e97\u540c\u6b65\u4e2d", 1)), updateBanner.value.kind === "actionable" ? (vue.openBlock(), 
+        vue.createElementBlock("button", {
+          key: 2,
+          class: "btn ghost sm",
+          onClick: openUpdate
+        }, "\u53bb\u66f4\u65b0")) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
+          class: "btn ghost sm",
+          onClick: dismissUpdate
+        }, "\u5ffd\u7565") ])) : vue.createCommentVNode("", true), tab.value === "system" ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_12, [ (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(visibleSystemSegs.value, s => (vue.openBlock(), 
         vue.createElementBlock("button", {
           key: s.k,
           class: vue.normalizeClass([ "seg", {
             active: systemSub.value === s.k
           } ]),
           onClick: $event => systemSub.value = s.k
-        }, vue.toDisplayString(s.l), 11, _hoisted_10))), 128)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_11, [ tab.value === "home" ? (vue.openBlock(), 
-        vue.createElementBlock(vue.Fragment, {
+        }, vue.toDisplayString(s.l), 11, _hoisted_13))), 128)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", {
+          class: "body",
+          style: vue.normalizeStyle(bodyStyle.value)
+        }, [ tab.value === "home" ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ announcement.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_12, [ vue.createElementVNode("div", _hoisted_13, [ _cache[39] || (_cache[39] = vue.createElementVNode("span", {
+        }, [ announcement.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_14, [ vue.createElementVNode("div", _hoisted_15, [ _cache[44] || (_cache[44] = vue.createElementVNode("span", {
           class: "locator"
-        }, "\u516c\u544a", -1)), vue.createElementVNode("span", _hoisted_14, vue.toDisplayString(announcementTime.value), 1) ]), vue.createElementVNode("div", _hoisted_15, vue.toDisplayString(announcement.value.title), 1), vue.createElementVNode("div", {
+        }, "\u516c\u544a", -1)), vue.createElementVNode("span", _hoisted_16, vue.toDisplayString(announcementTime.value), 1) ]), vue.createElementVNode("div", _hoisted_17, vue.toDisplayString(announcement.value.title), 1), vue.createElementVNode("div", {
           class: "an-body",
           innerHTML: announcement.value.html
-        }, null, 8, _hoisted_16) ])) : vue.createCommentVNode("", true), hasFeature("course-automation") ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_17, [ vue.createElementVNode("div", _hoisted_18, [ _cache[40] || (_cache[40] = vue.createElementVNode("span", {
+        }, null, 8, _hoisted_18) ])) : vue.createCommentVNode("", true), hasFeature("course-automation") ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_19, [ vue.createElementVNode("div", _hoisted_20, [ _cache[45] || (_cache[45] = vue.createElementVNode("span", {
           class: "locator"
-        }, "\u8bfe\u7a0b\u5b66\u4e60", -1)), vue.createElementVNode("div", _hoisted_19, [ vue.createElementVNode("button", {
+        }, "\u8bfe\u7a0b\u5b66\u4e60", -1)), vue.createElementVNode("div", _hoisted_21, [ vue.createElementVNode("button", {
           class: "btn ghost sm",
           onClick: openCourseSettings,
           "aria-label": "\u8bfe\u7a0b\u5b66\u4e60\u8bbe\u7f6e"
@@ -11914,9 +12988,9 @@
         }, vue.toDisplayString(settings.courseAuto ? "\u6682\u505c" : "\u7ee7\u7eed"), 1)) : vue.createCommentVNode("", true) ]) ]), vue.unref(legacyCourseUrl) ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ _cache[41] || (_cache[41] = vue.createElementVNode("div", {
+        }, [ _cache[46] || (_cache[46] = vue.createElementVNode("div", {
           class: "gate-h course-status"
-        }, "\u65e7\u7248\u8bfe\u7a0b\u9875\u9762 \xb7 \u8bfe\u7a0b\u5b66\u4e60\u53ea\u652f\u6301\u65b0\u7248", -1)), _cache[42] || (_cache[42] = vue.createElementVNode("div", {
+        }, "\u65e7\u7248\u8bfe\u7a0b\u9875\u9762 \xb7 \u8bfe\u7a0b\u5b66\u4e60\u53ea\u652f\u6301\u65b0\u7248", -1)), _cache[47] || (_cache[47] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u8d85\u661f\u540c\u4e00\u7ae0\u8282\u6709\u65b0\u65e7\u4e24\u79cd\u9875\u9762\uff0c\u5207\u6362\u540e\u8d26\u53f7\u4e0e\u8fdb\u5ea6\u4e0d\u53d8\u3002", -1)), vue.createElementVNode("button", {
           class: "btn ghost sm",
@@ -11924,9 +12998,9 @@
         }, "\u5207\u6362\u65b0\u7248") ], 64)) : !onCourseStudyPage.value ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ _cache[43] || (_cache[43] = vue.createElementVNode("div", {
+        }, [ _cache[48] || (_cache[48] = vue.createElementVNode("div", {
           class: "gate-h course-status"
-        }, "\u8bfe\u7a0b\u5b66\u4e60\u53ea\u5728\u8bfe\u7a0b\u7ae0\u8282\u9875\u8fd0\u884c", -1)), _cache[44] || (_cache[44] = vue.createElementVNode("div", {
+        }, "\u8bfe\u7a0b\u5b66\u4e60\u53ea\u5728\u8bfe\u7a0b\u7ae0\u8282\u9875\u8fd0\u884c", -1)), _cache[49] || (_cache[49] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u6253\u5f00\u67d0\u95e8\u8bfe\u7684\u7ae0\u8282\u5b66\u4e60\u9875\u540e\uff0c\u8fd9\u91cc\u4f1a\u663e\u793a\u8fdb\u5ea6\u4e0e\u72b6\u6001\u3002", -1)) ], 64)) : (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
@@ -11939,47 +13013,47 @@
             "white-space": "nowrap"
           },
           title: courseStatusText.value
-        }, vue.toDisplayString(courseStatusText.value), 9, _hoisted_20), coursePositionText.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_21, [ vue.createElementVNode("span", _hoisted_22, vue.toDisplayString(coursePositionText.value), 1), vue.createElementVNode("button", {
+        }, vue.toDisplayString(courseStatusText.value), 9, _hoisted_22), coursePositionText.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_23, [ vue.createElementVNode("span", _hoisted_24, vue.toDisplayString(coursePositionText.value), 1), vue.createElementVNode("button", {
           class: "btn ghost sm",
           onClick: cyclePlaybackRate
         }, vue.toDisplayString(settings.coursePlaybackRate) + "\xd7", 1) ])) : vue.createCommentVNode("", true), courseCountText.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_23, vue.toDisplayString(courseCountText.value), 1)) : vue.createCommentVNode("", true), courseSkipped.value.length ? (vue.openBlock(), 
-        vue.createElementBlock("details", _hoisted_24, [ vue.createElementVNode("summary", _hoisted_25, "\u8df3\u8fc7 " + vue.toDisplayString(courseSkipped.value.length) + " \u9879", 1), (vue.openBlock(true), 
+        vue.createElementBlock("div", _hoisted_25, vue.toDisplayString(courseCountText.value), 1)) : vue.createCommentVNode("", true), courseSkipped.value.length ? (vue.openBlock(), 
+        vue.createElementBlock("details", _hoisted_26, [ vue.createElementVNode("summary", _hoisted_27, "\u8df3\u8fc7 " + vue.toDisplayString(courseSkipped.value.length) + " \u9879", 1), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(courseSkipped.value, (item, i) => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: i,
           class: "cap-mute"
-        }, vue.toDisplayString(item.name) + " \xb7 " + vue.toDisplayString(skipReasonLabel(item.reason)), 1))), 128)) ])) : vue.createCommentVNode("", true), _cache[45] || (_cache[45] = vue.createElementVNode("div", {
+        }, vue.toDisplayString(item.name) + " \xb7 " + vue.toDisplayString(skipReasonLabel(item.reason)), 1))), 128)) ])) : vue.createCommentVNode("", true), _cache[50] || (_cache[50] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u6682\u505c\u4f1a\u540c\u65f6\u505c\u4e0b\u6b63\u5728\u64ad\u653e\u7684\u89c6\u9891\u3002", -1)) ], 64)) ])) : vue.createCommentVNode("", true), !detectedCount.value && !harvestedCount.value && !settings.courseAuto ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_26, [ _cache[46] || (_cache[46] = vue.createElementVNode("div", {
+        vue.createElementBlock("div", _hoisted_28, [ _cache[51] || (_cache[51] = vue.createElementVNode("div", {
           class: "standby-title"
-        }, "\u9759\u5019\u4e00\u95ee", -1)), vue.createElementVNode("div", _hoisted_27, vue.toDisplayString(standbyHint.value), 1) ])) : (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_28, [ vue.createElementVNode("div", _hoisted_29, [ _cache[47] || (_cache[47] = vue.createElementVNode("span", {
+        }, "\u9759\u5019\u4e00\u95ee", -1)), vue.createElementVNode("div", _hoisted_29, vue.toDisplayString(standbyHint.value), 1) ])) : (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_30, [ vue.createElementVNode("div", _hoisted_31, [ _cache[52] || (_cache[52] = vue.createElementVNode("span", {
           class: "locator"
-        }, "\u9875\u9762\u72b6\u6001", -1)), vue.createElementVNode("span", _hoisted_30, vue.toDisplayString(platformLabel.value), 1) ]), vue.createElementVNode("div", _hoisted_31, vue.toDisplayString(pageStatus.value), 1), vue.createElementVNode("div", _hoisted_32, vue.toDisplayString(homeHint.value), 1) ])), vue.createElementVNode("div", _hoisted_33, [ vue.createElementVNode("button", {
+        }, "\u9875\u9762\u72b6\u6001", -1)), vue.createElementVNode("span", _hoisted_32, vue.toDisplayString(platformLabel.value), 1) ]), vue.createElementVNode("div", _hoisted_33, vue.toDisplayString(pageStatus.value), 1), vue.createElementVNode("div", _hoisted_34, vue.toDisplayString(homeHint.value), 1) ])), vue.createElementVNode("div", _hoisted_35, [ vue.createElementVNode("button", {
           class: "btn ghost sm",
           onClick: openLogs
         }, "\u8fd0\u884c\u65e5\u5fd7"), detectedCount.value ? (vue.openBlock(), vue.createElementBlock("button", {
           key: 0,
           class: "btn ghost sm",
           onClick: exportPage
-        }, "\u5bfc\u51fa\u672c\u9875\u9898\u76ee")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_34, [ _cache[48] || (_cache[48] = vue.createElementVNode("div", {
+        }, "\u5bfc\u51fa\u672c\u9875\u9898\u76ee")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_36, [ _cache[53] || (_cache[53] = vue.createElementVNode("div", {
           class: "sep"
-        }, null, -1)), vue.createElementVNode("div", _hoisted_35, [ vue.createElementVNode("span", _hoisted_36, vue.toDisplayString(!loggedIn.value ? "\u672a\u767b\u5f55" : authStale.value ? `${accountName.value || "\u8d26\u53f7"} \xb7 \u9700\u91cd\u65b0\u9a8c\u8bc1` : accountName.value || "\u5df2\u767b\u5f55"), 1), vue.createElementVNode("div", _hoisted_37, [ loggedIn.value && balance.value != null ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_38, "\u4f59\u989d " + vue.toDisplayString(balance.value) + " \u5206", 1)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
+        }, null, -1)), vue.createElementVNode("div", _hoisted_37, [ vue.createElementVNode("span", _hoisted_38, vue.toDisplayString(!loggedIn.value ? "\u672a\u767b\u5f55" : authStale.value ? `${accountName.value || "\u8d26\u53f7"} \xb7 \u9700\u91cd\u65b0\u9a8c\u8bc1` : accountName.value || "\u5df2\u767b\u5f55"), 1), vue.createElementVNode("div", _hoisted_39, [ loggedIn.value && balance.value != null ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_40, "\u4f59\u989d " + vue.toDisplayString(balance.value) + " \u5206", 1)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
           class: "btn ghost sm",
           onClick: _cache[1] || (_cache[1] = $event => accountOpen.value = true)
-        }, vue.toDisplayString(loggedIn.value ? "\u8d26\u6237" : "\u767b\u5f55"), 1) ]) ]), vue.createElementVNode("div", _hoisted_39, vue.toDisplayString(loggedIn.value ? "\u4ed8\u8d39\u9898\u5e93\u627e\u5230\u53ef\u7528\u7b54\u6848\u540e\u6263\u5206\uff1b\u514d\u8d39\u7b54\u6848\u4e0d\u6263\u5206\uff0c\u547d\u4e2d\u672c\u673a\u6536\u5f55\u4e5f\u4e0d\u6263\u5206\u3002" : "\u672a\u767b\u5f55\u65f6\u4ec5\u67e5\u8be2\u514d\u8d39\u9898\u5e93\u3002"), 1) ]) ], 64)) : tab.value === "ask" ? (vue.openBlock(), 
+        }, vue.toDisplayString(loggedIn.value ? "\u8d26\u6237" : "\u767b\u5f55"), 1) ]) ]), vue.createElementVNode("div", _hoisted_41, vue.toDisplayString(loggedIn.value ? "\u4ed8\u8d39\u9898\u5e93\u627e\u5230\u53ef\u7528\u7b54\u6848\u540e\u6263\u5206\uff1b\u514d\u8d39\u7b54\u6848\u4e0d\u6263\u5206\uff0c\u547d\u4e2d\u672c\u673a\u6536\u5f55\u4e5f\u4e0d\u6263\u5206\u3002" : "\u672a\u767b\u5f55\u65f6\u4ec5\u67e5\u8be2\u514d\u8d39\u9898\u5e93\u3002"), 1) ]) ], 64)) : tab.value === "ask" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ note2.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_40, [ vue.createElementVNode("span", _hoisted_41, vue.toDisplayString(note2.value), 1), noteAction.value === "account" ? (vue.openBlock(), 
+        }, [ note2.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_42, [ vue.createElementVNode("span", _hoisted_43, vue.toDisplayString(note2.value), 1), noteAction.value === "account" ? (vue.openBlock(), 
         vue.createElementBlock("button", {
           key: 0,
           class: "btn ghost sm sub",
           onClick: _cache[2] || (_cache[2] = $event => accountOpen.value = true)
-        }, [ ..._cache[49] || (_cache[49] = [ vue.createTextVNode("\u53bb\u8d26\u6237 ", -1), vue.createElementVNode("svg", {
+        }, [ ..._cache[54] || (_cache[54] = [ vue.createTextVNode("\u53bb\u8d26\u6237 ", -1), vue.createElementVNode("svg", {
           class: "ic sm"
         }, [ vue.createElementVNode("use", {
           href: "#i-arrow"
@@ -11987,103 +13061,109 @@
           key: 1,
           class: "btn ghost sm sub",
           onClick: _cache[3] || (_cache[3] = $event => accountOpen.value = true)
-        }, [ ..._cache[50] || (_cache[50] = [ vue.createTextVNode("\u53bb\u767b\u5f55 ", -1), vue.createElementVNode("svg", {
+        }, [ ..._cache[55] || (_cache[55] = [ vue.createTextVNode("\u53bb\u767b\u5f55 ", -1), vue.createElementVNode("svg", {
           class: "ic sm"
         }, [ vue.createElementVNode("use", {
           href: "#i-arrow"
         }) ], -1) ]) ])) : vue.createCommentVNode("", true) ])) : vue.createCommentVNode("", true), runDone.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_42, [ _cache[64] || (_cache[64] = vue.createElementVNode("div", {
+        vue.createElementBlock("div", _hoisted_44, [ _cache[69] || (_cache[69] = vue.createElementVNode("div", {
           class: "ctitle"
-        }, "\u672c\u8f6e\u5b8c\u6210", -1)), vue.createElementVNode("div", _hoisted_43, [ _cache[51] || (_cache[51] = vue.createElementVNode("span", {
+        }, "\u672c\u8f6e\u5b8c\u6210", -1)), vue.createElementVNode("div", _hoisted_45, [ _cache[56] || (_cache[56] = vue.createElementVNode("span", {
           class: "k"
         }, "\u5df2\u56de\u586b", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.filled) + " \u9898", 1), runSummary.value.filled > 0 ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_44, "\u5df2\u6682\u5b58")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_45, [ _cache[52] || (_cache[52] = vue.createElementVNode("span", {
+        vue.createElementBlock("span", _hoisted_46, "\u5df2\u6682\u5b58")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_47, [ _cache[57] || (_cache[57] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u8ba1\u8d39", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.charged) + " \u5206", 1), _cache[53] || (_cache[53] = vue.createElementVNode("span", {
+        }, "\u8ba1\u8d39", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.charged) + " \u5206", 1), _cache[58] || (_cache[58] = vue.createElementVNode("span", {
           class: "cap-mute"
-        }, "\u547d\u4e2d\u5373\u8ba1\u8d39", -1)) ]), vue.createElementVNode("div", _hoisted_46, [ _cache[54] || (_cache[54] = vue.createElementVNode("span", {
+        }, "\u547d\u4e2d\u5373\u8ba1\u8d39", -1)) ]), vue.createElementVNode("div", _hoisted_48, [ _cache[59] || (_cache[59] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u672a\u547d\u4e2d", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.missed) + " \u9898", 1), _cache[55] || (_cache[55] = vue.createElementVNode("span", {
+        }, "\u672a\u547d\u4e2d", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.missed) + " \u9898", 1), _cache[60] || (_cache[60] = vue.createElementVNode("span", {
           class: "cap-mute"
-        }, "\u672a\u6263\u5206", -1)) ]), runSummary.value.unqueried ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_47, [ _cache[56] || (_cache[56] = vue.createElementVNode("span", {
+        }, "\u672a\u6263\u5206", -1)) ]), runSummary.value.unqueried ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_49, [ _cache[61] || (_cache[61] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u672a\u67e5\u8be2", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.unqueried) + " \u9898", 1), _cache[57] || (_cache[57] = vue.createElementVNode("span", {
+        }, "\u672a\u67e5\u8be2", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.unqueried) + " \u9898", 1), _cache[62] || (_cache[62] = vue.createElementVNode("span", {
           class: "cap-mute"
         }, "\u672a\u53d1\u8d77\u4ed8\u8d39\u67e5\u8be2 \xb7 \u672a\u6263\u5206", -1)) ])) : vue.createCommentVNode("", true), runSummary.value.chargedUnfilled ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_48, [ _cache[58] || (_cache[58] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_50, [ _cache[63] || (_cache[63] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u5df2\u6263\u672a\u586b", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.chargedUnfilled) + " \u9898", 1), _cache[59] || (_cache[59] = vue.createElementVNode("span", {
+        }, "\u5df2\u6263\u672a\u586b", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.chargedUnfilled) + " \u9898", 1), _cache[64] || (_cache[64] = vue.createElementVNode("span", {
           class: "cap-mute"
         }, "\u672a\u80fd\u5b89\u5168\u5199\u5165\u9875\u9762 \xb7 \u5df2\u6263\u5206\uff0c\u9700\u624b\u52a8\u6838\u5bf9", -1)) ])) : vue.createCommentVNode("", true), runSummary.value.hitUnfilled ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_49, [ _cache[60] || (_cache[60] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_51, [ _cache[65] || (_cache[65] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u6709\u7b54\u6848\u672a\u5199\u5165", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.hitUnfilled) + " \u9898", 1), _cache[61] || (_cache[61] = vue.createElementVNode("span", {
+        }, "\u6709\u7b54\u6848\u672a\u5199\u5165", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.hitUnfilled) + " \u9898", 1), _cache[66] || (_cache[66] = vue.createElementVNode("span", {
           class: "cap-mute"
         }, "\u672a\u80fd\u5b89\u5168\u5199\u5165\u9875\u9762 \xb7 \u672a\u6263\u5206\uff0c\u53ef\u5c55\u5f00\u6838\u5bf9", -1)) ])) : vue.createCommentVNode("", true), runSummary.value.skipped ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_50, [ _cache[62] || (_cache[62] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_52, [ _cache[67] || (_cache[67] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u672a\u5904\u7406", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.skipped) + " \u9898", 1), _cache[63] || (_cache[63] = vue.createElementVNode("span", {
+        }, "\u672a\u5904\u7406", -1)), vue.createElementVNode("b", null, vue.toDisplayString(runSummary.value.skipped) + " \u9898", 1), _cache[68] || (_cache[68] = vue.createElementVNode("span", {
           class: "cap-mute"
-        }, "\u89e3\u6790\u5931\u8d25\u6216\u9898\u578b\u4e0d\u652f\u6301 \xb7 \u672a\u67e5\u8be2\u3001\u672a\u6263\u5206", -1)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_51, vue.toDisplayString(submitNote.value), 1), _cache[65] || (_cache[65] = vue.createElementVNode("span", {
+        }, "\u89e3\u6790\u5931\u8d25\u6216\u9898\u578b\u4e0d\u652f\u6301 \xb7 \u672a\u67e5\u8be2\u3001\u672a\u6263\u5206", -1)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_53, vue.toDisplayString(submitNote.value), 1), _cache[70] || (_cache[70] = vue.createElementVNode("span", {
           class: "done-seal",
           "aria-hidden": "true"
-        }, "\u7b54", -1)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_52, [ !list.value.length ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_53, vue.toDisplayString(tip.value === "\u7a7a\u95f2" ? "\u5f53\u524d\u9875\u672a\u8bc6\u522b\u5230\u9898\u76ee \xb7 \u6253\u5f00\u4f5c\u4e1a\u9875\u540e\u81ea\u52a8\u5207\u5165" : tip.value), 1)) : vue.createCommentVNode("", true), _cache[67] || (_cache[67] = vue.createElementVNode("div", {
+        }, "\u7b54", -1)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_54, [ !list.value.length ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_55, vue.toDisplayString(tip.value === "\u7a7a\u95f2" ? "\u5f53\u524d\u9875\u672a\u8bc6\u522b\u5230\u9898\u76ee \xb7 \u6253\u5f00\u4f5c\u4e1a\u9875\u540e\u81ea\u52a8\u5207\u5165" : tip.value), 1)) : vue.createCommentVNode("", true), _cache[72] || (_cache[72] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u4ed8\u8d39\u9898\u5e93\u627e\u5230\u53ef\u7528\u7b54\u6848\u540e\u6263\u5206\uff1b\u514d\u8d39\u7b54\u6848\u4e0d\u6263\u5206\uff1b\u65e0\u6cd5\u5b89\u5168\u5339\u914d\u65f6\u4e0d\u4f1a\u56de\u586b\u3002", -1)), stats.value.charged ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_54, [ _cache[66] || (_cache[66] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_56, [ _cache[71] || (_cache[71] = vue.createElementVNode("span", {
           class: "spacer"
-        }, null, -1)), vue.createElementVNode("span", _hoisted_55, "\u4ed8\u8d39\u9898\u5e93\u547d\u4e2d " + vue.toDisplayString(stats.value.charged) + " \u9898", 1) ])) : vue.createCommentVNode("", true), stats.value.charged ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_56, "\u91cd\u590d\u7b54\u9898\u4f1a\u590d\u7528\u5df2\u6263\u5206\u7ed3\u679c\uff0c\u4e0d\u4f1a\u91cd\u590d\u6263\u5206\u3002")) : vue.createCommentVNode("", true) ]), list.value.length ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_57, [ vue.createElementVNode("button", {
+        }, null, -1)), vue.createElementVNode("span", _hoisted_57, "\u4ed8\u8d39\u9898\u5e93\u547d\u4e2d " + vue.toDisplayString(stats.value.charged) + " \u9898", 1) ])) : vue.createCommentVNode("", true), stats.value.charged ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_58, "\u91cd\u590d\u7b54\u9898\u4f1a\u590d\u7528\u5df2\u6263\u5206\u7ed3\u679c\uff0c\u4e0d\u4f1a\u91cd\u590d\u6263\u5206\u3002")) : vue.createCommentVNode("", true) ]), list.value.length ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_59, [ vue.createElementVNode("button", {
           class: "fold",
           onClick: _cache[4] || (_cache[4] = $event => navOpen.value = !navOpen.value)
-        }, [ _cache[69] || (_cache[69] = vue.createTextVNode("\u9898\u76ee\u5bfc\u822a", -1)), (vue.openBlock(), 
+        }, [ _cache[74] || (_cache[74] = vue.createTextVNode("\u9898\u76ee\u5bfc\u822a", -1)), (vue.openBlock(), 
         vue.createElementBlock("svg", {
           class: vue.normalizeClass([ "ic sm chev", {
             right: !navOpen.value
           } ])
-        }, [ ..._cache[68] || (_cache[68] = [ vue.createElementVNode("use", {
+        }, [ ..._cache[73] || (_cache[73] = [ vue.createElementVNode("use", {
           href: "#i-chevron"
         }, null, -1) ]) ], 2)) ]), navOpen.value ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ _cache[70] || (_cache[70] = vue.createStaticVNode('<div class="legend"><span><i class="sw cur"></i>\u5f53\u524d</span><span><i class="sw hit"></i>\u5df2\u7b54</span><span><i class="sw"></i>\u672a\u7b54</span><span><i class="sw miss"></i>\u65e0\u7b54\u6848</span></div>', 1)), vue.createElementVNode("div", _hoisted_58, [ (vue.openBlock(true), 
+        }, [ _cache[75] || (_cache[75] = vue.createStaticVNode('<div class="legend"><span><i class="sw cur"></i>\u5f53\u524d</span><span><i class="sw hit"></i>\u5df2\u7b54</span><span><i class="sw"></i>\u672a\u7b54</span><span><i class="sw miss"></i>\u65e0\u7b54\u6848</span></div>', 1)), vue.createElementVNode("div", _hoisted_60, [ (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(list.value, (it, i) => (vue.openBlock(), 
         vue.createElementBlock("button", {
           key: i,
           class: vue.normalizeClass([ "cell", cellClass(it, i) ]),
           onClick: $event => jump(i)
-        }, vue.toDisplayString(i + 1), 11, _hoisted_59))), 128)) ]) ], 64)) : vue.createCommentVNode("", true) ])) : vue.createCommentVNode("", true), cur.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_60, [ cur.value.status === "decodeFail" ? (vue.openBlock(), 
+        }, vue.toDisplayString(i + 1), 11, _hoisted_61))), 128)) ]) ], 64)) : vue.createCommentVNode("", true) ])) : vue.createCommentVNode("", true), cur.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_62, [ cur.value.status === "decodeFail" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ vue.createElementVNode("div", _hoisted_61, [ vue.createElementVNode("span", _hoisted_62, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), _cache[71] || (_cache[71] = vue.createElementVNode("span", {
+        }, [ vue.createElementVNode("div", _hoisted_63, [ vue.createElementVNode("span", _hoisted_64, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), _cache[76] || (_cache[76] = vue.createElementVNode("span", {
           class: "tag neutral"
-        }, "\u89e3\u7801\u5931\u8d25", -1)) ]), _cache[72] || (_cache[72] = vue.createElementVNode("div", {
+        }, "\u89e3\u7801\u5931\u8d25", -1)) ]), _cache[77] || (_cache[77] = vue.createElementVNode("div", {
           class: "stem"
-        }, "\uff08\u9898\u9762\u89e3\u6790\u5931\u8d25\uff0c\u5df2\u8df3\u8fc7\uff09", -1)), _cache[73] || (_cache[73] = vue.createElementVNode("div", {
+        }, "\uff08\u9898\u9762\u89e3\u6790\u5931\u8d25\uff0c\u5df2\u8df3\u8fc7\uff09", -1)), _cache[78] || (_cache[78] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u89e3\u6790\u5931\u8d25 \xb7 \u672a\u6263\u5206 \xb7 \u9700\u624b\u52a8\u6838\u5bf9", -1)) ], 64)) : cur.value.status === "unsupported" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ vue.createElementVNode("div", _hoisted_63, [ vue.createElementVNode("span", _hoisted_64, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), _cache[74] || (_cache[74] = vue.createElementVNode("span", {
+        }, [ vue.createElementVNode("div", _hoisted_65, [ vue.createElementVNode("span", _hoisted_66, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), _cache[79] || (_cache[79] = vue.createElementVNode("span", {
           class: "tag neutral"
-        }, "\u5185\u5bb9\u89e3\u6790\u5931\u8d25", -1)) ]), _cache[75] || (_cache[75] = vue.createElementVNode("div", {
+        }, "\u5185\u5bb9\u89e3\u6790\u5931\u8d25", -1)) ]), _cache[80] || (_cache[80] = vue.createElementVNode("div", {
           class: "stem"
-        }, "\uff08\u9898\u76ee\u65e0\u5408\u6cd5\u6587\u5b57\u6216\u56fe\u7247\uff0c\u5df2\u8df3\u8fc7\uff09", -1)), _cache[76] || (_cache[76] = vue.createElementVNode("div", {
+        }, "\uff08\u9898\u76ee\u65e0\u5408\u6cd5\u6587\u5b57\u6216\u56fe\u7247\uff0c\u5df2\u8df3\u8fc7\uff09", -1)), _cache[81] || (_cache[81] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u672a\u641c\u7d22 \xb7 \u672a\u6263\u5206 \xb7 \u672a\u56de\u586b", -1)) ], 64)) : (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 2
-        }, [ vue.createElementVNode("div", _hoisted_65, [ vue.createElementVNode("span", _hoisted_66, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), vue.createElementVNode("div", _hoisted_67, [ cur.value.treeProgress && cur.value.treeProgress.total > 1 ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_68, " \u7236\u9898 " + vue.toDisplayString(cur.value.treeProgress.hit) + "/" + vue.toDisplayString(cur.value.treeProgress.total) + " \xb7 " + vue.toDisplayString(treeStatusLabel(cur.value.treeProgress.status)), 1)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
+        }, [ vue.createElementVNode("div", _hoisted_67, [ vue.createElementVNode("span", _hoisted_68, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), vue.createElementVNode("div", _hoisted_69, [ cur.value.treeProgress && cur.value.treeProgress.total > 1 ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_70, " \u7236\u9898 " + vue.toDisplayString(cur.value.treeProgress.hit) + "/" + vue.toDisplayString(cur.value.treeProgress.total) + " \xb7 " + vue.toDisplayString(treeStatusLabel(cur.value.treeProgress.status)), 1)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
           class: "btn ghost sm sub",
           disabled: running.value,
           onClick: reAnswerCurrent
-        }, "\u91cd\u7b54\u672c\u9898", 8, _hoisted_69) ]) ]), vue.createElementVNode("div", _hoisted_70, [ vue.createElementVNode("span", _hoisted_71, "[" + vue.toDisplayString(currentTypeLabel.value) + "]", 1), vue.createVNode(_sfc_main$1, {
+        }, "\u91cd\u7b54\u672c\u9898", 8, _hoisted_71), settings.ai.enabled && aiHasCredential.value ? (vue.openBlock(), 
+        vue.createElementBlock("button", {
+          key: 1,
+          class: "btn ghost sm sub",
+          disabled: running.value,
+          onClick: aiAnswerCurrent
+        }, "AI \u7b54\u8fd9\u9898", 8, _hoisted_72)) : vue.createCommentVNode("", true) ]) ]), vue.createElementVNode("div", _hoisted_73, [ vue.createElementVNode("span", _hoisted_74, "[" + vue.toDisplayString(currentTypeLabel.value) + "]", 1), vue.createVNode(_sfc_main$1, {
           content: cur.value.q.stem,
           "max-height": "180px"
-        }, null, 8, [ "content" ]) ]), vue.createElementVNode("div", _hoisted_72, [ (vue.openBlock(true), 
+        }, null, 8, [ "content" ]) ]), vue.createElementVNode("div", _hoisted_75, [ (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(shownOpts.value, x => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: x.i,
@@ -12108,63 +13188,64 @@
           class: vue.normalizeClass([ "ic sm chev", {
             right: !optsExpanded.value
           } ])
-        }, [ ..._cache[77] || (_cache[77] = [ vue.createElementVNode("use", {
+        }, [ ..._cache[82] || (_cache[82] = [ vue.createElementVNode("use", {
           href: "#i-chevron"
-        }, null, -1) ]) ], 2)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_73, [ vue.createElementVNode("div", _hoisted_74, [ _cache[78] || (_cache[78] = vue.createElementVNode("span", {
+        }, null, -1) ]) ], 2)) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_76, [ vue.createElementVNode("div", _hoisted_77, [ _cache[83] || (_cache[83] = vue.createElementVNode("span", {
           class: "answer-label"
-        }, "\u53c2\u8003\u7b54\u6848", -1)), vue.createElementVNode("div", _hoisted_75, [ cur.value.aiGenerated ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_76, "AI \u751f\u6210 \xb7 \u5f85\u6838\u5bf9")) : vue.createCommentVNode("", true), cur.value.answer.length ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_77, vue.toDisplayString(cur.value.filled ? "\u5df2\u56de\u586b" : "\u5339\u914d\u5931\u8d25"), 1)) : vue.createCommentVNode("", true) ]) ]), _cache[80] || (_cache[80] = vue.createElementVNode("div", {
+        }, "\u53c2\u8003\u7b54\u6848", -1)), vue.createElementVNode("div", _hoisted_78, [ cur.value.aiGenerated ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_79, "AI \u751f\u6210 \xb7 \u5f85\u6838\u5bf9")) : vue.createCommentVNode("", true), !cur.value.answer.length && cur.value.aiSkipReason ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_80, vue.toDisplayString(vue.unref(AI_SKIP_LABEL)[cur.value.aiSkipReason]), 1)) : vue.createCommentVNode("", true), cur.value.answer.length ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_81, vue.toDisplayString(cur.value.filled ? "\u5df2\u56de\u586b" : "\u5339\u914d\u5931\u8d25"), 1)) : vue.createCommentVNode("", true) ]) ]), _cache[85] || (_cache[85] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u7b54\u6848\u4ec5\u4f9b\u53c2\u8003\uff0c\u81ea\u884c\u6838\u5bf9\u3002", -1)), ((_a2 = cur.value.answerPlan) == null ? void 0 : _a2.kind) === "slots" ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_78, [ (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(cur.value.answerPlan.slots, (slot, slotIndex) => (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_82, [ (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(cur.value.answerPlan.slots, (slot, slotIndex) => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: slot.slotId,
           class: "answer-item"
-        }, [ vue.createElementVNode("span", _hoisted_79, "\u7a7a " + vue.toDisplayString(slotIndex + 1), 1), vue.createElementVNode("span", _hoisted_80, [ (vue.openBlock(true), 
+        }, [ vue.createElementVNode("span", _hoisted_83, "\u7a7a " + vue.toDisplayString(slotIndex + 1), 1), vue.createElementVNode("span", _hoisted_84, [ (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(slot.values, (value, valueIndex) => (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: valueIndex
-        }, [ valueIndex ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_81, "\u3001")) : vue.createCommentVNode("", true), vue.createVNode(_sfc_main$1, {
+        }, [ valueIndex ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_85, "\u3001")) : vue.createCommentVNode("", true), vue.createVNode(_sfc_main$1, {
           content: value,
           "max-height": "120px"
         }, null, 8, [ "content" ]) ], 64))), 128)) ]) ]))), 128)) ])) : ((_b = cur.value.answerPlan) == null ? void 0 : _b.kind) === "matching-pair" ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_82, [ _cache[79] || (_cache[79] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_86, [ _cache[84] || (_cache[84] = vue.createElementVNode("span", {
           class: "answer-key"
-        }, "\u914d\u5bf9", -1)), vue.createElementVNode("span", _hoisted_83, [ vue.createVNode(_sfc_main$1, {
+        }, "\u914d\u5bf9", -1)), vue.createElementVNode("span", _hoisted_87, [ vue.createVNode(_sfc_main$1, {
           content: cur.value.answerPlan.displayValue,
           "max-height": "120px"
-        }, null, 8, [ "content" ]) ]) ])) : cur.value.answer.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_84, [ (vue.openBlock(true), 
+        }, null, 8, [ "content" ]) ]) ])) : cur.value.answer.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_88, [ (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(cur.value.answer, (answer, index) => (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: index
-        }, [ index ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_85, "\u3001")) : vue.createCommentVNode("", true), vue.createVNode(_sfc_main$1, {
+        }, [ index ? (vue.openBlock(), vue.createElementBlock("span", _hoisted_89, "\u3001")) : vue.createCommentVNode("", true), vue.createVNode(_sfc_main$1, {
           content: answer,
           "max-height": "120px"
-        }, null, 8, [ "content" ]) ], 64))), 128)) ])) : (vue.openBlock(), vue.createElementBlock("div", _hoisted_86, vue.toDisplayString(cur.value.status === "pending" ? "\u7b49\u5f85\u67e5\u9898" : "\u6682\u672a\u627e\u5230\u7b54\u6848"), 1)) ]) ], 64)) ])) : vue.createCommentVNode("", true) ], 64)) : tab.value === "harvest" ? (vue.openBlock(), 
+        }, null, 8, [ "content" ]) ], 64))), 128)) ])) : (vue.openBlock(), vue.createElementBlock("div", _hoisted_90, vue.toDisplayString(cur.value.status === "pending" ? "\u7b49\u5f85\u67e5\u9898" : "\u6682\u672a\u627e\u5230\u7b54\u6848"), 1)) ]) ], 64)) ])) : vue.createCommentVNode("", true) ], 64)) : tab.value === "harvest" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 2
         }, [ harvestedList.value.length ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ vue.createElementVNode("div", _hoisted_87, [ vue.createElementVNode("div", _hoisted_88, [ _cache[81] || (_cache[81] = vue.createElementVNode("span", {
+        }, [ vue.createElementVNode("div", _hoisted_91, [ vue.createElementVNode("div", _hoisted_92, [ _cache[86] || (_cache[86] = vue.createElementVNode("span", {
           class: "locator"
-        }, "\u672c\u9875\u6536\u5f55", -1)), vue.createElementVNode("div", _hoisted_89, [ vue.createElementVNode("span", _hoisted_90, vue.toDisplayString(harvestedList.value.length) + " \u9898", 1), vue.createElementVNode("button", {
+        }, "\u672c\u9875\u6536\u5f55", -1)), vue.createElementVNode("div", _hoisted_93, [ vue.createElementVNode("span", _hoisted_94, vue.toDisplayString(harvestedList.value.length) + " \u9898", 1), vue.createElementVNode("button", {
           class: "btn ghost sm",
           onClick: exportHarvest
-        }, "\u5bfc\u51fa\u672c\u9875\u6536\u5f55") ]) ]), _cache[82] || (_cache[82] = vue.createElementVNode("div", {
+        }, "\u5bfc\u51fa\u672c\u9875\u6536\u5f55") ]) ]), _cache[87] || (_cache[87] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u505a\u8fc7\u5e76\u51fa\u5206\u7684\u9898\u76ee\u5df2\u6536\u5f55\u5230\u672c\u673a\uff0c\u547d\u4e2d\u4e0d\u6263\u5206\u3001\u4e0d\u8054\u7f51\u3002\u5168\u90e8\u8bb0\u5f55\u4e0e\u5907\u4efd\u5728\u300c\u7cfb\u7edf \xb7 \u7f13\u5b58\u300d\u3002", -1)) ]), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(harvestedList.value, (h, i) => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: h.unitHash,
           class: "ent"
-        }, [ vue.createElementVNode("div", _hoisted_91, [ vue.createElementVNode("span", _hoisted_92, vue.toDisplayString(h.stem ? vue.unref(harvestTypeLabel)(h.itemType) : "\u65e0\u9898\u9762"), 1), vue.createElementVNode("span", _hoisted_93, vue.toDisplayString(i + 1), 1), !h.persisted ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_94, "\xb7 \u672a\u4fdd\u5b58")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", {
+        }, [ vue.createElementVNode("div", _hoisted_95, [ vue.createElementVNode("span", _hoisted_96, vue.toDisplayString(h.stem ? vue.unref(harvestTypeLabel)(h.itemType) : "\u65e0\u9898\u9762"), 1), vue.createElementVNode("span", _hoisted_97, vue.toDisplayString(i + 1), 1), !h.persisted ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_98, "\xb7 \u672a\u4fdd\u5b58")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", {
           class: vue.normalizeClass([ "ent-q", {
             "cap-mute": !h.stem
           } ])
-        }, vue.toDisplayString(h.stem || "\u8fd9\u6761\u6ca1\u6709\u9898\u9762\uff08\u6765\u6e90\u672a\u63d0\u4f9b\uff09\uff0c\u4ecd\u53ef\u6b63\u5e38\u547d\u4e2d"), 3), vue.createElementVNode("div", _hoisted_95, vue.toDisplayString(h.values.join("\u3001")), 1), h.options && h.options.length ? (vue.openBlock(), 
-        vue.createElementBlock("details", _hoisted_96, [ vue.createElementVNode("summary", _hoisted_97, "\u9009\u9879 " + vue.toDisplayString(h.options.length) + " \u9879", 1), (vue.openBlock(true), 
+        }, vue.toDisplayString(h.stem || "\u8fd9\u6761\u6ca1\u6709\u9898\u9762\uff08\u6765\u6e90\u672a\u63d0\u4f9b\uff09\uff0c\u4ecd\u53ef\u6b63\u5e38\u547d\u4e2d"), 3), vue.createElementVNode("div", _hoisted_99, vue.toDisplayString(h.values.join("\u3001")), 1), h.options && h.options.length ? (vue.openBlock(), 
+        vue.createElementBlock("details", _hoisted_100, [ vue.createElementVNode("summary", _hoisted_101, "\u9009\u9879 " + vue.toDisplayString(h.options.length) + " \u9879", 1), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(h.options, (op, oi) => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: oi,
@@ -12172,19 +13253,19 @@
         }, vue.toDisplayString(letter2(oi)) + "\u3001" + vue.toDisplayString(op), 1))), 128)) ])) : vue.createCommentVNode("", true) ]))), 128)) ], 64)) : (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ vue.createElementVNode("div", _hoisted_98, [ _cache[83] || (_cache[83] = vue.createElementVNode("div", {
+        }, [ vue.createElementVNode("div", _hoisted_102, [ _cache[88] || (_cache[88] = vue.createElementVNode("div", {
           class: "standby-title"
-        }, "\u672c\u9875\u6682\u65e0\u6536\u5f55", -1)), vue.createElementVNode("div", _hoisted_99, "\u6253\u5f00\u5df2\u6279\u9605\u7684\u4f5c\u4e1a\u6216\u8003\u8bd5\u7ed3\u679c\u9875\uff0c\u4f1a\u81ea\u52a8\u628a\u4f60\u505a\u5bf9\u7684\u9898\u6536\u5f55\u5230\u672c\u673a\u3002\u7d2f\u8ba1\u5df2\u6536\u5f55 " + vue.toDisplayString(localCacheCount.value) + " \u9898\uff0c\u5168\u90e8\u8bb0\u5f55\u5728\u300c\u7cfb\u7edf \xb7 \u7f13\u5b58\u300d\u3002", 1) ]), vue.createElementVNode("button", {
+        }, "\u672c\u9875\u6682\u65e0\u6536\u5f55", -1)), vue.createElementVNode("div", _hoisted_103, "\u6253\u5f00\u5df2\u6279\u9605\u7684\u4f5c\u4e1a\u6216\u8003\u8bd5\u7ed3\u679c\u9875\uff0c\u4f1a\u81ea\u52a8\u628a\u4f60\u505a\u5bf9\u7684\u9898\u6536\u5f55\u5230\u672c\u673a\u3002\u7d2f\u8ba1\u5df2\u6536\u5f55 " + vue.toDisplayString(localCacheCount.value) + " \u9898\uff0c\u5168\u90e8\u8bb0\u5f55\u5728\u300c\u7cfb\u7edf \xb7 \u7f13\u5b58\u300d\u3002", 1) ]), vue.createElementVNode("button", {
           class: "btn ghost block",
           onClick: goCacheManage
         }, "\u53bb\u7f13\u5b58\u7ba1\u7406") ], 64)) ], 64)) : tab.value === "system" && systemSub.value === "general" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 3
-        }, [ hasFeature("answer") ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_100, [ _cache[87] || (_cache[87] = vue.createElementVNode("div", {
+        }, [ hasFeature("answer") ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_104, [ _cache[92] || (_cache[92] = vue.createElementVNode("div", {
           class: "gh2"
-        }, "\u7b54\u9898\u884c\u4e3a", -1)), vue.createElementVNode("div", _hoisted_101, [ _cache[84] || (_cache[84] = vue.createElementVNode("span", {
+        }, "\u7b54\u9898\u884c\u4e3a", -1)), vue.createElementVNode("div", _hoisted_105, [ _cache[89] || (_cache[89] = vue.createElementVNode("span", {
           class: "lbl"
-        }, "\u7b54\u9898\u95f4\u9694", -1)), vue.createElementVNode("span", _hoisted_102, vue.toDisplayString(settings.delayMs) + " ms", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
+        }, "\u7b54\u9898\u95f4\u9694", -1)), vue.createElementVNode("span", _hoisted_106, vue.toDisplayString(settings.delayMs) + " ms", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
           class: "range",
           type: "range",
           min: "500",
@@ -12194,21 +13275,21 @@
           onChange: persist
         }, null, 544), [ [ vue.vModelText, settings.delayMs, void 0, {
           number: true
-        } ] ]), _cache[88] || (_cache[88] = vue.createElementVNode("div", {
+        } ] ]), _cache[93] || (_cache[93] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u76f8\u90bb\u4e24\u9898\u4e4b\u95f4\u7684\u5904\u7406\u95f4\u9694", -1)), (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(GENERAL_SWITCHES, s => (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: s.key
-        }, [ vue.createElementVNode("div", _hoisted_103, [ vue.createElementVNode("button", {
+        }, [ vue.createElementVNode("div", _hoisted_107, [ vue.createElementVNode("button", {
           class: vue.normalizeClass([ "switch", {
             off: !settings[s.key]
           } ]),
           onClick: s.toggle,
           "aria-label": `${s.label}\u5f00\u5173`
-        }, [ ..._cache[85] || (_cache[85] = [ vue.createElementVNode("i", null, null, -1) ]) ], 10, _hoisted_104), vue.createElementVNode("span", _hoisted_105, vue.toDisplayString(s.label), 1) ]), vue.createElementVNode("div", _hoisted_106, vue.toDisplayString(s.hint), 1) ], 64))), 64)), vue.createElementVNode("div", _hoisted_107, [ _cache[86] || (_cache[86] = vue.createElementVNode("span", {
+        }, [ ..._cache[90] || (_cache[90] = [ vue.createElementVNode("i", null, null, -1) ]) ], 10, _hoisted_108), vue.createElementVNode("span", _hoisted_109, vue.toDisplayString(s.label), 1) ]), vue.createElementVNode("div", _hoisted_110, vue.toDisplayString(s.hint), 1) ], 64))), 64)), vue.createElementVNode("div", _hoisted_111, [ _cache[91] || (_cache[91] = vue.createElementVNode("span", {
           class: "lbl"
-        }, "\u63d0\u4ea4\u9608\u503c", -1)), vue.createElementVNode("span", _hoisted_108, "\u53ef\u4fe1\u547d\u4e2d \u2265 " + vue.toDisplayString(Math.round(settings.autoSubmitThreshold * 100)) + "%", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
+        }, "\u63d0\u4ea4\u9608\u503c", -1)), vue.createElementVNode("span", _hoisted_112, "\u53ef\u4fe1\u547d\u4e2d \u2265 " + vue.toDisplayString(Math.round(settings.autoSubmitThreshold * 100)) + "%", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
           class: "range",
           type: "range",
           min: "0.5",
@@ -12218,36 +13299,55 @@
           onChange: persist
         }, null, 544), [ [ vue.vModelText, settings.autoSubmitThreshold, void 0, {
           number: true
-        } ] ]), _cache[89] || (_cache[89] = vue.createElementVNode("div", {
+        } ] ]), _cache[94] || (_cache[94] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u8fbe\u5230\u9608\u503c\u624d\u63d0\u4ea4\uff0c\u4f4e\u4e8e\u53ea\u6682\u5b58\u3002\u968f\u673a\u4f5c\u7b54\u586b\u7684\u7a7a\u4e0d\u7b97\u53ef\u4fe1\u547d\u4e2d\u3002", -1)) ])) : vue.createCommentVNode("", true), _cache[97] || (_cache[97] = vue.createElementVNode("div", {
+        }, "\u8fbe\u5230\u9608\u503c\u624d\u63d0\u4ea4\uff0c\u4f4e\u4e8e\u53ea\u6682\u5b58\u3002\u968f\u673a\u4f5c\u7b54\u586b\u7684\u7a7a\u4e0d\u7b97\u53ef\u4fe1\u547d\u4e2d\u3002", -1)) ])) : vue.createCommentVNode("", true), _cache[107] || (_cache[107] = vue.createElementVNode("div", {
           class: "sep"
-        }, null, -1)), vue.createElementVNode("div", _hoisted_109, [ _cache[92] || (_cache[92] = vue.createElementVNode("div", {
+        }, null, -1)), vue.createElementVNode("div", _hoisted_113, [ _cache[97] || (_cache[97] = vue.createElementVNode("div", {
           class: "gh2"
-        }, "\u9690\u79c1", -1)), vue.createElementVNode("div", _hoisted_110, [ vue.createElementVNode("button", {
+        }, "\u66f4\u65b0", -1)), vue.createElementVNode("div", _hoisted_114, [ vue.createElementVNode("button", {
           class: vue.normalizeClass([ "switch", {
-            off: !settings.reportUsage
+            off: !settings.checkUpdate
           } ]),
-          onClick: toggleReport,
-          "aria-label": "\u4e0a\u62a5\u533f\u540d\u5065\u5eb7\u5f00\u5173"
-        }, [ ..._cache[90] || (_cache[90] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[91] || (_cache[91] = vue.createElementVNode("span", {
+          onClick: _cache[8] || (_cache[8] = (...args) => vue.unref(toggleCheckUpdate) && vue.unref(toggleCheckUpdate)(...args)),
+          "aria-label": "\u68c0\u6d4b\u66f4\u65b0\u5f00\u5173"
+        }, [ ..._cache[95] || (_cache[95] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[96] || (_cache[96] = vue.createElementVNode("span", {
           class: "lbl",
           style: {
             flex: "1"
           }
-        }, "\u4e0a\u62a5\u533f\u540d\u5065\u5eb7", -1)) ]), _cache[93] || (_cache[93] = vue.createElementVNode("div", {
+        }, "\u68c0\u6d4b\u66f4\u65b0", -1)) ]), _cache[98] || (_cache[98] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u4ec5\u4e0a\u62a5\u547d\u4e2d\u7387\u4e0e\u9898\u578b\uff0c\u4e0d\u542b\u9898\u9762\u4e0e\u8d26\u53f7", -1)) ]), _cache[98] || (_cache[98] = vue.createElementVNode("div", {
+        }, "\u6253\u5f00\u9875\u9762\u65f6\u68c0\u6d4b\u662f\u5426\u6709\u65b0\u7248\u672c\uff0c\u6bcf\u5929\u6700\u591a\u4e00\u6b21", -1)) ]), _cache[108] || (_cache[108] = vue.createElementVNode("div", {
           class: "sep"
-        }, null, -1)), vue.createElementVNode("div", _hoisted_111, [ _cache[96] || (_cache[96] = vue.createElementVNode("div", {
+        }, null, -1)), vue.createElementVNode("div", _hoisted_115, [ _cache[101] || (_cache[101] = vue.createElementVNode("div", {
           class: "gh2"
-        }, "\u6570\u636e\u4e0e\u66f4\u65b0", -1)), vue.createElementVNode("div", _hoisted_112, [ vue.createElementVNode("div", null, [ _cache[94] || (_cache[94] = vue.createElementVNode("div", {
+        }, "\u9690\u79c1", -1)), vue.createElementVNode("div", _hoisted_116, [ vue.createElementVNode("button", {
+          class: vue.normalizeClass([ "switch", {
+            off: !settings.reportUsage
+          } ]),
+          onClick: toggleReport,
+          "aria-label": "\u4e0a\u62a5\u4f7f\u7528\u7edf\u8ba1\u5f00\u5173"
+        }, [ ..._cache[99] || (_cache[99] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[100] || (_cache[100] = vue.createElementVNode("span", {
+          class: "lbl",
+          style: {
+            flex: "1"
+          }
+        }, "\u4e0a\u62a5\u4f7f\u7528\u7edf\u8ba1", -1)) ]), _cache[102] || (_cache[102] = vue.createElementVNode("div", {
+          class: "cap-mute"
+        }, "\u53ea\u53d1\u4e09\u7c7b\u7ed3\u5c40\u8ba1\u6570\uff1a\u81ea\u52a8\u63d0\u4ea4\u3001\u8bfe\u7a0b\u5b66\u4e60\u505c\u6b62\u539f\u56e0\u3001AI \u8865\u7b54\uff1b\u547d\u4e2d\u6bd4\u4f8b\u53ea\u53d1\u6863\u4f4d\u3002", -1)), _cache[103] || (_cache[103] = vue.createElementVNode("div", {
+          class: "cap-mute"
+        }, "\u53e6\u5e26\u4e00\u4e2a\u968f\u673a\u5b89\u88c5\u6807\u8bc6\u3001\u5e73\u53f0\u540d\u548c\u7248\u672c\u53f7\uff1b\u4e0d\u542b\u9898\u9762\u4e0e\u7b54\u6848\u3002", -1)) ]), _cache[109] || (_cache[109] = vue.createElementVNode("div", {
+          class: "sep"
+        }, null, -1)), vue.createElementVNode("div", _hoisted_117, [ _cache[106] || (_cache[106] = vue.createElementVNode("div", {
+          class: "gh2"
+        }, "\u6570\u636e\u4e0e\u66f4\u65b0", -1)), vue.createElementVNode("div", _hoisted_118, [ vue.createElementVNode("div", null, [ _cache[104] || (_cache[104] = vue.createElementVNode("div", {
           class: "lbl"
-        }, "\u672c\u5730\u7b54\u6848\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_113, "\u5df2\u6536\u5f55 " + vue.toDisplayString(localCacheCount.value) + " \u9898 \xb7 \u53ea\u5b58\u4f60\u505a\u8fc7\u5e76\u51fa\u5206\u7684\u9898\u76ee \xb7 \u547d\u4e2d\u4e0d\u6263\u5206\u3001\u4e0d\u8054\u7f51", 1) ]), vue.createElementVNode("button", {
+        }, "\u672c\u5730\u7b54\u6848\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_119, "\u5df2\u6536\u5f55 " + vue.toDisplayString(localCacheCount.value) + " \u9898 \xb7 \u53ea\u5b58\u4f60\u505a\u8fc7\u5e76\u51fa\u5206\u7684\u9898\u76ee \xb7 \u547d\u4e2d\u4e0d\u6263\u5206\u3001\u4e0d\u8054\u7f51", 1) ]), vue.createElementVNode("button", {
           class: "btn ghost sm",
-          onClick: _cache[8] || (_cache[8] = $event => systemSub.value = "cache")
-        }, "\u7ba1\u7406") ]), cachePersistFailed.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_114, "\u5b58\u4e0d\u4e0b\u4e86 \xb7 \u672c\u673a\u5b58\u50a8\u5199\u5165\u88ab\u62d2\uff0c\u6700\u8fd1\u7684\u6536\u5f55\u6ca1\u6709\u843d\u76d8\u3002\u5230\u7f13\u5b58\u9875\u5bfc\u51fa\u5907\u4efd\u5e76\u6e05\u7406\u3002")) : cacheOverWarn.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_115, "\u5df2\u8d85\u51fa\u5efa\u8bae\u5bb9\u91cf " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898 \xb7 \u4e0d\u4f1a\u81ea\u52a8\u5220\u9664\u8bb0\u5f55\uff0c\u5efa\u8bae\u5bfc\u51fa\u5907\u4efd\u540e\u6e05\u7406\u3002", 1)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_116, [ _cache[95] || (_cache[95] = vue.createElementVNode("div", null, [ vue.createElementVNode("div", {
+          onClick: _cache[9] || (_cache[9] = $event => systemSub.value = "cache")
+        }, "\u7ba1\u7406") ]), cachePersistFailed.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_120, "\u5b58\u4e0d\u4e0b\u4e86 \xb7 \u672c\u673a\u5b58\u50a8\u5199\u5165\u88ab\u62d2\uff0c\u6700\u8fd1\u7684\u6536\u5f55\u6ca1\u6709\u843d\u76d8\u3002\u5230\u7f13\u5b58\u9875\u5bfc\u51fa\u5907\u4efd\u5e76\u6e05\u7406\u3002")) : cacheOverWarn.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_121, "\u5df2\u8d85\u51fa\u5efa\u8bae\u5bb9\u91cf " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898 \xb7 \u4e0d\u4f1a\u81ea\u52a8\u5220\u9664\u8bb0\u5f55\uff0c\u5efa\u8bae\u5bfc\u51fa\u5907\u4efd\u540e\u6e05\u7406\u3002", 1)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_122, [ _cache[105] || (_cache[105] = vue.createElementVNode("div", null, [ vue.createElementVNode("div", {
           class: "lbl"
         }, "\u89c4\u5219\u66f4\u65b0"), vue.createElementVNode("div", {
           class: "cap-mute"
@@ -12255,40 +13355,135 @@
           class: "btn ghost sm",
           disabled: running.value || ruleUpdating.value,
           onClick: updateRules
-        }, vue.toDisplayString(ruleUpdating.value ? "\u68c0\u67e5\u4e2d\u2026" : "\u68c0\u67e5\u66f4\u65b0"), 9, _hoisted_117) ]), ruleUpdateNote.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_118, vue.toDisplayString(ruleUpdateNote.value), 1)) : vue.createCommentVNode("", true) ]) ], 64)) : tab.value === "system" && systemSub.value === "course" ? (vue.openBlock(), 
-        vue.createElementBlock(vue.Fragment, {
-          key: 4
-        }, [ vue.createElementVNode("div", _hoisted_119, [ _cache[103] || (_cache[103] = vue.createElementVNode("div", {
+        }, vue.toDisplayString(ruleUpdating.value ? "\u68c0\u67e5\u4e2d\u2026" : "\u68c0\u67e5\u66f4\u65b0"), 9, _hoisted_123) ]), ruleUpdateNote.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_124, vue.toDisplayString(ruleUpdateNote.value), 1)) : vue.createCommentVNode("", true) ]) ], 64)) : tab.value === "system" && systemSub.value === "ai" ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_125, [ _cache[121] || (_cache[121] = vue.createElementVNode("div", {
           class: "gh2"
-        }, "\u5b66\u4e60\u884c\u4e3a", -1)), vue.createElementVNode("div", _hoisted_120, [ vue.createElementVNode("button", {
+        }, "AI \u8865\u7b54", -1)), vue.createElementVNode("div", _hoisted_126, [ vue.createElementVNode("button", {
           class: vue.normalizeClass([ "switch", {
-            off: !settings.courseAuto
+            off: !settings.ai.enabled
           } ]),
-          onClick: _cache[9] || (_cache[9] = (...args) => vue.unref(toggleCourseAuto) && vue.unref(toggleCourseAuto)(...args)),
-          "aria-label": "\u4efb\u52a1\u70b9\u81ea\u52a8\u64ad\u653e\u5f00\u5173"
-        }, [ ..._cache[99] || (_cache[99] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[100] || (_cache[100] = vue.createElementVNode("span", {
+          onClick: toggleAi,
+          "aria-label": "AI \u8865\u7b54\u5f00\u5173"
+        }, [ ..._cache[110] || (_cache[110] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[111] || (_cache[111] = vue.createElementVNode("span", {
           class: "lbl",
           style: {
             flex: "1"
           }
-        }, "\u81ea\u52a8\u64ad\u653e\u89c6\u9891/\u97f3\u9891\uff08\u5b9e\u9a8c\uff09", -1)) ]), vue.createElementVNode("div", _hoisted_121, [ _cache[101] || (_cache[101] = vue.createElementVNode("span", {
+        }, "\u9898\u5e93\u6ca1\u7b54\u4e0a\u7684\u9898\u4ea4\u7ed9 AI", -1)) ]), _cache[122] || (_cache[122] = vue.createElementVNode("div", {
+          class: "cap-mute"
+        }, "\u7528\u4f60\u81ea\u5df1\u7684 AI \u670d\u52a1\u5546 Key \u8865\u7b54\uff0c\u9898\u76ee\u5185\u5bb9\u4f1a\u53d1\u9001\u7ed9\u4f60\u9009\u62e9\u7684\u670d\u52a1\u5546\uff1b\u6ca1\u79ef\u5206\u4e5f\u80fd\u7528\u3002", -1)), _cache[123] || (_cache[123] = vue.createElementVNode("div", {
+          class: "cap-mute"
+        }, "Key \u4e0e\u9898\u76ee\u7ecf\u7231\u95ee\u7b54\u540e\u7aef\u8f6c\u53d1\u7ed9\u670d\u52a1\u5546\uff0c\u6d4f\u89c8\u5668\u4e0d\u76f4\u8fde\uff1b\u540e\u7aef\u53ea\u7528\u5b83\u53d1\u8fd9\u4e00\u6b21\u8bf7\u6c42\uff0c\u4e0d\u4fdd\u5b58\u3001\u4e0d\u8bb0\u65e5\u5fd7\u3002", -1)), settings.ai.enabled ? (vue.openBlock(), 
+        vue.createElementBlock(vue.Fragment, {
+          key: 0
+        }, [ vue.createElementVNode("div", _hoisted_127, [ _cache[113] || (_cache[113] = vue.createElementVNode("span", {
           class: "lbl"
-        }, "\u64ad\u653e\u500d\u901f", -1)), vue.createElementVNode("span", _hoisted_122, vue.toDisplayString(settings.coursePlaybackRate) + "\xd7", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
+        }, "\u670d\u52a1\u5546", -1)), vue.createElementVNode("select", {
+          class: "sel",
+          value: settings.ai.channelId,
+          "aria-label": "AI \u670d\u52a1\u5546",
+          onChange: _cache[10] || (_cache[10] = $event => onAiChannelChange($event.target.value))
+        }, [ _cache[112] || (_cache[112] = vue.createElementVNode("option", {
+          value: ""
+        }, "\u9009\u62e9\u670d\u52a1\u5546", -1)), (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(aiChannelOptions.value, c => (vue.openBlock(), 
+        vue.createElementBlock("option", {
+          key: c.id,
+          value: c.id
+        }, vue.toDisplayString(c.name) + vue.toDisplayString(c.recommended ? " \xb7 \u63a8\u8350" : ""), 9, _hoisted_129))), 128)) ], 40, _hoisted_128) ]), aiSelectedChannel.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_130, [ _cache[114] || (_cache[114] = vue.createElementVNode("span", {
+          class: "lbl"
+        }, "\u6a21\u578b", -1)), vue.createElementVNode("select", {
+          class: "sel",
+          value: settings.ai.modelId,
+          "aria-label": "AI \u6a21\u578b",
+          onChange: _cache[11] || (_cache[11] = $event => onAiModelChange($event.target.value))
+        }, [ (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(aiSelectedChannel.value.models, m => (vue.openBlock(), 
+        vue.createElementBlock("option", {
+          key: m.id,
+          value: m.id
+        }, vue.toDisplayString(m.label ?? m.id), 9, _hoisted_132))), 128)) ], 40, _hoisted_131) ])) : vue.createCommentVNode("", true), aiSelectedChannel.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_133, [ vue.createTextVNode(vue.toDisplayString(aiSelectedChannel.value.keyHelp) + " ", 1), vue.createElementVNode("a", {
+          href: aiSelectedChannel.value.signupUrl,
+          target: "_blank",
+          rel: "noopener noreferrer"
+        }, "\u83b7\u53d6 Key", 8, _hoisted_134) ])) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_135, [ vue.withDirectives(vue.createElementVNode("input", {
+          class: "in",
+          type: "password",
+          "onUpdate:modelValue": _cache[12] || (_cache[12] = $event => aiCredentialDraft.value = $event),
+          "aria-label": "AI Key",
+          placeholder: aiHasCredential.value ? "\u5df2\u4fdd\u5b58 \xb7 \u8f93\u5165\u65b0\u503c\u53ef\u66ff\u6362" : "\u7c98\u8d34 API Key"
+        }, null, 8, _hoisted_136), [ [ vue.vModelText, aiCredentialDraft.value ] ]), vue.createElementVNode("button", {
+          class: "btn ghost sm",
+          disabled: !aiCredentialDraft.value.trim(),
+          onClick: saveAiCredential
+        }, "\u4fdd\u5b58", 8, _hoisted_137), aiHasCredential.value ? (vue.openBlock(), vue.createElementBlock("button", {
+          key: 0,
+          class: "btn ghost sm",
+          onClick: removeAiCredential
+        }, "\u5220\u9664")) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_138, [ vue.createElementVNode("button", {
+          class: "btn ghost sm",
+          disabled: aiProbing.value || !aiHasCredential.value || !settings.ai.modelId,
+          onClick: probeAi
+        }, vue.toDisplayString(aiProbing.value ? "\u6d4b\u8bd5\u4e2d\u2026" : "\u6d4b\u8bd5\u8fde\u63a5"), 9, _hoisted_139), vue.createElementVNode("span", _hoisted_140, vue.toDisplayString(aiProbeNote.value), 1) ]), vue.createElementVNode("div", _hoisted_141, [ vue.createElementVNode("button", {
+          class: vue.normalizeClass([ "switch", {
+            off: !settings.ai.countTowardSubmit
+          } ]),
+          onClick: toggleAiCount,
+          "aria-label": "AI \u7b54\u6848\u8ba1\u5165\u81ea\u52a8\u63d0\u4ea4\u5f00\u5173"
+        }, [ ..._cache[115] || (_cache[115] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[116] || (_cache[116] = vue.createElementVNode("span", {
+          class: "lbl",
+          style: {
+            flex: "1"
+          }
+        }, "AI \u7b54\u6848\u8ba1\u5165\u81ea\u52a8\u63d0\u4ea4", -1)) ]), _cache[119] || (_cache[119] = vue.createElementVNode("div", {
+          class: "cap-mute"
+        }, "\u5173\u6389\u540e AI \u586b\u7684\u9898\u4e0d\u7b97\u53ef\u4fe1\u547d\u4e2d\uff0c\u53ea\u6682\u5b58\u4e0d\u63d0\u4ea4\u3002", -1)), vue.createElementVNode("div", _hoisted_142, [ vue.createElementVNode("button", {
+          class: vue.normalizeClass([ "switch", {
+            off: !settings.ai.cache
+          } ]),
+          onClick: toggleAiCache,
+          "aria-label": "AI \u7b54\u6848\u5b58\u5165\u7f13\u5b58\u5f00\u5173"
+        }, [ ..._cache[117] || (_cache[117] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[118] || (_cache[118] = vue.createElementVNode("span", {
+          class: "lbl",
+          style: {
+            flex: "1"
+          }
+        }, "AI \u7b54\u6848\u5b58\u5165\u7f13\u5b58", -1)) ]), _cache[120] || (_cache[120] = vue.createElementVNode("div", {
+          class: "cap-mute"
+        }, "\u5b58\u8fdb\u672c\u673a\u7f13\u5b58\uff0c\u5e76\u5171\u4eab\u7ed9\u5176\u4ed6\u7528\u6237\uff08\u4f1a\u6807\u4e3a AI \u751f\u6210 \xb7 \u5f85\u6838\u5bf9\uff09\u3002", -1)) ], 64)) : vue.createCommentVNode("", true) ])) : tab.value === "system" && systemSub.value === "course" ? (vue.openBlock(), 
+        vue.createElementBlock(vue.Fragment, {
+          key: 5
+        }, [ vue.createElementVNode("div", _hoisted_143, [ _cache[128] || (_cache[128] = vue.createElementVNode("div", {
+          class: "gh2"
+        }, "\u5b66\u4e60\u884c\u4e3a", -1)), vue.createElementVNode("div", _hoisted_144, [ vue.createElementVNode("button", {
+          class: vue.normalizeClass([ "switch", {
+            off: !settings.courseAuto
+          } ]),
+          onClick: _cache[13] || (_cache[13] = (...args) => vue.unref(toggleCourseAuto) && vue.unref(toggleCourseAuto)(...args)),
+          "aria-label": "\u4efb\u52a1\u70b9\u81ea\u52a8\u64ad\u653e\u5f00\u5173"
+        }, [ ..._cache[124] || (_cache[124] = [ vue.createElementVNode("i", null, null, -1) ]) ], 2), _cache[125] || (_cache[125] = vue.createElementVNode("span", {
+          class: "lbl",
+          style: {
+            flex: "1"
+          }
+        }, "\u81ea\u52a8\u64ad\u653e\u89c6\u9891/\u97f3\u9891\uff08\u5b9e\u9a8c\uff09", -1)) ]), vue.createElementVNode("div", _hoisted_145, [ _cache[126] || (_cache[126] = vue.createElementVNode("span", {
+          class: "lbl"
+        }, "\u64ad\u653e\u500d\u901f", -1)), vue.createElementVNode("span", _hoisted_146, vue.toDisplayString(settings.coursePlaybackRate) + "\xd7", 1) ]), vue.withDirectives(vue.createElementVNode("input", {
           class: "range",
           type: "range",
           min: "1",
           max: "2",
           step: "0.5",
-          "onUpdate:modelValue": _cache[10] || (_cache[10] = $event => settings.coursePlaybackRate = $event),
+          "onUpdate:modelValue": _cache[14] || (_cache[14] = $event => settings.coursePlaybackRate = $event),
           onChange: persist
         }, null, 544), [ [ vue.vModelText, settings.coursePlaybackRate, void 0, {
           number: true
-        } ] ]), vue.createElementVNode("div", _hoisted_123, [ _cache[102] || (_cache[102] = vue.createElementVNode("span", {
+        } ] ]), vue.createElementVNode("div", _hoisted_147, [ _cache[127] || (_cache[127] = vue.createElementVNode("span", {
           class: "lbl"
-        }, "\u5f53\u524d\u72b6\u6001", -1)), vue.createElementVNode("span", _hoisted_124, vue.toDisplayString(mediaStatusText.value), 1) ]) ]), _cache[107] || (_cache[107] = vue.createElementVNode("div", {
+        }, "\u5f53\u524d\u72b6\u6001", -1)), vue.createElementVNode("span", _hoisted_148, vue.toDisplayString(mediaStatusText.value), 1) ]) ]), _cache[132] || (_cache[132] = vue.createElementVNode("div", {
           class: "sep"
-        }, null, -1)), vue.createElementVNode("div", _hoisted_125, [ _cache[105] || (_cache[105] = vue.createElementVNode("div", {
+        }, null, -1)), vue.createElementVNode("div", _hoisted_149, [ _cache[130] || (_cache[130] = vue.createElementVNode("div", {
           class: "gh2"
         }, "\u5904\u7406\u54ea\u4e9b\u4efb\u52a1\u70b9", -1)), (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(vue.unref(taskToggles), k => (vue.openBlock(), 
         vue.createElementBlock("div", {
@@ -12300,47 +13495,47 @@
           } ]),
           onClick: $event => toggleTaskKind(k),
           "aria-label": `${vue.unref(taskToggleLabel)[k]}\u4efb\u52a1\u70b9\u5f00\u5173`
-        }, [ ..._cache[104] || (_cache[104] = [ vue.createElementVNode("i", null, null, -1) ]) ], 10, _hoisted_126), vue.createElementVNode("span", _hoisted_127, vue.toDisplayString(vue.unref(taskToggleLabel)[k]), 1) ]))), 128)), _cache[106] || (_cache[106] = vue.createElementVNode("div", {
+        }, [ ..._cache[129] || (_cache[129] = [ vue.createElementVNode("i", null, null, -1) ]) ], 10, _hoisted_150), vue.createElementVNode("span", _hoisted_151, vue.toDisplayString(vue.unref(taskToggleLabel)[k]), 1) ]))), 128)), _cache[131] || (_cache[131] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u5173\u6389\u7684\u7c7b\u578b\u76f4\u63a5\u8df3\u8fc7\uff0c\u4e5f\u4e0d\u8ba1\u5165\u672c\u8282\u8fd8\u5269\u591a\u5c11\u6ca1\u505a\u3002", -1)) ]) ], 64)) : tab.value === "system" && systemSub.value === "cache" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
-          key: 5
+          key: 6
         }, [ cacheImportPreview.value ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ _cache[113] || (_cache[113] = vue.createElementVNode("div", {
+        }, [ _cache[138] || (_cache[138] = vue.createElementVNode("div", {
           class: "ctitle"
-        }, "\u5bfc\u5165\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_128, [ vue.createElementVNode("div", _hoisted_129, [ _cache[108] || (_cache[108] = vue.createElementVNode("span", {
+        }, "\u5bfc\u5165\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_152, [ vue.createElementVNode("div", _hoisted_153, [ _cache[133] || (_cache[133] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u6587\u4ef6\u5185", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.fileCount) + " \u6761", 1) ]), vue.createElementVNode("div", _hoisted_130, [ _cache[109] || (_cache[109] = vue.createElementVNode("span", {
+        }, "\u6587\u4ef6\u5185", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.fileCount) + " \u6761", 1) ]), vue.createElementVNode("div", _hoisted_154, [ _cache[134] || (_cache[134] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u5c06\u65b0\u589e", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.added) + " \u6761", 1) ]), vue.createElementVNode("div", _hoisted_131, [ _cache[110] || (_cache[110] = vue.createElementVNode("span", {
+        }, "\u5c06\u65b0\u589e", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.added) + " \u6761", 1) ]), vue.createElementVNode("div", _hoisted_155, [ _cache[135] || (_cache[135] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u5c06\u8986\u76d6", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.replaced) + " \u6761", 1), _cache[111] || (_cache[111] = vue.createElementVNode("span", {
+        }, "\u5c06\u8986\u76d6", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.replaced) + " \u6761", 1), _cache[136] || (_cache[136] = vue.createElementVNode("span", {
           class: "cap-mute"
-        }, "\u540c\u9898\u5c06\u88ab\u66ff\u6362", -1)) ]), vue.createElementVNode("div", _hoisted_132, [ _cache[112] || (_cache[112] = vue.createElementVNode("span", {
+        }, "\u540c\u9898\u5c06\u88ab\u66ff\u6362", -1)) ]), vue.createElementVNode("div", _hoisted_156, [ _cache[137] || (_cache[137] = vue.createElementVNode("span", {
           class: "k"
         }, "\u5bfc\u5165\u540e", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheImportPreview.value.total) + " \u9898", 1) ]) ]), cacheImportPreview.value.replaced ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_133, "\u5c06\u8986\u76d6 " + vue.toDisplayString(cacheImportPreview.value.replaced) + " \u6761\u5df2\u6709\u8bb0\u5f55 \xb7 \u91cc\u9762\u53ef\u80fd\u6709\u4f60\u505a\u8fc7\u5e76\u51fa\u5206\u540e\u6536\u5f55\u7684\u7b54\u6848\uff0c\u5bfc\u5165\u4f1a\u7528\u6587\u4ef6\u91cc\u7684\u7b54\u6848\u9876\u6389\u5b83\u4eec\uff0c\u9876\u6389\u540e\u4e0d\u53ef\u64a4\u9500\u3002\u60f3\u7559\u5e95\u5c31\u5148\u53d6\u6d88\uff0c\u5bfc\u51fa\u4e00\u4efd\u518d\u5bfc\u5165\u3002", 1)) : vue.createCommentVNode("", true), _cache[114] || (_cache[114] = vue.createElementVNode("div", {
+        vue.createElementBlock("div", _hoisted_157, "\u5c06\u8986\u76d6 " + vue.toDisplayString(cacheImportPreview.value.replaced) + " \u6761\u5df2\u6709\u8bb0\u5f55 \xb7 \u91cc\u9762\u53ef\u80fd\u6709\u4f60\u505a\u8fc7\u5e76\u51fa\u5206\u540e\u6536\u5f55\u7684\u7b54\u6848\uff0c\u5bfc\u5165\u4f1a\u7528\u6587\u4ef6\u91cc\u7684\u7b54\u6848\u9876\u6389\u5b83\u4eec\uff0c\u9876\u6389\u540e\u4e0d\u53ef\u64a4\u9500\u3002\u60f3\u7559\u5e95\u5c31\u5148\u53d6\u6d88\uff0c\u5bfc\u51fa\u4e00\u4efd\u518d\u5bfc\u5165\u3002", 1)) : vue.createCommentVNode("", true), _cache[139] || (_cache[139] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u5bfc\u5165\u7684\u7b54\u6848\u547d\u4e2d\u65f6\u4e0d\u6263\u5206\u3002\u7231\u95ee\u7b54\u4e0d\u6838\u9a8c\u5bfc\u5165\u5185\u5bb9\u662f\u5426\u6b63\u786e\uff0c\u63d0\u4ea4\u4f5c\u4e1a\u524d\u81ea\u884c\u6838\u5bf9\u3002", -1)), _cache[115] || (_cache[115] = vue.createElementVNode("div", {
+        }, "\u5bfc\u5165\u7684\u7b54\u6848\u547d\u4e2d\u65f6\u4e0d\u6263\u5206\u3002\u7231\u95ee\u7b54\u4e0d\u6838\u9a8c\u5bfc\u5165\u5185\u5bb9\u662f\u5426\u6b63\u786e\uff0c\u63d0\u4ea4\u4f5c\u4e1a\u524d\u81ea\u884c\u6838\u5bf9\u3002", -1)), _cache[140] || (_cache[140] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u5bfc\u5165\u4e0d\u4f1a\u6dd8\u6c70\u5df2\u6709\u8bb0\u5f55\uff0c\u4e5f\u4e0d\u4f1a\u6539\u52a8\u5df2\u56de\u586b\u7684\u9875\u9762\u6216\u89e6\u53d1\u63d0\u4ea4\u3002", -1)) ], 64)) : cacheClearPending.value ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ _cache[118] || (_cache[118] = vue.createElementVNode("div", {
+        }, [ _cache[143] || (_cache[143] = vue.createElementVNode("div", {
           class: "ctitle"
-        }, "\u6e05\u7a7a\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_134, [ vue.createElementVNode("div", _hoisted_135, [ _cache[116] || (_cache[116] = vue.createElementVNode("span", {
+        }, "\u6e05\u7a7a\u7f13\u5b58", -1)), vue.createElementVNode("div", _hoisted_158, [ vue.createElementVNode("div", _hoisted_159, [ _cache[141] || (_cache[141] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u5c06\u6e05\u7a7a", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheEntries.value.length) + " \u9898", 1) ]), _cache[117] || (_cache[117] = vue.createElementVNode("div", {
+        }, "\u5c06\u6e05\u7a7a", -1)), vue.createElementVNode("b", null, vue.toDisplayString(cacheEntries.value.length) + " \u9898", 1) ]), _cache[142] || (_cache[142] = vue.createElementVNode("div", {
           class: "prow"
         }, [ vue.createElementVNode("span", {
           class: "k"
-        }, "\u5f71\u54cd"), vue.createElementVNode("span", null, "\u518d\u9047\u5230\u8fd9\u4e9b\u9898\u9700\u91cd\u65b0\u67e5\u8be2\uff0c\u4ed8\u8d39\u547d\u4e2d\u4f1a\u91cd\u65b0\u6263\u5206\u3002") ], -1)) ]), _cache[119] || (_cache[119] = vue.createElementVNode("div", {
+        }, "\u5f71\u54cd"), vue.createElementVNode("span", null, "\u518d\u9047\u5230\u8fd9\u4e9b\u9898\u9700\u91cd\u65b0\u67e5\u8be2\uff0c\u4ed8\u8d39\u547d\u4e2d\u4f1a\u91cd\u65b0\u6263\u5206\u3002") ], -1)) ]), _cache[144] || (_cache[144] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u6e05\u7a7a\u4e0d\u53ef\u64a4\u9500\u3002\u5bfc\u51fa\u53ef\u7559\u4e00\u4efd\u5907\u4efd\u3002", -1)) ], 64)) : !cacheEntries.value.length ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 2
-        }, [ _cache[120] || (_cache[120] = vue.createElementVNode("div", {
+        }, [ _cache[145] || (_cache[145] = vue.createElementVNode("div", {
           class: "standby"
         }, [ vue.createElementVNode("div", {
           class: "standby-title"
@@ -12356,42 +13551,42 @@
           rel: "noopener noreferrer"
         }, "\u89e3\u6790\u5bfc\u5165") ], 64)) : (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 3
-        }, [ vue.createElementVNode("div", _hoisted_136, [ vue.createElementVNode("span", _hoisted_137, [ vue.createElementVNode("b", null, vue.toDisplayString(cacheEntries.value.length), 1), vue.createTextVNode(" / " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898", 1) ]), vue.createElementVNode("div", _hoisted_138, [ vue.createElementVNode("i", {
+        }, [ vue.createElementVNode("div", _hoisted_160, [ vue.createElementVNode("span", _hoisted_161, [ vue.createElementVNode("b", null, vue.toDisplayString(cacheEntries.value.length), 1), vue.createTextVNode(" / " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898", 1) ]), vue.createElementVNode("div", _hoisted_162, [ vue.createElementVNode("i", {
           class: vue.normalizeClass({
             over: cacheOverWarn.value
           }),
           style: vue.normalizeStyle({
             width: `${Math.min(100, cacheEntries.value.length / vue.unref(CACHE_WARN_ENTRIES) * 100)}%`
           })
-        }, null, 6) ]) ]), cachePersistFailed.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_139, "\u5b58\u4e0d\u4e0b\u4e86 \xb7 \u672c\u673a\u5b58\u50a8\u5199\u5165\u88ab\u62d2\uff0c\u6700\u8fd1\u7684\u6536\u5f55\u6ca1\u6709\u843d\u76d8\u3002\u5148\u5bfc\u51fa\u5907\u4efd\uff0c\u518d\u5220\u6389\u4e00\u4e9b\u4e0d\u9700\u8981\u7684\u8bb0\u5f55\u3002")) : cacheOverWarn.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_140, "\u5df2\u8d85\u51fa\u5efa\u8bae\u5bb9\u91cf \xb7 \u4e0d\u4f1a\u81ea\u52a8\u5220\u9664\u4efb\u4f55\u8bb0\u5f55\uff0c\u4f46\u8868\u8d8a\u5927\u5199\u5165\u8d8a\u6162\u3002\u5efa\u8bae\u5bfc\u51fa\u5907\u4efd\u540e\u6e05\u7406\u4e0d\u518d\u9700\u8981\u7684\u3002")) : cacheNearWarn.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_141, "\u63a5\u8fd1\u5efa\u8bae\u5bb9\u91cf " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898 \xb7 \u53ef\u5148\u5bfc\u51fa\u5907\u4efd\u3002", 1)) : vue.createCommentVNode("", true), _cache[123] || (_cache[123] = vue.createElementVNode("div", {
+        }, null, 6) ]) ]), cachePersistFailed.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_163, "\u5b58\u4e0d\u4e0b\u4e86 \xb7 \u672c\u673a\u5b58\u50a8\u5199\u5165\u88ab\u62d2\uff0c\u6700\u8fd1\u7684\u6536\u5f55\u6ca1\u6709\u843d\u76d8\u3002\u5148\u5bfc\u51fa\u5907\u4efd\uff0c\u518d\u5220\u6389\u4e00\u4e9b\u4e0d\u9700\u8981\u7684\u8bb0\u5f55\u3002")) : cacheOverWarn.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_164, "\u5df2\u8d85\u51fa\u5efa\u8bae\u5bb9\u91cf \xb7 \u4e0d\u4f1a\u81ea\u52a8\u5220\u9664\u4efb\u4f55\u8bb0\u5f55\uff0c\u4f46\u8868\u8d8a\u5927\u5199\u5165\u8d8a\u6162\u3002\u5efa\u8bae\u5bfc\u51fa\u5907\u4efd\u540e\u6e05\u7406\u4e0d\u518d\u9700\u8981\u7684\u3002")) : cacheNearWarn.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_165, "\u63a5\u8fd1\u5efa\u8bae\u5bb9\u91cf " + vue.toDisplayString(vue.unref(CACHE_WARN_ENTRIES)) + " \u9898 \xb7 \u53ef\u5148\u5bfc\u51fa\u5907\u4efd\u3002", 1)) : vue.createCommentVNode("", true), _cache[148] || (_cache[148] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u547d\u4e2d\u7f13\u5b58\u4e0d\u6263\u5206\u3001\u4e0d\u8054\u7f51\u3002\u53ea\u6536\u5f55\u4f60\u505a\u8fc7\u5e76\u51fa\u5206\u7684\u9898\u76ee\uff0c\u4e0d\u4f1a\u81ea\u52a8\u5220\u9664\u3002", -1)), importedNeverHit.value.total ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 3
         }, [ importedNeverHit.value.neverHit === importedNeverHit.value.total ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_142, "\u5bfc\u5165\u7684 " + vue.toDisplayString(importedNeverHit.value.total) + " \u6761\u4e00\u6761\u90fd\u8fd8\u6ca1\u547d\u4e2d\u8fc7 \xb7 \u5982\u679c\u5176\u4e2d\u7684\u9898\u4f60\u5df2\u7ecf\u505a\u5230\u8fc7\uff0c\u591a\u534a\u662f\u9898\u9762\u4e0e\u9875\u9762\u5bf9\u4e0d\u4e0a\u3002\u5148\u62ff\u4e00\u9053\u5df2\u77e5\u7684\u9898\u9a8c\u4e00\u6b21\u518d\u8bf4\u3002", 1)) : (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_143, "\u5bfc\u5165 " + vue.toDisplayString(importedNeverHit.value.total) + " \u6761 \xb7 \u5176\u4e2d " + vue.toDisplayString(importedNeverHit.value.neverHit) + " \u6761\u6682\u672a\u547d\u4e2d\u3002", 1)), _cache[121] || (_cache[121] = vue.createElementVNode("div", {
+        vue.createElementBlock("div", _hoisted_166, "\u5bfc\u5165\u7684 " + vue.toDisplayString(importedNeverHit.value.total) + " \u6761\u4e00\u6761\u90fd\u8fd8\u6ca1\u547d\u4e2d\u8fc7 \xb7 \u5982\u679c\u5176\u4e2d\u7684\u9898\u4f60\u5df2\u7ecf\u505a\u5230\u8fc7\uff0c\u591a\u534a\u662f\u9898\u9762\u4e0e\u9875\u9762\u5bf9\u4e0d\u4e0a\u3002\u5148\u62ff\u4e00\u9053\u5df2\u77e5\u7684\u9898\u9a8c\u4e00\u6b21\u518d\u8bf4\u3002", 1)) : (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_167, "\u5bfc\u5165 " + vue.toDisplayString(importedNeverHit.value.total) + " \u6761 \xb7 \u5176\u4e2d " + vue.toDisplayString(importedNeverHit.value.neverHit) + " \u6761\u6682\u672a\u547d\u4e2d\u3002", 1)), _cache[146] || (_cache[146] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u300c\u547d\u4e2d\u300d\u53ea\u8868\u793a\u9898\u76ee\u5bf9\u4e0a\u4e86\u53f7\uff0c\u4e0d\u8868\u793a\u7b54\u6848\u771f\u7684\u7528\u4e0a\u4e86\u3002\u8fd9\u4e2a\u6570\u53ea\u4f5c\u53c2\u8003\uff1a\u521a\u547d\u4e2d\u7684\u6700\u591a\u4e00\u5206\u949f\u540e\u624d\u8ba1\u5165\uff0c\u5173\u9875\u9762\u592a\u5feb\u5c31\u6c38\u8fdc\u4e0d\u8ba1\uff1b\u6682\u672a\u547d\u4e2d\u91cc\u65e2\u6709\u4f60\u8fd8\u6ca1\u505a\u5230\u7684\u9898\uff0c\u4e5f\u53ef\u80fd\u6709\u9898\u9762\u5bf9\u4e0d\u4e0a\u7684\u3002", -1)) ], 64)) : vue.createCommentVNode("", true), vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[11] || (_cache[11] = $event => cacheQuery.value = $event),
+          "onUpdate:modelValue": _cache[15] || (_cache[15] = $event => cacheQuery.value = $event),
           placeholder: "\u641c\u7d22\u9898\u5e72\u6216\u7b54\u6848"
         }, null, 512), [ [ vue.vModelText, cacheQuery.value ] ]), cacheNote.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_144, vue.toDisplayString(cacheNote.value), 1)) : vue.createCommentVNode("", true), matchedCache.value.length > CACHE_LIST_LIMIT ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_145, "\u5171 " + vue.toDisplayString(matchedCache.value.length) + " \u6761 \xb7 \u53ea\u5217\u51fa\u524d " + vue.toDisplayString(CACHE_LIST_LIMIT) + " \u6761\uff0c\u7528\u641c\u7d22\u7f29\u5c0f\u8303\u56f4\u3002", 1)) : vue.createCommentVNode("", true), (vue.openBlock(true), 
+        vue.createElementBlock("div", _hoisted_168, vue.toDisplayString(cacheNote.value), 1)) : vue.createCommentVNode("", true), matchedCache.value.length > CACHE_LIST_LIMIT ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_169, "\u5171 " + vue.toDisplayString(matchedCache.value.length) + " \u6761 \xb7 \u53ea\u5217\u51fa\u524d " + vue.toDisplayString(CACHE_LIST_LIMIT) + " \u6761\uff0c\u7528\u641c\u7d22\u7f29\u5c0f\u8303\u56f4\u3002", 1)) : vue.createCommentVNode("", true), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(filteredCache.value, entry => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: entry.unitHash,
           class: "ent"
-        }, [ vue.createElementVNode("div", _hoisted_146, [ vue.createElementVNode("span", _hoisted_147, vue.toDisplayString(entry.stem ? vue.unref(harvestTypeLabel)(entry.itemType) : "\u65e0\u9898\u9762"), 1), entry.importedAt ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_148, "\u5bfc\u5165")) : entry.platform ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_149, vue.toDisplayString(entry.platform), 1)) : vue.createCommentVNode("", true), vue.createElementVNode("span", _hoisted_150, vue.toDisplayString(cacheDate(entry.savedAt)), 1), vue.createElementVNode("button", {
+        }, [ vue.createElementVNode("div", _hoisted_170, [ vue.createElementVNode("span", _hoisted_171, vue.toDisplayString(entry.stem ? vue.unref(harvestTypeLabel)(entry.itemType) : "\u65e0\u9898\u9762"), 1), entry.importedAt ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_172, "\u5bfc\u5165")) : entry.platform ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_173, vue.toDisplayString(entry.platform), 1)) : vue.createCommentVNode("", true), vue.createElementVNode("span", _hoisted_174, vue.toDisplayString(cacheDate(entry.savedAt)), 1), vue.createElementVNode("button", {
           class: "ent-del",
           "aria-label": `\u5220\u9664\u7f13\u5b58 ${entry.unitHash.slice(0, 8)}`,
           onClick: $event => removeCacheEntry(entry.unitHash)
-        }, [ ..._cache[122] || (_cache[122] = [ vue.createElementVNode("svg", {
+        }, [ ..._cache[147] || (_cache[147] = [ vue.createElementVNode("svg", {
           class: "ic sm",
           viewBox: "0 0 24 24",
           fill: "none",
@@ -12401,62 +13596,67 @@
           d: "M6 7h12M9.5 7V5.5h5V7M8 7l.7 12h6.6L16 7",
           "stroke-linecap": "round",
           "stroke-linejoin": "round"
-        }) ], -1) ]) ], 8, _hoisted_151) ]), vue.createElementVNode("div", {
+        }) ], -1) ]) ], 8, _hoisted_175) ]), vue.createElementVNode("div", {
           class: vue.normalizeClass([ "ent-q", {
             "cap-mute": !entry.stem
           } ])
-        }, vue.toDisplayString(entry.stem || "\u8fd9\u6761\u8bb0\u5f55\u6ca1\u6709\u9898\u9762\uff08\u6765\u6e90\u672a\u63d0\u4f9b\uff09\uff0c\u4ecd\u53ef\u6b63\u5e38\u547d\u4e2d"), 3), vue.createElementVNode("div", _hoisted_152, vue.toDisplayString(entry.values.join("\u3001")), 1), entry.options.length ? (vue.openBlock(), 
-        vue.createElementBlock("details", _hoisted_153, [ vue.createElementVNode("summary", _hoisted_154, "\u9009\u9879 " + vue.toDisplayString(entry.options.length) + " \u9879", 1), (vue.openBlock(true), 
+        }, vue.toDisplayString(entry.stem || "\u8fd9\u6761\u8bb0\u5f55\u6ca1\u6709\u9898\u9762\uff08\u6765\u6e90\u672a\u63d0\u4f9b\uff09\uff0c\u4ecd\u53ef\u6b63\u5e38\u547d\u4e2d"), 3), vue.createElementVNode("div", _hoisted_176, vue.toDisplayString(entry.values.join("\u3001")), 1), entry.options.length ? (vue.openBlock(), 
+        vue.createElementBlock("details", _hoisted_177, [ vue.createElementVNode("summary", _hoisted_178, "\u9009\u9879 " + vue.toDisplayString(entry.options.length) + " \u9879", 1), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(entry.options, (op, oi) => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: oi,
           class: "cap-mute"
         }, vue.toDisplayString(letter2(oi)) + "\u3001" + vue.toDisplayString(op), 1))), 128)) ])) : vue.createCommentVNode("", true) ]))), 128)), !filteredCache.value.length ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_155, "\u6ca1\u6709\u5339\u914d\u7684\u7f13\u5b58\u3002")) : vue.createCommentVNode("", true) ], 64)) ], 64)) : tab.value === "system" && systemSub.value === "diag" ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_179, "\u6ca1\u6709\u5339\u914d\u7684\u7f13\u5b58\u3002")) : vue.createCommentVNode("", true) ], 64)) ], 64)) : tab.value === "system" && systemSub.value === "diag" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
-          key: 6
-        }, [ vue.createElementVNode("div", _hoisted_156, [ vue.createElementVNode("div", _hoisted_157, [ _cache[124] || (_cache[124] = vue.createElementVNode("span", {
+          key: 7
+        }, [ vue.createElementVNode("div", _hoisted_180, [ vue.createElementVNode("div", _hoisted_181, [ _cache[149] || (_cache[149] = vue.createElementVNode("span", {
           class: "ctitle"
         }, "\u5f53\u524d\u89c4\u5219", -1)), ruleDiag.value ? (vue.openBlock(), vue.createElementBlock("span", {
           key: 0,
           class: vue.normalizeClass([ "tag", ruleDiag.value.source === "remote-active" ? "acc" : "neutral" ])
         }, vue.toDisplayString(ruleDiag.value.sourceLabel), 3)) : vue.createCommentVNode("", true) ]), ruleDiag.value ? (vue.openBlock(), 
-        vue.createElementBlock("dl", _hoisted_158, [ _cache[125] || (_cache[125] = vue.createElementVNode("dt", null, "\u89c4\u5219\u5305", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.packageId), 1), _cache[126] || (_cache[126] = vue.createElementVNode("dt", null, "\u7248\u672c", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.version) + " \xb7 seq " + vue.toDisplayString(ruleDiag.value.releaseSequence), 1), ruleDiag.value.release ? (vue.openBlock(), 
-        vue.createElementBlock("dt", _hoisted_159, "\u901a\u9053")) : vue.createCommentVNode("", true), ruleDiag.value.release ? (vue.openBlock(), 
-        vue.createElementBlock("dd", _hoisted_160, vue.toDisplayString(ruleDiag.value.release.channel) + " \xb7 " + vue.toDisplayString(ruleDiag.value.release.rolloutPercent) + "%", 1)) : vue.createCommentVNode("", true), _cache[127] || (_cache[127] = vue.createElementVNode("dt", null, "\u6821\u9a8c", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.loadStatusLabel), 1) ])) : (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_161, "\u672c\u6b21\u4f1a\u8bdd\u8fd8\u6ca1\u6709\u5339\u914d\u5230\u89c4\u5219\u3002")), ruleDiag.value && (ruleDiag.value.lifecycle || ruleDiag.value.lifecycleFailure || ruleDiag.value.rechecks.used > 0) ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_162, "\u751f\u547d\u5468\u671f \xb7 " + vue.toDisplayString(ruleDiag.value.lifecycle ? `${ruleDiag.value.lifecycle.state} \xb7 \u8f6c\u79fb ${ruleDiag.value.lifecycle.transitions}` : `\u672a\u542f\u52a8 \xb7 ${ruleDiag.value.lifecycleFailure}`) + vue.toDisplayString(ruleDiag.value.eventFailure ? ` \xb7 \u6700\u8fd1\u5931\u8d25 ${ruleDiag.value.eventFailure.event} ${ruleDiag.value.eventFailure.code}` : "") + " \xb7 \u91cd\u68c0 " + vue.toDisplayString(ruleDiag.value.rechecks.used) + "/" + vue.toDisplayString(ruleDiag.value.rechecks.max), 1)) : vue.createCommentVNode("", true), ((_c = ruleDiag.value) == null ? void 0 : _c.walker.session) ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_163, "\u8d70\u67e5 \xb7 \u5df2\u5207 " + vue.toDisplayString(ruleDiag.value.walker.session.steps) + " \u9898" + vue.toDisplayString(ruleDiag.value.walker.session.lastStop ? ` \xb7 ${WALK_STOP_TEXT[ruleDiag.value.walker.session.lastStop]}` : ""), 1)) : vue.createCommentVNode("", true), ((_d = ruleDiag.value) == null ? void 0 : _d.commit.last) ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_164, "\u6682\u5b58 \xb7 " + vue.toDisplayString(COMMIT_OUTCOME_TEXT[ruleDiag.value.commit.last]) + "\uff08" + vue.toDisplayString(ruleDiag.value.commit.runs) + " \u6b21\uff09", 1)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_165, "\u5f15\u64ce " + vue.toDisplayString(vue.unref(ENGINE_ID)) + " \xb7 \u811a\u672c " + vue.toDisplayString(vue.unref(SCRIPT_VERSION)), 1), lastCaptureFailure.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_166, "\u89c4\u5219\u6355\u83b7\u5931\u8d25 \xb7 " + vue.toDisplayString(lastCaptureFailure.value) + " \xb7 \u8fd9\u9875\u4e0d\u662f\u6ca1\u6709\u9898\uff0c\u662f\u89c4\u5219\u6ca1\u8dd1\u5b8c", 1)) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_167, [ vue.createElementVNode("div", {
+        vue.createElementBlock("dl", _hoisted_182, [ _cache[150] || (_cache[150] = vue.createElementVNode("dt", null, "\u89c4\u5219\u5305", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.packageId), 1), _cache[151] || (_cache[151] = vue.createElementVNode("dt", null, "\u7248\u672c", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.version) + " \xb7 seq " + vue.toDisplayString(ruleDiag.value.releaseSequence), 1), ruleDiag.value.release ? (vue.openBlock(), 
+        vue.createElementBlock("dt", _hoisted_183, "\u901a\u9053")) : vue.createCommentVNode("", true), ruleDiag.value.release ? (vue.openBlock(), 
+        vue.createElementBlock("dd", _hoisted_184, vue.toDisplayString(ruleDiag.value.release.channel) + " \xb7 " + vue.toDisplayString(ruleDiag.value.release.rolloutPercent) + "%", 1)) : vue.createCommentVNode("", true), _cache[152] || (_cache[152] = vue.createElementVNode("dt", null, "\u6821\u9a8c", -1)), vue.createElementVNode("dd", null, vue.toDisplayString(ruleDiag.value.loadStatusLabel), 1) ])) : (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_185, "\u672c\u6b21\u4f1a\u8bdd\u8fd8\u6ca1\u6709\u5339\u914d\u5230\u89c4\u5219\u3002")), ruleDiag.value && (ruleDiag.value.lifecycle || ruleDiag.value.lifecycleFailure || ruleDiag.value.rechecks.used > 0) ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_186, "\u751f\u547d\u5468\u671f \xb7 " + vue.toDisplayString(ruleDiag.value.lifecycle ? `${ruleDiag.value.lifecycle.state} \xb7 \u8f6c\u79fb ${ruleDiag.value.lifecycle.transitions}` : `\u672a\u542f\u52a8 \xb7 ${ruleDiag.value.lifecycleFailure}`) + vue.toDisplayString(ruleDiag.value.eventFailure ? ` \xb7 \u6700\u8fd1\u5931\u8d25 ${ruleDiag.value.eventFailure.event} ${ruleDiag.value.eventFailure.code}` : "") + " \xb7 \u91cd\u68c0 " + vue.toDisplayString(ruleDiag.value.rechecks.used) + "/" + vue.toDisplayString(ruleDiag.value.rechecks.max), 1)) : vue.createCommentVNode("", true), ((_c = ruleDiag.value) == null ? void 0 : _c.walker.session) ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_187, "\u8d70\u67e5 \xb7 \u5df2\u5207 " + vue.toDisplayString(ruleDiag.value.walker.session.steps) + " \u9898" + vue.toDisplayString(ruleDiag.value.walker.session.lastStop ? ` \xb7 ${WALK_STOP_TEXT[ruleDiag.value.walker.session.lastStop]}` : ""), 1)) : vue.createCommentVNode("", true), ((_d = ruleDiag.value) == null ? void 0 : _d.commit.last) ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_188, "\u6682\u5b58 \xb7 " + vue.toDisplayString(COMMIT_OUTCOME_TEXT[ruleDiag.value.commit.last]) + "\uff08" + vue.toDisplayString(ruleDiag.value.commit.runs) + " \u6b21\uff09", 1)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_189, "\u5f15\u64ce " + vue.toDisplayString(vue.unref(ENGINE_ID)) + " \xb7 \u811a\u672c " + vue.toDisplayString(vue.unref(SCRIPT_VERSION)), 1), vue.createElementVNode("div", _hoisted_190, [ vue.createElementVNode("button", {
+          class: "btn ghost sm",
+          disabled: updateChecking.value,
+          onClick: checkUpdateNow
+        }, "\u68c0\u67e5\u66f4\u65b0", 8, _hoisted_191), updateManualNote.value ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_192, vue.toDisplayString(updateManualNote.value), 1)) : vue.createCommentVNode("", true) ]), lastCaptureFailure.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_193, "\u89c4\u5219\u6355\u83b7\u5931\u8d25 \xb7 " + vue.toDisplayString(lastCaptureFailure.value) + " \xb7 \u8fd9\u9875\u4e0d\u662f\u6ca1\u6709\u9898\uff0c\u662f\u89c4\u5219\u6ca1\u8dd1\u5b8c", 1)) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_194, [ vue.createElementVNode("div", {
           class: "row"
-        }, [ _cache[128] || (_cache[128] = vue.createElementVNode("span", {
+        }, [ _cache[153] || (_cache[153] = vue.createElementVNode("span", {
           class: "ctitle"
         }, "\u8fd0\u884c\u65e5\u5fd7", -1)), vue.createElementVNode("button", {
           class: "btn ghost sm",
           onClick: clearLogs
-        }, "\u6e05\u7a7a") ]), vue.createElementVNode("div", _hoisted_168, [ (vue.openBlock(), vue.createElementBlock(vue.Fragment, null, vue.renderList(LOG_LEVELS, lvl => vue.createElementVNode("button", {
+        }, "\u6e05\u7a7a") ]), vue.createElementVNode("div", _hoisted_195, [ (vue.openBlock(), vue.createElementBlock(vue.Fragment, null, vue.renderList(LOG_LEVELS, lvl => vue.createElementVNode("button", {
           key: lvl.k,
           class: vue.normalizeClass([ "seg", {
             active: logFilter.value === lvl.k
           } ]),
           onClick: $event => logFilter.value = lvl.k
-        }, vue.toDisplayString(lvl.l), 11, _hoisted_169)), 64)) ]), filteredLogs.value.length ? (vue.openBlock(), 
-        vue.createElementBlock("ul", _hoisted_170, [ (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(filteredLogs.value, (item, i) => (vue.openBlock(), 
+        }, vue.toDisplayString(lvl.l), 11, _hoisted_196)), 64)) ]), filteredLogs.value.length ? (vue.openBlock(), 
+        vue.createElementBlock("ul", _hoisted_197, [ (vue.openBlock(true), vue.createElementBlock(vue.Fragment, null, vue.renderList(filteredLogs.value, (item, i) => (vue.openBlock(), 
         vue.createElementBlock("li", {
           key: i,
           class: vue.normalizeClass([ "log-row", `log-${item.type}` ])
-        }, [ vue.createElementVNode("span", _hoisted_171, vue.toDisplayString(item.time), 1), vue.createElementVNode("span", _hoisted_172, [ vue.createTextVNode(vue.toDisplayString(item.content), 1), item.repeat > 1 ? (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_173, " \xd7 " + vue.toDisplayString(item.repeat), 1)) : vue.createCommentVNode("", true) ]) ], 2))), 128)) ])) : (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_174, "\u6682\u65e0\u65e5\u5fd7")) ]), vue.createElementVNode("div", _hoisted_175, [ vue.createElementVNode("button", {
+        }, [ vue.createElementVNode("span", _hoisted_198, vue.toDisplayString(item.time), 1), vue.createElementVNode("span", _hoisted_199, [ vue.createTextVNode(vue.toDisplayString(item.content), 1), item.repeat > 1 ? (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_200, " \xd7 " + vue.toDisplayString(item.repeat), 1)) : vue.createCommentVNode("", true) ]) ], 2))), 128)) ])) : (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_201, "\u6682\u65e0\u65e5\u5fd7")) ]), vue.createElementVNode("div", _hoisted_202, [ vue.createElementVNode("button", {
           class: "fold",
-          onClick: _cache[12] || (_cache[12] = $event => diagOpen.value = !diagOpen.value)
-        }, [ _cache[130] || (_cache[130] = vue.createTextVNode("\u9875\u9762\u8bca\u65ad \xb7 \u53ea\u8bc6\u522b\u4e0d\u6263\u5206", -1)), (vue.openBlock(), 
+          onClick: _cache[16] || (_cache[16] = $event => diagOpen.value = !diagOpen.value)
+        }, [ _cache[155] || (_cache[155] = vue.createTextVNode("\u9875\u9762\u8bca\u65ad \xb7 \u53ea\u8bc6\u522b\u4e0d\u6263\u5206", -1)), (vue.openBlock(), 
         vue.createElementBlock("svg", {
           class: vue.normalizeClass([ "ic sm chev", {
             right: !diagOpen.value
           } ])
-        }, [ ..._cache[129] || (_cache[129] = [ vue.createElementVNode("use", {
+        }, [ ..._cache[154] || (_cache[154] = [ vue.createElementVNode("use", {
           href: "#i-chevron"
         }, null, -1) ]) ], 2)) ]), diagOpen.value ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
@@ -12464,49 +13664,49 @@
           class: "btn ghost sm",
           disabled: running.value,
           onClick: runDiag
-        }, "\u8fd0\u884c\u8bca\u65ad", 8, _hoisted_176), diag.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_177, [ vue.createTextVNode(vue.toDisplayString(diag.value.matched ? `\u547d\u4e2d${platformLabel.value} \xb7 \u6293\u5230 ${diag.value.count} \u9898 \xb7 \u56fe\u7247 ${diag.value.imageCount} \u5f20 \xb7 \u6536\u5f55 ${diag.value.harvestedCount} \u9898` : "\u672a\u547d\u4e2d\u5f53\u524d\u9875") + " ", 1), (vue.openBlock(true), 
+        }, "\u8fd0\u884c\u8bca\u65ad", 8, _hoisted_203), diag.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_204, [ vue.createTextVNode(vue.toDisplayString(diag.value.matched ? `\u547d\u4e2d${platformLabel.value} \xb7 \u6293\u5230 ${diag.value.count} \u9898 \xb7 \u56fe\u7247 ${diag.value.imageCount} \u5f20 \xb7 \u6536\u5f55 ${diag.value.harvestedCount} \u9898` : "\u672a\u547d\u4e2d\u5f53\u524d\u9875") + " ", 1), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(diag.value.items, (it, i) => (vue.openBlock(), 
         vue.createElementBlock("div", {
           key: i
         }, vue.toDisplayString(i + 1) + ". [" + vue.toDisplayString(it.type) + "] " + vue.toDisplayString(it.decodeFailed ? "\u89e3\u7801\u5931\u8d25" : it.stemPreview) + " \xb7 " + vue.toDisplayString(it.optionCount) + " \u9009\u9879", 1))), 128)), diag.value.ruleFlow && diag.value.ruleFlow.status === "ok" ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_178, "\u89c4\u5219\u8bca\u65ad " + vue.toDisplayString(JSON.stringify(diag.value.ruleFlow.value)), 1)) : diag.value.ruleFlow && diag.value.ruleFlow.status === "failed" ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_179, "\u89c4\u5219\u8bca\u65ad\u5931\u8d25 \xb7 " + vue.toDisplayString(diag.value.ruleFlow.error), 1)) : vue.createCommentVNode("", true) ])) : (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_180, "\u70b9\u300c\u8fd0\u884c\u8bca\u65ad\u300d\u8bc6\u522b\u5f53\u524d\u9875")) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
+        vue.createElementBlock("div", _hoisted_205, "\u89c4\u5219\u8bca\u65ad " + vue.toDisplayString(JSON.stringify(diag.value.ruleFlow.value)), 1)) : diag.value.ruleFlow && diag.value.ruleFlow.status === "failed" ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_206, "\u89c4\u5219\u8bca\u65ad\u5931\u8d25 \xb7 " + vue.toDisplayString(diag.value.ruleFlow.error), 1)) : vue.createCommentVNode("", true) ])) : (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_207, "\u70b9\u300c\u8fd0\u884c\u8bca\u65ad\u300d\u8bc6\u522b\u5f53\u524d\u9875")) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
           class: "fold",
-          onClick: _cache[13] || (_cache[13] = $event => ruleMetaOpen.value = !ruleMetaOpen.value)
-        }, [ _cache[132] || (_cache[132] = vue.createTextVNode("\u89c4\u5219\u660e\u7ec6", -1)), (vue.openBlock(), 
+          onClick: _cache[17] || (_cache[17] = $event => ruleMetaOpen.value = !ruleMetaOpen.value)
+        }, [ _cache[157] || (_cache[157] = vue.createTextVNode("\u89c4\u5219\u660e\u7ec6", -1)), (vue.openBlock(), 
         vue.createElementBlock("svg", {
           class: vue.normalizeClass([ "ic sm chev", {
             right: !ruleMetaOpen.value
           } ])
-        }, [ ..._cache[131] || (_cache[131] = [ vue.createElementVNode("use", {
+        }, [ ..._cache[156] || (_cache[156] = [ vue.createElementVNode("use", {
           href: "#i-chevron"
         }, null, -1) ]) ], 2)) ]), ruleMetaOpen.value && ruleDiag.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_181, [ vue.createElementVNode("div", _hoisted_182, [ _cache[133] || (_cache[133] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_208, [ vue.createElementVNode("div", _hoisted_209, [ _cache[158] || (_cache[158] = vue.createElementVNode("span", {
           class: "rule-key"
-        }, "hash", -1)), vue.createElementVNode("span", _hoisted_183, vue.toDisplayString(ruleDiag.value.contentHash), 1) ]), ruleDiag.value.release ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_184, [ _cache[134] || (_cache[134] = vue.createElementVNode("span", {
+        }, "hash", -1)), vue.createElementVNode("span", _hoisted_210, vue.toDisplayString(ruleDiag.value.contentHash), 1) ]), ruleDiag.value.release ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_211, [ _cache[159] || (_cache[159] = vue.createElementVNode("span", {
           class: "rule-key"
-        }, "release", -1)), vue.createElementVNode("span", _hoisted_185, [ vue.createTextVNode(vue.toDisplayString(ruleDiag.value.release.releaseId) + " \xb7 bucket " + vue.toDisplayString(ruleDiag.value.release.cohortBucket), 1), vue.unref(protocol.isRuleCandidateTestDelivery)(ruleDiag.value.release) ? (vue.openBlock(), 
+        }, "release", -1)), vue.createElementVNode("span", _hoisted_212, [ vue.createTextVNode(vue.toDisplayString(ruleDiag.value.release.releaseId) + " \xb7 bucket " + vue.toDisplayString(ruleDiag.value.release.cohortBucket), 1), vue.unref(protocol.isRuleCandidateTestDelivery)(ruleDiag.value.release) ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
         }, [ vue.createTextVNode(" \xb7 \u6d4b\u8bd5\u8bbe\u5907\u56fa\u5b9a\u547d\u4e2d") ], 64)) : vue.createCommentVNode("", true) ]) ])) : vue.createCommentVNode("", true), ruleDiag.value.candidateVersion ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_186, [ _cache[135] || (_cache[135] = vue.createElementVNode("span", {
+        vue.createElementBlock("div", _hoisted_213, [ _cache[160] || (_cache[160] = vue.createElementVNode("span", {
           class: "rule-key"
-        }, "candidate", -1)), vue.createElementVNode("span", _hoisted_187, vue.toDisplayString(ruleDiag.value.candidateVersion), 1) ])) : vue.createCommentVNode("", true), ruleDiag.value.lastKnownGoodVersion ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_188, [ _cache[136] || (_cache[136] = vue.createElementVNode("span", {
+        }, "candidate", -1)), vue.createElementVNode("span", _hoisted_214, vue.toDisplayString(ruleDiag.value.candidateVersion), 1) ])) : vue.createCommentVNode("", true), ruleDiag.value.lastKnownGoodVersion ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_215, [ _cache[161] || (_cache[161] = vue.createElementVNode("span", {
           class: "rule-key"
-        }, "\u4e0a\u6b21\u53ef\u7528", -1)), vue.createElementVNode("span", _hoisted_189, vue.toDisplayString(ruleDiag.value.lastKnownGoodVersion), 1) ])) : vue.createCommentVNode("", true) ])) : ruleMetaOpen.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_190, "\u672c\u6b21\u4f1a\u8bdd\u8fd8\u6ca1\u6709\u5339\u914d\u5230\u89c4\u5219\u3002")) : vue.createCommentVNode("", true) ]) ], 64)) : vue.createCommentVNode("", true) ]), vue.createElementVNode("div", _hoisted_191, [ tab.value === "home" ? (vue.openBlock(), 
+        }, "\u4e0a\u6b21\u53ef\u7528", -1)), vue.createElementVNode("span", _hoisted_216, vue.toDisplayString(ruleDiag.value.lastKnownGoodVersion), 1) ])) : vue.createCommentVNode("", true) ])) : ruleMetaOpen.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_217, "\u672c\u6b21\u4f1a\u8bdd\u8fd8\u6ca1\u6709\u5339\u914d\u5230\u89c4\u5219\u3002")) : vue.createCommentVNode("", true) ]) ], 64)) : vue.createCommentVNode("", true) ], 4), vue.createElementVNode("div", _hoisted_218, [ tab.value === "home" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ detectedCount.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_192, [ vue.createElementVNode("div", _hoisted_193, [ _cache[137] || (_cache[137] = vue.createElementVNode("span", {
+        }, [ detectedCount.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_219, [ vue.createElementVNode("div", _hoisted_220, [ _cache[162] || (_cache[162] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u5c06\u56de\u586b", -1)), vue.createElementVNode("b", null, "\u6700\u591a " + vue.toDisplayString(detectedCount.value) + " \u9898", 1) ]), vue.createElementVNode("div", _hoisted_194, [ _cache[138] || (_cache[138] = vue.createElementVNode("span", {
+        }, "\u5c06\u56de\u586b", -1)), vue.createElementVNode("b", null, "\u6700\u591a " + vue.toDisplayString(detectedCount.value) + " \u9898", 1) ]), vue.createElementVNode("div", _hoisted_221, [ _cache[163] || (_cache[163] = vue.createElementVNode("span", {
           class: "k"
-        }, "\u9884\u8ba1\u6263\u5206", -1)), vue.createElementVNode("b", null, "\u2264 " + vue.toDisplayString(detectedCount.value) + " \u5206", 1), _cache[139] || (_cache[139] = vue.createElementVNode("span", {
+        }, "\u9884\u8ba1\u6263\u5206", -1)), vue.createElementVNode("b", null, "\u2264 " + vue.toDisplayString(detectedCount.value) + " \u5206", 1), _cache[164] || (_cache[164] = vue.createElementVNode("span", {
           class: "cap-mute"
-        }, "\u547d\u4e2d\u624d\u6263", -1)) ]), _cache[140] || (_cache[140] = vue.createElementVNode("div", {
+        }, "\u547d\u4e2d\u624d\u6263", -1)) ]), _cache[165] || (_cache[165] = vue.createElementVNode("div", {
           class: "prow"
         }, [ vue.createElementVNode("span", {
           class: "k"
@@ -12516,15 +13716,15 @@
           class: "btn block",
           disabled: running.value,
           onClick: start
-        }, "\u5f00\u59cb\u7b54\u9898", 8, _hoisted_195)) : (vue.openBlock(), vue.createElementBlock("button", {
+        }, "\u5f00\u59cb\u7b54\u9898", 8, _hoisted_222)) : (vue.openBlock(), vue.createElementBlock("button", {
           key: 2,
           class: "btn ghost block",
           disabled: running.value,
-          onClick: _cache[14] || (_cache[14] = $event => detectQuestions())
-        }, "\u91cd\u65b0\u8bc6\u522b\u672c\u9875", 8, _hoisted_196)) ], 64)) : tab.value === "ask" ? (vue.openBlock(), 
+          onClick: _cache[18] || (_cache[18] = $event => detectQuestions())
+        }, "\u91cd\u65b0\u8bc6\u522b\u672c\u9875", 8, _hoisted_223)) ], 64)) : tab.value === "ask" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ list.value.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_197, [ vue.createElementVNode("span", _hoisted_198, vue.toDisplayString(tip.value), 1), vue.createElementVNode("div", _hoisted_199, [ (vue.openBlock(true), 
+        }, [ list.value.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_224, [ vue.createElementVNode("span", _hoisted_225, vue.toDisplayString(tip.value), 1), vue.createElementVNode("div", _hoisted_226, [ (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(list.value, (it, i) => (vue.openBlock(), 
         vue.createElementBlock("i", {
           key: i,
@@ -12532,14 +13732,14 @@
             on: it.status !== "pending"
           })
         }, null, 2))), 128)) ]) ])) : vue.createCommentVNode("", true), hasFeature("answer") ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_200, [ vue.createElementVNode("button", {
+        vue.createElementBlock("div", _hoisted_227, [ vue.createElementVNode("button", {
           class: "btn",
           style: {
             flex: "1"
           },
           disabled: running.value,
           onClick: start
-        }, "\u5f00\u59cb\u7b54\u9898", 8, _hoisted_201), running.value ? (vue.openBlock(), vue.createElementBlock("button", {
+        }, "\u5f00\u59cb\u7b54\u9898", 8, _hoisted_228), running.value ? (vue.openBlock(), vue.createElementBlock("button", {
           key: 0,
           class: "btn ghost",
           style: {
@@ -12556,7 +13756,7 @@
         }, "\u91cd\u65b0\u7b54\u9898")) ])) : vue.createCommentVNode("", true) ], 64)) : tab.value === "system" && systemSub.value === "cache" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 2
-        }, [ cacheImportPreview.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_202, [ vue.createElementVNode("button", {
+        }, [ cacheImportPreview.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_229, [ vue.createElementVNode("button", {
           class: "btn ghost",
           style: {
             flex: "1"
@@ -12569,19 +13769,19 @@
           },
           onClick: confirmImport
         }, "\u5bfc\u5165 " + vue.toDisplayString(cacheImportPreview.value.fileCount) + " \u6761", 1) ])) : cacheClearPending.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_203, [ vue.createElementVNode("button", {
+        vue.createElementBlock("div", _hoisted_230, [ vue.createElementVNode("button", {
           class: "btn ghost",
           style: {
             flex: "1"
           },
-          onClick: _cache[15] || (_cache[15] = $event => cacheClearPending.value = false)
+          onClick: _cache[19] || (_cache[19] = $event => cacheClearPending.value = false)
         }, "\u53d6\u6d88"), vue.createElementVNode("button", {
           class: "btn ghost danger",
           style: {
             flex: "2"
           },
           onClick: clearCacheAll
-        }, "\u786e\u8ba4\u6e05\u7a7a") ])) : cacheEntries.value.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_204, [ vue.createElementVNode("button", {
+        }, "\u786e\u8ba4\u6e05\u7a7a") ])) : cacheEntries.value.length ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_231, [ vue.createElementVNode("button", {
           class: "btn ghost",
           style: {
             flex: "1"
@@ -12603,7 +13803,7 @@
           rel: "noopener noreferrer"
         }, "\u89e3\u6790\u5bfc\u5165"), vue.createElementVNode("button", {
           class: "btn ghost danger",
-          onClick: _cache[16] || (_cache[16] = $event => cacheClearPending.value = true)
+          onClick: _cache[20] || (_cache[20] = $event => cacheClearPending.value = true)
         }, "\u6e05\u7a7a") ])) : vue.createCommentVNode("", true) ], 64)) : tab.value === "system" && systemSub.value === "diag" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 3
@@ -12613,7 +13813,7 @@
         }, "\u5bfc\u51fa\u8bca\u65ad\uff08\u65e5\u5fd7 + \u89c4\u5219\u4fe1\u606f\uff09"), vue.createElementVNode("button", {
           class: "btn ghost block",
           onClick: exportPageSnapshot
-        }, "\u5bfc\u51fa\u9875\u9762\u5feb\u7167"), _cache[141] || (_cache[141] = vue.createElementVNode("div", {
+        }, "\u5bfc\u51fa\u9875\u9762\u5feb\u7167"), _cache[166] || (_cache[166] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u9875\u9762\u7ed3\u6784\u7684\u5b58\u6863\uff0c\u7528\u4e8e\u590d\u73b0\u95ee\u9898\uff1b\u59d3\u540d\u3001\u5b66\u53f7\u3001\u4ee4\u724c\u7b49\u5df2\u81ea\u52a8\u906e\u76d6\u3002", -1)), vue.unref(IS_DEV) ? (vue.openBlock(), 
         vue.createElementBlock("button", {
@@ -12621,42 +13821,59 @@
           class: "btn ghost danger block",
           disabled: ruleUpdating.value,
           onClick: resetRuleStorageAndReload
-        }, " \u91cd\u7f6e\u89c4\u5219\u6570\u636e\u5e76\u5237\u65b0\uff08dev\uff09 ", 8, _hoisted_205)) : vue.createCommentVNode("", true) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_206, [ vue.createElementVNode("span", _hoisted_207, "v" + vue.toDisplayString(vue.unref(SCRIPT_VERSION)) + " \xb7 " + vue.toDisplayString(ruleVersionLabel.value), 1), _cache[142] || (_cache[142] = vue.createElementVNode("span", {
+        }, " \u91cd\u7f6e\u89c4\u5219\u6570\u636e\u5e76\u5237\u65b0\uff08dev\uff09 ", 8, _hoisted_232)) : vue.createCommentVNode("", true) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_233, [ vue.createElementVNode("span", _hoisted_234, "v" + vue.toDisplayString(vue.unref(SCRIPT_VERSION)) + " \xb7 " + vue.toDisplayString(ruleVersionLabel.value), 1), _cache[167] || (_cache[167] = vue.createElementVNode("span", {
           class: "luokuan"
-        }, "\u95ee\uff0c\u5fc5\u6709\u7b54\u3002", -1)) ]) ]), accountOpen.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", {
-          key: 2,
+        }, "\u95ee\uff0c\u5fc5\u6709\u7b54\u3002", -1)) ]) ]), vue.createElementVNode("button", {
+          class: "grip",
+          type: "button",
+          "aria-label": "\u8c03\u6574\u9762\u677f\u5927\u5c0f",
+          onPointerdown: startResize,
+          onPointermove: moveResize,
+          onPointerup: finishResize,
+          onPointercancel: finishResize,
+          onLostpointercapture: finishResize
+        }, [ ..._cache[168] || (_cache[168] = [ vue.createElementVNode("svg", {
+          viewBox: "0 0 12 12",
+          "aria-hidden": "true"
+        }, [ vue.createElementVNode("path", {
+          d: "M11 4.5L4.5 11M11 8.5L8.5 11",
+          fill: "none",
+          stroke: "currentColor",
+          "stroke-width": "1.4",
+          "stroke-linecap": "round"
+        }) ], -1) ]) ], 32), accountOpen.value ? (vue.openBlock(), vue.createElementBlock("div", {
+          key: 3,
           class: "scrim",
           onClick: closeAccount
-        })) : vue.createCommentVNode("", true), accountOpen.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_208, [ !loggedIn.value ? (vue.openBlock(), 
+        })) : vue.createCommentVNode("", true), accountOpen.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_235, [ !loggedIn.value ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
-        }, [ _cache[146] || (_cache[146] = vue.createElementVNode("div", {
+        }, [ _cache[172] || (_cache[172] = vue.createElementVNode("div", {
           class: "ctitle"
-        }, "\u767b\u5f55", -1)), vue.createElementVNode("div", _hoisted_209, [ vue.createElementVNode("button", {
+        }, "\u767b\u5f55", -1)), vue.createElementVNode("div", _hoisted_236, [ vue.createElementVNode("button", {
           class: vue.normalizeClass([ "btn sm", {
             ghost: authMode.value !== "account"
           } ]),
           disabled: authing.value,
-          onClick: _cache[17] || (_cache[17] = $event => {
+          onClick: _cache[21] || (_cache[21] = $event => {
             authMode.value = "account";
             authMsg.value = "";
           })
-        }, " \u8d26\u53f7\u767b\u5f55 ", 10, _hoisted_210), vue.createElementVNode("button", {
+        }, " \u8d26\u53f7\u767b\u5f55 ", 10, _hoisted_237), vue.createElementVNode("button", {
           class: vue.normalizeClass([ "btn sm", {
             ghost: authMode.value !== "card"
           } ]),
           disabled: authing.value,
-          onClick: _cache[18] || (_cache[18] = $event => {
+          onClick: _cache[22] || (_cache[22] = $event => {
             authMode.value = "card";
             authMsg.value = "";
           })
-        }, " \u5361\u5bc6\u76f4\u8fde ", 10, _hoisted_211) ]), authMode.value === "card" ? (vue.openBlock(), 
+        }, " \u5361\u5bc6\u76f4\u8fde ", 10, _hoisted_238) ]), authMode.value === "card" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
         }, [ vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[19] || (_cache[19] = $event => cardLoginCode.value = $event),
+          "onUpdate:modelValue": _cache[23] || (_cache[23] = $event => cardLoginCode.value = $event),
           placeholder: "\u8f93\u5165\u5361\u5bc6",
           autocomplete: "off",
           onKeyup: vue.withKeys(doCardAuth, [ "enter" ])
@@ -12664,59 +13881,59 @@
           class: "btn",
           disabled: authing.value,
           onClick: doCardAuth
-        }, vue.toDisplayString(authing.value ? "\u9a8c\u8bc1\u4e2d\u2026" : "\u8fdb\u5165"), 9, _hoisted_212), _cache[143] || (_cache[143] = vue.createElementVNode("div", {
+        }, vue.toDisplayString(authing.value ? "\u9a8c\u8bc1\u4e2d\u2026" : "\u8fdb\u5165"), 9, _hoisted_239), _cache[169] || (_cache[169] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u5361\u5bc6\u4f59\u989d\u4f1a\u5728\u65b0\u7ebf\u4e0e\u8001\u7ebf\u5171\u7528\uff0c\u8017\u5c3d\u524d\u65e0\u9700\u5151\u6362\u5230\u8d26\u53f7\u3002", -1)) ], 64)) : (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
         }, [ vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[20] || (_cache[20] = $event => username.value = $event),
+          "onUpdate:modelValue": _cache[24] || (_cache[24] = $event => username.value = $event),
           placeholder: "\u7528\u6237\u540d\u6216\u90ae\u7bb1"
         }, null, 512), [ [ vue.vModelText, username.value ] ]), vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[21] || (_cache[21] = $event => password.value = $event),
+          "onUpdate:modelValue": _cache[25] || (_cache[25] = $event => password.value = $event),
           type: "password",
           placeholder: "\u5bc6\u7801",
-          onKeyup: _cache[22] || (_cache[22] = vue.withKeys($event => doAuth("login"), [ "enter" ]))
+          onKeyup: _cache[26] || (_cache[26] = vue.withKeys($event => doAuth("login"), [ "enter" ]))
         }, null, 544), [ [ vue.vModelText, password.value ] ]), vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[23] || (_cache[23] = $event => email.value = $event),
+          "onUpdate:modelValue": _cache[27] || (_cache[27] = $event => email.value = $event),
           type: "email",
           placeholder: "\u90ae\u7bb1 \u9009\u586b\uff0c\u53ef\u7528\u4e8e\u767b\u5f55\u4e0e\u627e\u56de\u5bc6\u7801"
-        }, null, 512), [ [ vue.vModelText, email.value ] ]), vue.createElementVNode("div", _hoisted_213, [ vue.createElementVNode("button", {
+        }, null, 512), [ [ vue.vModelText, email.value ] ]), vue.createElementVNode("div", _hoisted_240, [ vue.createElementVNode("button", {
           class: "btn",
           style: {
             flex: "1"
           },
           disabled: authing.value,
-          onClick: _cache[24] || (_cache[24] = $event => doAuth("login"))
-        }, "\u767b\u5f55", 8, _hoisted_214), vue.createElementVNode("button", {
+          onClick: _cache[28] || (_cache[28] = $event => doAuth("login"))
+        }, "\u767b\u5f55", 8, _hoisted_241), vue.createElementVNode("button", {
           class: "btn ghost",
           style: {
             flex: "1"
           },
           disabled: authing.value,
-          onClick: _cache[25] || (_cache[25] = $event => doAuth("register"))
-        }, "\u6ce8\u518c", 8, _hoisted_215) ]), _cache[144] || (_cache[144] = vue.createElementVNode("div", {
+          onClick: _cache[29] || (_cache[29] = $event => doAuth("register"))
+        }, "\u6ce8\u518c", 8, _hoisted_242) ]), _cache[170] || (_cache[170] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u6ce8\u518c\u8981\u6c42\u7528\u6237\u540d 3-32 \u4f4d\u3001\u5bc6\u7801\u81f3\u5c11 8 \u4f4d\uff1b\u767b\u5f55\u4e0d\u53d7\u6b64\u9650\uff0c\u8001\u8d26\u53f7\u7167\u539f\u6837\u586b\u3002", -1)), _cache[145] || (_cache[145] = vue.createElementVNode("div", {
+        }, "\u6ce8\u518c\u8981\u6c42\u7528\u6237\u540d 3-32 \u4f4d\u3001\u5bc6\u7801\u81f3\u5c11 8 \u4f4d\uff1b\u767b\u5f55\u4e0d\u53d7\u6b64\u9650\uff0c\u8001\u8d26\u53f7\u7167\u539f\u6837\u586b\u3002", -1)), _cache[171] || (_cache[171] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u90ae\u7bb1\u4e0d\u586b\u4e5f\u80fd\u6ce8\u518c\u3002\u586b\u4e86\u53ef\u4ee5\u62ff\u5b83\u767b\u5f55\uff1b\u4e0d\u586b\u5219\u5fd8\u8bb0\u5bc6\u7801\u540e\u65e0\u6cd5\u627e\u56de\u3002", -1)) ], 64)), authMsg.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_216, vue.toDisplayString(authMsg.value), 1)) : vue.createCommentVNode("", true), _cache[147] || (_cache[147] = vue.createElementVNode("div", {
+        vue.createElementBlock("div", _hoisted_243, vue.toDisplayString(authMsg.value), 1)) : vue.createCommentVNode("", true), _cache[173] || (_cache[173] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u672a\u767b\u5f55\u65f6\u4ec5\u67e5\u8be2\u514d\u8d39\u9898\u5e93\u3002", -1)) ], 64)) : (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
-        }, [ vue.createElementVNode("div", _hoisted_217, [ vue.createElementVNode("span", _hoisted_218, vue.toDisplayString(avatarInitial.value), 1), vue.createElementVNode("div", _hoisted_219, [ vue.createElementVNode("div", _hoisted_220, vue.toDisplayString(accountName.value || "\u5df2\u767b\u5f55"), 1), authStale.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_221, vue.toDisplayString(AUTH_STALE_NOTE))) : vue.createCommentVNode("", true) ]) ]), authStale.value ? (vue.openBlock(), 
+        }, [ vue.createElementVNode("div", _hoisted_244, [ vue.createElementVNode("span", _hoisted_245, vue.toDisplayString(avatarInitial.value), 1), vue.createElementVNode("div", _hoisted_246, [ vue.createElementVNode("div", _hoisted_247, vue.toDisplayString(accountName.value || "\u5df2\u767b\u5f55"), 1), authStale.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_248, vue.toDisplayString(AUTH_STALE_NOTE))) : vue.createCommentVNode("", true) ]) ]), authStale.value ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 0
         }, [ cardSession.value ? (vue.openBlock(), vue.createElementBlock(vue.Fragment, {
           key: 0
         }, [ vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[26] || (_cache[26] = $event => cardLoginCode.value = $event),
+          "onUpdate:modelValue": _cache[30] || (_cache[30] = $event => cardLoginCode.value = $event),
           placeholder: "\u91cd\u65b0\u8f93\u5165\u5361\u5bc6",
           autocomplete: "off",
           onKeyup: vue.withKeys(doCardAuth, [ "enter" ])
@@ -12724,52 +13941,52 @@
           class: "btn",
           disabled: authing.value,
           onClick: doCardAuth
-        }, "\u91cd\u65b0\u9a8c\u8bc1\u5361\u5bc6", 8, _hoisted_222) ], 64)) : (vue.openBlock(), 
+        }, "\u91cd\u65b0\u9a8c\u8bc1\u5361\u5bc6", 8, _hoisted_249) ], 64)) : (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
           key: 1
         }, [ vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[27] || (_cache[27] = $event => password.value = $event),
+          "onUpdate:modelValue": _cache[31] || (_cache[31] = $event => password.value = $event),
           type: "password",
           placeholder: "\u5bc6\u7801",
-          onKeyup: _cache[28] || (_cache[28] = vue.withKeys($event => doAuth("login"), [ "enter" ]))
+          onKeyup: _cache[32] || (_cache[32] = vue.withKeys($event => doAuth("login"), [ "enter" ]))
         }, null, 544), [ [ vue.vModelText, password.value ] ]), vue.createElementVNode("button", {
           class: "btn",
           disabled: authing.value,
-          onClick: _cache[29] || (_cache[29] = $event => doAuth("login"))
-        }, "\u91cd\u65b0\u767b\u5f55", 8, _hoisted_223) ], 64)), authMsg.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_224, vue.toDisplayString(authMsg.value), 1)) : vue.createCommentVNode("", true) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_225, [ _cache[148] || (_cache[148] = vue.createElementVNode("span", {
+          onClick: _cache[33] || (_cache[33] = $event => doAuth("login"))
+        }, "\u91cd\u65b0\u767b\u5f55", 8, _hoisted_250) ], 64)), authMsg.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_251, vue.toDisplayString(authMsg.value), 1)) : vue.createCommentVNode("", true) ], 64)) : vue.createCommentVNode("", true), vue.createElementVNode("div", _hoisted_252, [ _cache[174] || (_cache[174] = vue.createElementVNode("span", {
           class: "lbl"
-        }, "\u79ef\u5206\u4f59\u989d", -1)), balance.value != null ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_226, [ vue.createElementVNode("span", _hoisted_227, vue.toDisplayString(balance.value), 1) ])) : (vue.openBlock(), 
-        vue.createElementBlock("span", _hoisted_228, "\u8bfb\u53d6\u4e2d\u2026")) ]), !cardSession.value && emailBound.value === false ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_229, " \u8fd9\u4e2a\u8d26\u53f7\u6ca1\u6709\u7ed1\u5b9a\u90ae\u7bb1\uff0c\u5fd8\u8bb0\u5bc6\u7801\u540e\u65e0\u6cd5\u81ea\u52a9\u627e\u56de\u3002 ")) : vue.createCommentVNode("", true), !cardSession.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_230, [ vue.withDirectives(vue.createElementVNode("input", {
+        }, "\u79ef\u5206\u4f59\u989d", -1)), balance.value != null ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_253, [ vue.createElementVNode("span", _hoisted_254, vue.toDisplayString(balance.value), 1) ])) : (vue.openBlock(), 
+        vue.createElementBlock("span", _hoisted_255, "\u8bfb\u53d6\u4e2d\u2026")) ]), !cardSession.value && emailBound.value === false ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_256, " \u8fd9\u4e2a\u8d26\u53f7\u6ca1\u6709\u7ed1\u5b9a\u90ae\u7bb1\uff0c\u5fd8\u8bb0\u5bc6\u7801\u540e\u65e0\u6cd5\u81ea\u52a9\u627e\u56de\u3002 ")) : vue.createCommentVNode("", true), !cardSession.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_257, [ vue.withDirectives(vue.createElementVNode("input", {
           class: "in",
-          "onUpdate:modelValue": _cache[30] || (_cache[30] = $event => cardCode.value = $event),
+          "onUpdate:modelValue": _cache[34] || (_cache[34] = $event => cardCode.value = $event),
           placeholder: "\u8f93\u5165\u5361\u5bc6",
           onKeyup: vue.withKeys(doRedeem, [ "enter" ])
         }, null, 544), [ [ vue.vModelText, cardCode.value ] ]), vue.createElementVNode("button", {
           class: "btn",
           disabled: !cardCode.value.trim() || redeeming.value,
           onClick: doRedeem
-        }, vue.toDisplayString(redeeming.value ? "\u5151\u6362\u4e2d\u2026" : "\u5151\u6362"), 9, _hoisted_231) ])) : (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_232, "\u5361\u5bc6\u76f4\u8fde\u4f59\u989d\u53ef\u5728\u65b0\u7ebf\u4e0e\u8001\u7ebf\u76f4\u63a5\u4f7f\u7528\uff1b\u8981\u5151\u6362\u5230\u8d26\u53f7\uff0c\u5148\u9000\u51fa\u5361\u5bc6\u76f4\u8fde\u3002")), redeemNote.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_233, vue.toDisplayString(redeemNote.value), 1)) : vue.createCommentVNode("", true), _cache[149] || (_cache[149] = vue.createElementVNode("div", {
+        }, vue.toDisplayString(redeeming.value ? "\u5151\u6362\u4e2d\u2026" : "\u5151\u6362"), 9, _hoisted_258) ])) : (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_259, "\u5361\u5bc6\u76f4\u8fde\u4f59\u989d\u53ef\u5728\u65b0\u7ebf\u4e0e\u8001\u7ebf\u76f4\u63a5\u4f7f\u7528\uff1b\u8981\u5151\u6362\u5230\u8d26\u53f7\uff0c\u5148\u9000\u51fa\u5361\u5bc6\u76f4\u8fde\u3002")), redeemNote.value ? (vue.openBlock(), 
+        vue.createElementBlock("div", _hoisted_260, vue.toDisplayString(redeemNote.value), 1)) : vue.createCommentVNode("", true), _cache[175] || (_cache[175] = vue.createElementVNode("div", {
           class: "cap-mute"
-        }, "\u547d\u4e2d\u624d\u8ba1\u5206\uff0c\u672a\u547d\u4e2d\u4e0d\u6263\u5206\uff1b\u540c\u4e00\u9898\u91cd\u8dd1\u4e0d\u91cd\u590d\u6263\u5206\u3002", -1)), vue.createElementVNode("div", _hoisted_234, [ vue.createElementVNode("span", _hoisted_235, vue.toDisplayString(accountName.value), 1), vue.createElementVNode("button", {
+        }, "\u547d\u4e2d\u624d\u8ba1\u5206\uff0c\u672a\u547d\u4e2d\u4e0d\u6263\u5206\uff1b\u540c\u4e00\u9898\u91cd\u8dd1\u4e0d\u91cd\u590d\u6263\u5206\u3002", -1)), vue.createElementVNode("div", _hoisted_261, [ vue.createElementVNode("span", _hoisted_262, vue.toDisplayString(accountName.value), 1), vue.createElementVNode("button", {
           class: "btn danger sm",
           onClick: logout
         }, "\u9000\u51fa\u767b\u5f55") ]) ], 64)) ])) : vue.createCommentVNode("", true), captchaOpen.value ? (vue.openBlock(), 
-        vue.createElementBlock("div", _hoisted_236, [ vue.createElementVNode("div", _hoisted_237, [ vue.createElementVNode("div", {
+        vue.createElementBlock("div", _hoisted_263, [ vue.createElementVNode("div", _hoisted_264, [ vue.createElementVNode("div", {
           class: "row"
-        }, [ _cache[151] || (_cache[151] = vue.createElementVNode("span", {
+        }, [ _cache[177] || (_cache[177] = vue.createElementVNode("span", {
           class: "ctitle"
         }, "\u5b8c\u6210\u4eba\u673a\u9a8c\u8bc1", -1)), vue.createElementVNode("button", {
           class: "x",
           type: "button",
           "aria-label": "\u53d6\u6d88\u4eba\u673a\u9a8c\u8bc1",
           onClick: cancelCaptcha
-        }, [ ..._cache[150] || (_cache[150] = [ vue.createElementVNode("svg", {
+        }, [ ..._cache[176] || (_cache[176] = [ vue.createElementVNode("svg", {
           class: "ic"
         }, [ vue.createElementVNode("use", {
           href: "#i-minus"
@@ -12781,14 +13998,14 @@
           title: "\u7231\u95ee\u7b54\u6ce8\u518c\u4eba\u673a\u9a8c\u8bc1",
           sandbox: "allow-scripts allow-same-origin",
           onLoad: onCaptchaFrameLoad
-        }, null, 544), _cache[152] || (_cache[152] = vue.createElementVNode("div", {
+        }, null, 544), _cache[178] || (_cache[178] = vue.createElementVNode("div", {
           class: "cap-mute"
         }, "\u9a8c\u8bc1\u7ed3\u679c\u53ea\u968f\u52a0\u5bc6\u6ce8\u518c\u8bf7\u6c42\u53d1\u9001\u3002", -1)) ]) ])) : vue.createCommentVNode("", true) ], 4));
       };
     }
   });
 
-  const PANEL_STYLE = `\n:host, .aiask-root {\n  --acc: #1e478f;\n  --acc-tint: color-mix(in srgb, var(--acc) 9%, #fff);\n  --ink: #171a21; --body: #4b5059; --mute: #8b909b;\n  --line: #e6e8ec; --line-strong: #aab0ba;\n  --canvas: #fff; --soft: #f6f7f9;\n  --err: #c8322f;\n  --mono: "JetBrains Mono","IBM Plex Mono","Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;\n  --sans: "Inter","Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;\n  --zhu: #c7391b;\n  --serif: "Songti SC","Noto Serif SC","SimSun",serif;\n  font-family: var(--sans);\n  font-feature-settings: "ss01","ss02","cv01","tnum";\n  font-variant-numeric: tabular-nums;\n  color: var(--ink); -webkit-font-smoothing: antialiased;\n  \n  overflow-wrap: anywhere;\n}\n.aiask-root * { box-sizing: border-box; }\n\n\n.bubble { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; display: flex; align-items: center; gap: 8px; cursor: move; user-select: none; touch-action: none; }\n.tip { background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; color: var(--body); font: 12px/1.3 var(--mono); box-shadow: 0 1px 2px rgba(23,26,33,.05); }\n.launcher { appearance: none; position: relative; width: 44px; height: 44px; border: 0; background: transparent; cursor: move; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: none; }\n.badge { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--acc); color: #fff; font: 11px/18px var(--mono); text-align: center; border: 2px solid var(--canvas); box-sizing: border-box; }\n\n\n.seal { background: var(--zhu); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); }\n.seal.s44 { width: 44px; height: 44px; border-radius: 8px; font-size: 26px; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.55), 0 2px 6px rgba(23,26,33,.18); }\n.seal.s28 { width: 28px; height: 28px; border-radius: 5px; font-size: 17px; }\n.seal.s22 { width: 22px; height: 22px; border-radius: 4px; font-size: 14px; }\n\n\n.luokuan { font-family: var(--serif); color: var(--zhu); font-size: 11px; letter-spacing: 1px; }\n\n\n.standby-title { font-family: var(--serif); font-size: 17px; letter-spacing: 6px; color: var(--ink); }\n.standby { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 0 10px; text-align: center; }\n\n\n.done-seal { position: absolute; right: 10px; top: 9px; width: 48px; height: 48px; border-radius: 9px; background: var(--zhu); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; font-size: 28px; opacity: .92; box-shadow: inset 0 0 0 2px rgba(255,255,255,.5), 0 1px 3px rgba(199,57,27,.3); animation: seal-drop .18s cubic-bezier(.22,1,.36,1) both; }\n@keyframes seal-drop {\n  from { transform: scale(1.15) rotate(0deg); opacity: 0; }\n  to { transform: scale(1) rotate(-4deg); opacity: .92; }\n}\n@media (prefers-reduced-motion: reduce) {\n  .done-seal { animation: none; transform: rotate(-4deg); }\n}\n\n\n.panel { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; width: min(340px, calc(100vw - 32px)); background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 1px rgba(23,26,33,.03), 0 6px 14px -4px rgba(23,26,33,.05), 0 20px 30px -12px rgba(23,26,33,.10); }\n\n\n.head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: move; user-select: none; touch-action: none; }\n.name { font-size: 13.5px; font-weight: 600; letter-spacing: -0.3px; white-space: nowrap; }\n.spacer { flex: 1; }\n.chip { font: 12px/1.3 var(--sans); color: var(--body); background: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }\n.chip.mono { font-family: var(--mono); }\n.x { border: 1px solid transparent; background: none; cursor: pointer; color: var(--mute); width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 0; }\n.x:hover { background: var(--soft); color: var(--ink); }\n\n\n.ava { width: 24px; height: 24px; border-radius: 5px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; border: none; padding: 0; cursor: pointer; flex: 0 0 auto; font-family: var(--sans); }\n.ava.out { background: var(--canvas); color: var(--mute); border: 1px dashed var(--line-strong); font-weight: 400; }\n.ava.lg { width: 32px; height: 32px; border-radius: 6px; font-size: 15px; }\n\n\n.scrim { position: absolute; inset: 0; z-index: 8; background: rgba(23,26,33,.10); }\n.pop { position: absolute; top: 40px; right: 10px; width: 262px; z-index: 9; background: var(--canvas); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 1px 2px rgba(23,26,33,.04), 0 10px 20px -6px rgba(23,26,33,.14); }\n.sep-top { border-top: 1px solid var(--line); padding-top: 9px; }\n\n\n.tabbar { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }\n.tab { appearance: none; border: none; background: none; cursor: pointer; padding: 8px 10px; font-size: 13px; letter-spacing: -0.2px; color: var(--body); border-bottom: 2px solid transparent; margin-bottom: -1px; }\n.tab.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }\n\n\n.subbar { display: flex; gap: 4px; padding: 8px 12px 0; flex: 0 0 auto; }\n.seg { appearance: none; border: 1px solid var(--line); background: var(--canvas); color: var(--body); cursor: pointer; padding: 4px 10px; font-size: 12px; border-radius: 6px; font-family: var(--sans); line-height: 1.3; }\n.seg.active { background: var(--ink); color: #fff; border-color: var(--ink); }\n.seg:hover:not(.active) { background: var(--soft); }\n\n\n.home-user { display: flex; align-items: center; gap: 8px; }\n.home-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }\n\n\n.log-filter { display: flex; flex-wrap: wrap; gap: 4px; }\n.log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }\n.log-row { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 1.4; padding: 4px 0; border-bottom: 1px solid var(--line); }\n.log-row:last-child { border-bottom: none; }\n.log-time { color: var(--mute); flex: 0 0 auto; }\n.log-repeat { color: var(--muted); }\n.log-msg { color: var(--body); flex: 1; min-width: 0; word-break: break-word; }\n.log-row.log-warning .log-msg { color: var(--body); }\n.log-row.log-error .log-msg { color: var(--err); }\n\n\n.rule-meta { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }\n.rule-row { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); font: 11.5px/1.45 var(--mono); }\n.rule-row:last-child { border-bottom: none; }\n.rule-key { color: var(--mute); }\n.rule-value { color: var(--body); overflow-wrap: anywhere; }\n\n\n.body { padding: 12px; display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; max-height: min(520px, calc(100vh - 200px)); overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }\n.body::-webkit-scrollbar { width: 6px; }\n.body::-webkit-scrollbar-track { background: transparent; }\n.body::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; }\n.grp { display: flex; flex-direction: column; gap: 8px; }\n.sep { border-top: 1px solid var(--line); }\n\n.gh2 { font: 11px/1.4 var(--mono); color: var(--mute); letter-spacing: .3px; }\n\n.statcard { border: 1px solid var(--line); border-radius: 6px; padding: 11px; display: flex; flex-direction: column; gap: 8px; }\n.statgrid { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; font-size: 12px; align-items: baseline; margin: 0; }\n.statgrid dt { color: var(--mute); }\n.statgrid dd { margin: 0; font-family: var(--mono); }\n\n\n.actbar { flex: 0 0 auto; border-top: 1px solid var(--line); background: var(--canvas); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }\n.actbar-foot { display: flex; align-items: center; justify-content: space-between; }\n\n\n.fold { display: flex; align-items: center; gap: 6px; cursor: pointer; font: 12px/1.4 var(--mono); color: var(--mute); padding: 4px 6px; margin: 0 -6px; border-radius: 6px; background: none; border: none; text-align: left; width: calc(100% + 12px); }\n.fold:hover { background: var(--soft); }\n.fold .chev { margin-left: auto; color: var(--mute); transition: transform .15s ease; }\n.fold .chev.right { transform: rotate(-90deg); }\n\n\n.card { min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--canvas); }\n\n\n.gate-h { font-size: 16px; font-weight: 600; letter-spacing: -0.4px; color: var(--ink); }\n.ctitle { font-size: 13.5px; font-weight: 600; letter-spacing: -0.2px; color: var(--ink); }\n.stem { min-width: 0; font-size: 15px; font-weight: 500; letter-spacing: -0.25px; line-height: 1.45; color: var(--ink); word-break: auto-phrase; text-wrap: pretty; }\n.question-content { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }\n.question-content img { display: inline-block; max-width: 100%; height: auto; object-fit: contain; vertical-align: middle; }\n.image-failed { color: var(--err); font-size: 12px; }\n.lbl { font-size: 13.5px; font-weight: 500; letter-spacing: -0.2px; }\n.locator { font-size: 12px; color: var(--body); letter-spacing: -0.1px; }\n.cap-mute { font-size: 12px; color: var(--mute); line-height: 1.45; }\n.mono { font-family: var(--mono); }\n\n\n.skip summary { cursor: pointer; list-style: none; }\n.skip summary::-webkit-details-marker { display: none; }\n.skip summary::before { content: '\u25b8 '; }\n.skip[open] summary::before { content: '\u25be '; }\n.skip div { padding-left: 12px; }\n\n\n.ic { width: 14px; height: 14px; display: block; color: currentColor; flex: 0 0 auto; }\n.ic.sm { width: 12px; height: 12px; }\n\n\n.btn { appearance: none; border: 1px solid var(--ink); background: var(--ink); color: #fff; border-radius: 6px; height: 32px; padding: 0 12px; font-size: 13.5px; font-weight: 500; letter-spacing: -0.2px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1; font-family: var(--sans); flex-shrink: 0; text-decoration: none; }\n.btn:hover { background: #0f1218; border-color: #0f1218; }\n.btn:disabled { opacity: .5; cursor: not-allowed; }\n.btn.ghost { background: var(--canvas); color: var(--ink); border-color: var(--line); }\n.btn.ghost:hover:not(:disabled) { background: var(--soft); border-color: var(--line-strong); }\n.btn.ghost.sub { color: var(--body); }\n.btn.danger { background: var(--canvas); color: var(--err); border-color: color-mix(in srgb, var(--err) 28%, #fff); }\n.btn.danger:hover { background: color-mix(in srgb, var(--err) 6%, #fff); }\n.btn.sm { height: 28px; padding: 0 8px; font-size: 12px; }\n.btn.block { width: 100%; }\n\n\n.in { width: 100%; height: 36px; padding: 0 12px; font-family: var(--sans); border: 1px solid var(--line); border-radius: 6px; font-size: 13.5px; letter-spacing: -0.2px; color: var(--ink); background: var(--canvas); }\n.in::placeholder { color: var(--mute); }\n.in:focus { outline: 2px solid var(--acc); outline-offset: 0; border-color: var(--acc); }\n\n\n.captcha-cover { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 12px; background: color-mix(in srgb, var(--canvas) 94%, transparent); }\n.captcha-card { width: 100%; padding: 12px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); box-shadow: 0 1px 1px rgba(23,26,33,.03), 0 8px 16px -4px rgba(23,26,33,.08); }\n.captcha-frame { display: block; width: 100%; height: 150px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); }\n\n\n.prev { border: 1px solid var(--line-strong); border-radius: 6px; background: var(--soft); padding: 9px 10px; display: flex; flex-direction: column; gap: 5px; }\n.prow { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }\n.prow .k { color: var(--mute); min-width: 56px; flex: 0 0 auto; }\n.prow b { font-family: var(--mono); font-weight: 600; }\n.done { position: relative; display: flex; flex-direction: column; gap: 8px; }\n\n\n.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }\n\n\n.prog { display: flex; align-items: center; gap: 8px; }\n.prog .stat { font-size: 12px; color: var(--body); white-space: nowrap; }\n.prog .stat b { font-family: var(--mono); font-weight: 400; color: var(--ink); }\n.ticks { flex: 1; display: flex; gap: 2px; height: 6px; }\n.ticks i { flex: 1; border-radius: 1px; background: var(--line); }\n.ticks i.on { background: var(--ink); }\n\n\n.switch-row { display: flex; align-items: center; gap: 8px; }\n.switch { width: 32px; height: 20px; border-radius: 999px; background: var(--ink); position: relative; flex: 0 0 auto; border: none; cursor: pointer; padding: 0; }\n.switch.off { background: var(--line-strong); }\n.switch > i { position: absolute; top: 2px; left: 14px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 1px rgba(23,26,33,.2); transition: left .15s ease; }\n.switch.off > i { left: 2px; }\n\n\n.tag { display: inline-flex; align-items: center; font-size: 12px; padding: 2px 8px; border-radius: 6px; line-height: 1.4; white-space: nowrap; }\n.tag.acc { background: var(--acc-tint); color: var(--acc); border: 1px solid color-mix(in srgb, var(--acc) 22%, #fff); font-family: var(--mono); }\n.tag.neutral { background: var(--soft); color: var(--body); border: 1px solid var(--line); }\n\n\n.banner { display: flex; align-items: center; gap: 8px; border-radius: 6px; padding: 8px 12px; font-size: 13px; background: var(--soft); border: 1px solid var(--line); color: var(--body); }\n\n\n.anb { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 13px; background: var(--soft); border-bottom: 1px solid var(--line); color: var(--body); flex: 0 0 auto; }\n.anb .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--mute); flex: 0 0 auto; }\n.anb .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }\n\n.anb.warning { border-bottom-color: var(--line-strong); }\n.anb.warning .dot { background: var(--ink); }\n.anb.warning .t { font-weight: 600; }\n.anb.critical { background: color-mix(in srgb, var(--err) 8%, #fff); border-bottom-color: color-mix(in srgb, var(--err) 26%, #fff); }\n.anb.critical .dot { background: var(--err); }\n\n.an-body { font-size: 13.5px; line-height: 1.55; color: var(--body); }\n.an-body p { margin: 6px 0; }\n.an-body a { color: var(--acc); }\n.an-body img { max-width: 100%; }\n.an-body :is(h1, h2, h3) { font-size: 14px; margin: 8px 0 4px; color: var(--ink); }\n\n\n.legend { display: flex; gap: 8px 12px; flex-wrap: wrap; }\n.legend span { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--mute); white-space: nowrap; }\n.sw { width: 10px; height: 10px; border-radius: 2px; background: var(--canvas); border: 1px solid var(--line); flex: 0 0 auto; }\n.sw.cur { box-shadow: inset 0 0 0 2px var(--acc); border-color: transparent; }\n.sw.hit { background: var(--acc-tint); border-color: var(--acc); }\n.sw.miss { background: color-mix(in srgb, var(--err) 10%, #fff); border-color: var(--err); }\n.grid { display: flex; flex-wrap: wrap; gap: 4px; }\n.cell { width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); cursor: pointer; font: 12px/1 var(--mono); color: var(--body); padding: 0; display: flex; align-items: center; justify-content: center; }\n.cell.cur { box-shadow: inset 0 0 0 2px var(--acc); border-color: transparent; color: var(--ink); }\n.cell.hit { background: var(--acc-tint); border-color: var(--acc); color: var(--acc); }\n.cell.miss { color: var(--err); border-color: color-mix(in srgb, var(--err) 35%, #fff); background: color-mix(in srgb, var(--err) 6%, #fff); }\n\n\n.opts { min-width: 0; display: flex; flex-direction: column; gap: 2px; }\n.optrow { min-width: 0; display: flex; align-items: center; gap: 8px; }\n.opt { min-width: 0; flex: 1; font-size: 13.5px; color: var(--body); line-height: 1.45; letter-spacing: -0.2px; }\n.opt.hit { color: var(--acc); font-weight: 500; }\n.expand { display: inline-flex; align-items: center; gap: 4px; font: 12px/1 var(--mono); color: var(--mute); cursor: pointer; white-space: nowrap; background: none; border: none; padding: 0; }\n.question-head { min-height: 28px; }\n.stem-type { margin-right: 4px; color: var(--mute); font-weight: 400; }\n.answer-block { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }\n.answer-label { font-size: 12px; color: var(--mute); }\n.answer-value { color: var(--acc); font: 500 13px/1.5 var(--mono); word-break: break-word; }\n.answer-list { display: flex; flex-direction: column; gap: 6px; }\n.answer-item { display: flex; align-items: flex-start; gap: 8px; }\n.answer-key { flex: 0 0 auto; min-width: 36px; color: var(--muted); font: 12px/1.5 var(--mono); }\n\n\n.ent { border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; display: flex; flex-direction: column; gap: 5px; }\n.ent-top { display: flex; align-items: center; gap: 6px; }\n.ent-ty { font: 10.5px/1.4 var(--mono); color: var(--body); border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; flex: 0 0 auto; }\n.ent-tm { font: 10.5px/1.4 var(--mono); color: var(--mute); margin-left: auto; }\n.ent-q { font-size: 13px; line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }\n.ent-a { font: 12.5px/1.5 var(--mono); color: var(--acc); word-break: break-word; }\n.ent-ops summary { cursor: pointer; list-style: none; }\n.ent-ops summary::-webkit-details-marker { display: none; }\n.ent-ops summary::before { content: '\u25b8 '; }\n.ent-ops[open] summary::before { content: '\u25be '; }\n.ent-ops div { padding-left: 12px; }\n.ent-del { width: 20px; height: 20px; border: none; background: none; color: var(--line-strong); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px; flex: 0 0 auto; }\n.ent-del:hover { background: color-mix(in srgb, var(--err) 6%, #fff); color: var(--err); }\n\n.meter { flex: 1; height: 5px; background: var(--soft); border-radius: 3px; overflow: hidden; }\n.meter i { display: block; height: 100%; background: var(--ink); }\n.meter i.over { background: var(--err); }\n\n.alert { border: 1px solid color-mix(in srgb, var(--err) 35%, #fff); background: color-mix(in srgb, var(--err) 6%, #fff); color: var(--err); border-radius: 6px; padding: 8px 10px; font-size: 12px; line-height: 1.55; }\n\n\n.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }\n.balance { font-size: 20px; font-weight: 600; letter-spacing: -0.6px; font-family: var(--mono); color: var(--ink); }\n.range { width: 100%; accent-color: var(--ink); }\n`;
+  const PANEL_STYLE = `\n:host, .aiask-root {\n  --acc: #1e478f;\n  --acc-tint: color-mix(in srgb, var(--acc) 9%, #fff);\n  --ink: #171a21; --body: #4b5059; --mute: #8b909b;\n  --line: #e6e8ec; --line-strong: #aab0ba;\n  --canvas: #fff; --soft: #f6f7f9;\n  --err: #c8322f;\n  --mono: "JetBrains Mono","IBM Plex Mono","Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;\n  --sans: "Inter","Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;\n  --zhu: #c7391b;\n  --serif: "Songti SC","Noto Serif SC","SimSun",serif;\n  font-family: var(--sans);\n  font-feature-settings: "ss01","ss02","cv01","tnum";\n  font-variant-numeric: tabular-nums;\n  color: var(--ink); -webkit-font-smoothing: antialiased;\n  \n  overflow-wrap: anywhere;\n}\n.aiask-root * { box-sizing: border-box; }\n\n\n.bubble { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; display: flex; align-items: center; gap: 8px; cursor: move; user-select: none; touch-action: none; }\n.tip { background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; color: var(--body); font: 12px/1.3 var(--mono); box-shadow: 0 1px 2px rgba(23,26,33,.05); }\n.launcher { appearance: none; position: relative; width: 44px; height: 44px; border: 0; background: transparent; cursor: move; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: none; }\n.badge { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--acc); color: #fff; font: 11px/18px var(--mono); text-align: center; border: 2px solid var(--canvas); box-sizing: border-box; }\n\n\n.seal { background: var(--zhu); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); }\n.seal.s44 { width: 44px; height: 44px; border-radius: 8px; font-size: 26px; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.55), 0 2px 6px rgba(23,26,33,.18); }\n.seal.s28 { width: 28px; height: 28px; border-radius: 5px; font-size: 17px; }\n.seal.s22 { width: 22px; height: 22px; border-radius: 4px; font-size: 14px; }\n\n\n.luokuan { font-family: var(--serif); color: var(--zhu); font-size: 11px; letter-spacing: 1px; }\n\n\n.standby-title { font-family: var(--serif); font-size: 17px; letter-spacing: 6px; color: var(--ink); }\n.standby { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 0 10px; text-align: center; }\n\n\n.done-seal { position: absolute; right: 10px; top: 9px; width: 48px; height: 48px; border-radius: 9px; background: var(--zhu); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; font-size: 28px; opacity: .92; box-shadow: inset 0 0 0 2px rgba(255,255,255,.5), 0 1px 3px rgba(199,57,27,.3); animation: seal-drop .18s cubic-bezier(.22,1,.36,1) both; }\n@keyframes seal-drop {\n  from { transform: scale(1.15) rotate(0deg); opacity: 0; }\n  to { transform: scale(1) rotate(-4deg); opacity: .92; }\n}\n@media (prefers-reduced-motion: reduce) {\n  .done-seal { animation: none; transform: rotate(-4deg); }\n}\n\n\n.panel { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; width: min(340px, calc(100vw - 32px)); background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 1px rgba(23,26,33,.03), 0 6px 14px -4px rgba(23,26,33,.05), 0 20px 30px -12px rgba(23,26,33,.10); }\n\n\n.head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: move; user-select: none; touch-action: none; }\n.name { font-size: 13.5px; font-weight: 600; letter-spacing: -0.3px; white-space: nowrap; }\n.spacer { flex: 1; }\n.chip { font: 12px/1.3 var(--sans); color: var(--body); background: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }\n.chip.mono { font-family: var(--mono); }\n.x { border: 1px solid transparent; background: none; cursor: pointer; color: var(--mute); width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 0; }\n.x:hover { background: var(--soft); color: var(--ink); }\n\n\n.ava { width: 24px; height: 24px; border-radius: 5px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; border: none; padding: 0; cursor: pointer; flex: 0 0 auto; font-family: var(--sans); }\n.ava.out { background: var(--canvas); color: var(--mute); border: 1px dashed var(--line-strong); font-weight: 400; }\n.ava.lg { width: 32px; height: 32px; border-radius: 6px; font-size: 15px; }\n\n\n.scrim { position: absolute; inset: 0; z-index: 8; background: rgba(23,26,33,.10); }\n.pop { position: absolute; top: 40px; right: 10px; width: 262px; z-index: 9; background: var(--canvas); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 1px 2px rgba(23,26,33,.04), 0 10px 20px -6px rgba(23,26,33,.14); }\n.sep-top { border-top: 1px solid var(--line); padding-top: 9px; }\n\n\n.tabbar { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }\n.tab { appearance: none; border: none; background: none; cursor: pointer; padding: 8px 10px; font-size: 13px; letter-spacing: -0.2px; color: var(--body); border-bottom: 2px solid transparent; margin-bottom: -1px; }\n.tab.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }\n\n\n.subbar { display: flex; gap: 4px; padding: 8px 12px 0; flex: 0 0 auto; }\n.seg { appearance: none; border: 1px solid var(--line); background: var(--canvas); color: var(--body); cursor: pointer; padding: 4px 10px; font-size: 12px; border-radius: 6px; font-family: var(--sans); line-height: 1.3; }\n.seg.active { background: var(--ink); color: #fff; border-color: var(--ink); }\n.seg:hover:not(.active) { background: var(--soft); }\n\n\n.home-user { display: flex; align-items: center; gap: 8px; }\n.home-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }\n\n\n.log-filter { display: flex; flex-wrap: wrap; gap: 4px; }\n.log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }\n.log-row { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 1.4; padding: 4px 0; border-bottom: 1px solid var(--line); }\n.log-row:last-child { border-bottom: none; }\n.log-time { color: var(--mute); flex: 0 0 auto; }\n.log-repeat { color: var(--muted); }\n.log-msg { color: var(--body); flex: 1; min-width: 0; word-break: break-word; }\n.log-row.log-warning .log-msg { color: var(--body); }\n.log-row.log-error .log-msg { color: var(--err); }\n\n\n.rule-meta { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }\n.rule-row { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); font: 11.5px/1.45 var(--mono); }\n.rule-row:last-child { border-bottom: none; }\n.rule-key { color: var(--mute); }\n.rule-value { color: var(--body); overflow-wrap: anywhere; }\n\n\n.body { padding: 12px; display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; max-height: min(520px, calc(100vh - 200px)); overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }\n.body::-webkit-scrollbar { width: 6px; }\n.body::-webkit-scrollbar-track { background: transparent; }\n.body::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; }\n.grp { display: flex; flex-direction: column; gap: 8px; }\n.sep { border-top: 1px solid var(--line); }\n\n.gh2 { font: 11px/1.4 var(--mono); color: var(--mute); letter-spacing: .3px; }\n\n.statcard { border: 1px solid var(--line); border-radius: 6px; padding: 11px; display: flex; flex-direction: column; gap: 8px; }\n.statgrid { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; font-size: 12px; align-items: baseline; margin: 0; }\n.statgrid dt { color: var(--mute); }\n.statgrid dd { margin: 0; font-family: var(--mono); }\n\n\n.actbar { flex: 0 0 auto; border-top: 1px solid var(--line); background: var(--canvas); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }\n\n.actbar-foot { display: flex; align-items: center; justify-content: space-between; padding-right: 14px; }\n\n\n.grip { position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px; padding: 0; border: none; background: none; color: var(--line-strong); cursor: nwse-resize; touch-action: none; display: flex; align-items: center; justify-content: center; }\n.grip:hover { color: var(--mute); }\n.grip svg { width: 12px; height: 12px; display: block; }\n\n\n.fold { display: flex; align-items: center; gap: 6px; cursor: pointer; font: 12px/1.4 var(--mono); color: var(--mute); padding: 4px 6px; margin: 0 -6px; border-radius: 6px; background: none; border: none; text-align: left; width: calc(100% + 12px); }\n.fold:hover { background: var(--soft); }\n.fold .chev { margin-left: auto; color: var(--mute); transition: transform .15s ease; }\n.fold .chev.right { transform: rotate(-90deg); }\n\n\n.card { min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--canvas); }\n\n\n.gate-h { font-size: 16px; font-weight: 600; letter-spacing: -0.4px; color: var(--ink); }\n.ctitle { font-size: 13.5px; font-weight: 600; letter-spacing: -0.2px; color: var(--ink); }\n.stem { min-width: 0; font-size: 15px; font-weight: 500; letter-spacing: -0.25px; line-height: 1.45; color: var(--ink); word-break: auto-phrase; text-wrap: pretty; }\n.question-content { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }\n.question-content img { display: inline-block; max-width: 100%; height: auto; object-fit: contain; vertical-align: middle; }\n.image-failed { color: var(--err); font-size: 12px; }\n.lbl { font-size: 13.5px; font-weight: 500; letter-spacing: -0.2px; }\n.locator { font-size: 12px; color: var(--body); letter-spacing: -0.1px; }\n.cap-mute { font-size: 12px; color: var(--mute); line-height: 1.45; }\n.mono { font-family: var(--mono); }\n\n\n.skip summary { cursor: pointer; list-style: none; }\n.skip summary::-webkit-details-marker { display: none; }\n.skip summary::before { content: '\u25b8 '; }\n.skip[open] summary::before { content: '\u25be '; }\n.skip div { padding-left: 12px; }\n\n\n.ic { width: 14px; height: 14px; display: block; color: currentColor; flex: 0 0 auto; }\n.ic.sm { width: 12px; height: 12px; }\n\n\n.btn { appearance: none; border: 1px solid var(--ink); background: var(--ink); color: #fff; border-radius: 6px; height: 32px; padding: 0 12px; font-size: 13.5px; font-weight: 500; letter-spacing: -0.2px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1; font-family: var(--sans); flex-shrink: 0; text-decoration: none; }\n.btn:hover { background: #0f1218; border-color: #0f1218; }\n.btn:disabled { opacity: .5; cursor: not-allowed; }\n.btn.ghost { background: var(--canvas); color: var(--ink); border-color: var(--line); }\n.btn.ghost:hover:not(:disabled) { background: var(--soft); border-color: var(--line-strong); }\n.btn.ghost.sub { color: var(--body); }\n.btn.danger { background: var(--canvas); color: var(--err); border-color: color-mix(in srgb, var(--err) 28%, #fff); }\n.btn.danger:hover { background: color-mix(in srgb, var(--err) 6%, #fff); }\n.btn.sm { height: 28px; padding: 0 8px; font-size: 12px; }\n.btn.block { width: 100%; }\n\n\n.in { width: 100%; height: 36px; padding: 0 12px; font-family: var(--sans); border: 1px solid var(--line); border-radius: 6px; font-size: 13.5px; letter-spacing: -0.2px; color: var(--ink); background: var(--canvas); }\n.in::placeholder { color: var(--mute); }\n.in:focus { outline: 2px solid var(--acc); outline-offset: 0; border-color: var(--acc); }\n\n\n.sel { flex: 1; height: 36px; padding: 0 8px; font-family: var(--sans); border: 1px solid var(--line); border-radius: 6px; font-size: 13.5px; color: var(--ink); background: var(--canvas); }\n.sel:focus { outline: 2px solid var(--acc); outline-offset: 0; border-color: var(--acc); }\n\n\n.captcha-cover { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 12px; background: color-mix(in srgb, var(--canvas) 94%, transparent); }\n.captcha-card { width: 100%; padding: 12px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); box-shadow: 0 1px 1px rgba(23,26,33,.03), 0 8px 16px -4px rgba(23,26,33,.08); }\n.captcha-frame { display: block; width: 100%; height: 150px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); }\n\n\n.prev { border: 1px solid var(--line-strong); border-radius: 6px; background: var(--soft); padding: 9px 10px; display: flex; flex-direction: column; gap: 5px; }\n.prow { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }\n.prow .k { color: var(--mute); min-width: 56px; flex: 0 0 auto; }\n.prow b { font-family: var(--mono); font-weight: 600; }\n.done { position: relative; display: flex; flex-direction: column; gap: 8px; }\n\n\n.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }\n\n\n.prog { display: flex; align-items: center; gap: 8px; }\n.prog .stat { font-size: 12px; color: var(--body); white-space: nowrap; }\n.prog .stat b { font-family: var(--mono); font-weight: 400; color: var(--ink); }\n.ticks { flex: 1; display: flex; gap: 2px; height: 6px; }\n.ticks i { flex: 1; border-radius: 1px; background: var(--line); }\n.ticks i.on { background: var(--ink); }\n\n\n.switch-row { display: flex; align-items: center; gap: 8px; }\n.switch { width: 32px; height: 20px; border-radius: 999px; background: var(--ink); position: relative; flex: 0 0 auto; border: none; cursor: pointer; padding: 0; }\n.switch.off { background: var(--line-strong); }\n.switch > i { position: absolute; top: 2px; left: 14px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 1px rgba(23,26,33,.2); transition: left .15s ease; }\n.switch.off > i { left: 2px; }\n\n\n.tag { display: inline-flex; align-items: center; font-size: 12px; padding: 2px 8px; border-radius: 6px; line-height: 1.4; white-space: nowrap; }\n.tag.acc { background: var(--acc-tint); color: var(--acc); border: 1px solid color-mix(in srgb, var(--acc) 22%, #fff); font-family: var(--mono); }\n.tag.neutral { background: var(--soft); color: var(--body); border: 1px solid var(--line); }\n\n\n.banner { display: flex; align-items: center; gap: 8px; border-radius: 6px; padding: 8px 12px; font-size: 13px; background: var(--soft); border: 1px solid var(--line); color: var(--body); }\n\n\n.anb { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 13px; background: var(--soft); border-bottom: 1px solid var(--line); color: var(--body); flex: 0 0 auto; }\n.anb .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--mute); flex: 0 0 auto; }\n.anb .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }\n\n.anb.warning { border-bottom-color: var(--line-strong); }\n.anb.warning .dot { background: var(--ink); }\n.anb.warning .t { font-weight: 600; }\n.anb.critical { background: color-mix(in srgb, var(--err) 8%, #fff); border-bottom-color: color-mix(in srgb, var(--err) 26%, #fff); }\n.anb.critical .dot { background: var(--err); }\n\n.an-body { font-size: 13.5px; line-height: 1.55; color: var(--body); }\n.an-body p { margin: 6px 0; }\n.an-body a { color: var(--acc); }\n.an-body img { max-width: 100%; }\n.an-body :is(h1, h2, h3) { font-size: 14px; margin: 8px 0 4px; color: var(--ink); }\n\n\n.legend { display: flex; gap: 8px 12px; flex-wrap: wrap; }\n.legend span { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--mute); white-space: nowrap; }\n.sw { width: 10px; height: 10px; border-radius: 2px; background: var(--canvas); border: 1px solid var(--line); flex: 0 0 auto; }\n.sw.cur { box-shadow: inset 0 0 0 2px var(--acc); border-color: transparent; }\n.sw.hit { background: var(--acc-tint); border-color: var(--acc); }\n.sw.miss { background: color-mix(in srgb, var(--err) 10%, #fff); border-color: var(--err); }\n.grid { display: flex; flex-wrap: wrap; gap: 4px; }\n.cell { width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); cursor: pointer; font: 12px/1 var(--mono); color: var(--body); padding: 0; display: flex; align-items: center; justify-content: center; }\n.cell.cur { box-shadow: inset 0 0 0 2px var(--acc); border-color: transparent; color: var(--ink); }\n.cell.hit { background: var(--acc-tint); border-color: var(--acc); color: var(--acc); }\n.cell.miss { color: var(--err); border-color: color-mix(in srgb, var(--err) 35%, #fff); background: color-mix(in srgb, var(--err) 6%, #fff); }\n\n\n.opts { min-width: 0; display: flex; flex-direction: column; gap: 2px; }\n.optrow { min-width: 0; display: flex; align-items: center; gap: 8px; }\n.opt { min-width: 0; flex: 1; font-size: 13.5px; color: var(--body); line-height: 1.45; letter-spacing: -0.2px; }\n.opt.hit { color: var(--acc); font-weight: 500; }\n.expand { display: inline-flex; align-items: center; gap: 4px; font: 12px/1 var(--mono); color: var(--mute); cursor: pointer; white-space: nowrap; background: none; border: none; padding: 0; }\n.question-head { min-height: 28px; }\n.stem-type { margin-right: 4px; color: var(--mute); font-weight: 400; }\n.answer-block { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }\n.answer-label { font-size: 12px; color: var(--mute); }\n.answer-value { color: var(--acc); font: 500 13px/1.5 var(--mono); word-break: break-word; }\n.answer-list { display: flex; flex-direction: column; gap: 6px; }\n.answer-item { display: flex; align-items: flex-start; gap: 8px; }\n.answer-key { flex: 0 0 auto; min-width: 36px; color: var(--muted); font: 12px/1.5 var(--mono); }\n\n\n.ent { border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; display: flex; flex-direction: column; gap: 5px; }\n.ent-top { display: flex; align-items: center; gap: 6px; }\n.ent-ty { font: 10.5px/1.4 var(--mono); color: var(--body); border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; flex: 0 0 auto; }\n.ent-tm { font: 10.5px/1.4 var(--mono); color: var(--mute); margin-left: auto; }\n.ent-q { font-size: 13px; line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }\n.ent-a { font: 12.5px/1.5 var(--mono); color: var(--acc); word-break: break-word; }\n.ent-ops summary { cursor: pointer; list-style: none; }\n.ent-ops summary::-webkit-details-marker { display: none; }\n.ent-ops summary::before { content: '\u25b8 '; }\n.ent-ops[open] summary::before { content: '\u25be '; }\n.ent-ops div { padding-left: 12px; }\n.ent-del { width: 20px; height: 20px; border: none; background: none; color: var(--line-strong); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px; flex: 0 0 auto; }\n.ent-del:hover { background: color-mix(in srgb, var(--err) 6%, #fff); color: var(--err); }\n\n.meter { flex: 1; height: 5px; background: var(--soft); border-radius: 3px; overflow: hidden; }\n.meter i { display: block; height: 100%; background: var(--ink); }\n.meter i.over { background: var(--err); }\n\n.alert { border: 1px solid color-mix(in srgb, var(--err) 35%, #fff); background: color-mix(in srgb, var(--err) 6%, #fff); color: var(--err); border-radius: 6px; padding: 8px 10px; font-size: 12px; line-height: 1.55; }\n\n\n.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }\n.balance { font-size: 20px; font-weight: 600; letter-spacing: -0.6px; font-family: var(--mono); color: var(--ink); }\n.range { width: 100%; accent-color: var(--ink); }\n`;
 
   function mountPanel() {
     if (document.getElementById("aiask-host")) return;
