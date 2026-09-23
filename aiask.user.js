@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.4.1
+// @version      3.4.2
 // @author       爱问答
 // @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
@@ -141,7 +141,7 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.4.1";
+  const SCRIPT_VERSION = "3.4.2";
 
   const ENGINE_ID = "a2a02cfdd2472db6";
 
@@ -6116,7 +6116,7 @@
     return done ? "test-done" : null;
   };
 
-  function surveyTasks$2(documents) {
+  function surveyTasks(documents) {
     const attachments = courseAttachments(documents);
     const framesByJobId = new Map;
     for (const document2 of documents) {
@@ -6183,7 +6183,7 @@
     return element.getAttribute("value") ?? "";
   };
 
-  function sectionCursor$2(documents) {
+  function sectionCursor(documents) {
     for (const document2 of documents) {
       const courseId = inputValue(document2, courseConfig().cursorCourseId);
       const chapterId = inputValue(document2, courseConfig().cursorChapterId);
@@ -6201,7 +6201,7 @@
   }
 
   function advanceSectionViaSite(documents) {
-    const cursor = sectionCursor$2(documents);
+    const cursor = sectionCursor(documents);
     if (!cursor) return false;
     const pageWindow = courseWindow(cursor.document);
     const counter = pageWindow == null ? void 0 : pageWindow.PCount;
@@ -6216,7 +6216,7 @@
 
   const CHAPTER_ID_PATTERN = /\('(.*)','(.*)','(.*)'\)/u;
 
-  function chapterInfos$2(documents) {
+  function chapterInfos(documents) {
     for (const document2 of documents) {
       const elements = [ ...document2.querySelectorAll(courseConfig().chapter) ];
       if (elements.length === 0) continue;
@@ -6237,14 +6237,14 @@
     return [];
   }
 
-  function nextUnfinishedChapter$2(chapters) {
+  function nextUnfinishedChapter(chapters) {
     const pending = chapters.filter(chapter => chapter.unfinishedCount > 0 && !chapter.active);
     if (pending.length === 0) return null;
     const activeIndex = chapters.findIndex(chapter => chapter.active);
     return pending.find(chapter => chapters.indexOf(chapter) > activeIndex) ?? pending[0] ?? null;
   }
 
-  function jumpToChapter$2(documents, chapter) {
+  function jumpToChapter(documents, chapter) {
     var _a;
     const entry = (_a = chapter.element.parentElement) == null ? void 0 : _a.querySelector(courseConfig().chapterName);
     if (entry) {
@@ -6253,7 +6253,7 @@
         return true;
       } catch {}
     }
-    const cursor = sectionCursor$2(documents);
+    const cursor = sectionCursor(documents);
     if (!cursor || !chapter.chapterId) return false;
     const pageWindow = courseWindow(cursor.document);
     const jump = pageWindow == null ? void 0 : pageWindow.getTeacherAjax;
@@ -6313,7 +6313,7 @@
     }
   }
 
-  const MAX_PLAYBACK_RATE$2 = 2;
+  const MAX_PLAYBACK_RATE = 2;
 
   const hasFaceRecognition = doc => {
     for (const img of doc.querySelectorAll(courseConfig().faceLegacy)) if (img.getAttribute("src")) return true;
@@ -6350,9 +6350,9 @@
 
   const hasLoadingMedia = documents => documents.some(doc => [ ...doc.querySelectorAll("video, audio") ].some(el => isLoadingMedia(el)));
 
-  function playMedia$2(pending, options) {
+  function playMedia(pending, options) {
     var _a;
-    const rate = Math.min(Math.max(options.playbackRate ?? 1, 1), MAX_PLAYBACK_RATE$2);
+    const rate = Math.min(Math.max(options.playbackRate ?? 1, 1), MAX_PLAYBACK_RATE);
     pending.volume = options.volume ?? 0;
     pending.playbackRate = rate;
     void ((_a = pending.play()) == null ? void 0 : _a.catch(() => {}));
@@ -6397,7 +6397,7 @@
             taskKey: task.key
           };
         }
-        return playMedia$2(pending, options);
+        return playMedia(pending, options);
       }
 
      case "chapter-test":
@@ -6460,7 +6460,7 @@
         reason: "video-quiz"
       };
     }
-    const survey = surveyTasks$2(documents);
+    const survey = surveyTasks(documents);
     if (survey.authoritative) return stepSurveyedTask(survey, documents, options);
     const media = playableMediaList(documents);
     const markerDone = documents.slice(1).some(taskAlreadyDone);
@@ -6476,7 +6476,7 @@
         kind: hasLoadingMedia(documents) ? "loading" : "idle"
       };
     }
-    return playMedia$2(pending, options);
+    return playMedia(pending, options);
   }
 
   function taskTabs(documents) {
@@ -6515,14 +6515,14 @@
     return null;
   }
 
-  function advanceSection$2(documents) {
+  function advanceSection(documents) {
     const target = nextSectionTarget(documents);
     if (!target) return false;
     target.click();
     return true;
   }
 
-  function sectionSignature$2(documents) {
+  function sectionSignature(documents) {
     var _a, _b;
     const href = ((_b = (_a = documents[0]) == null ? void 0 : _a.location) == null ? void 0 : _b.href) ?? "";
     const tabs = taskTabs(documents);
@@ -6534,7 +6534,7 @@
 
   const MAX_SCROLL_TARGETS = 2e3;
 
-  function simulateReading$2(documents) {
+  function simulateReading(documents) {
     var _a, _b, _c;
     const summary = {
       frames: documents.length,
@@ -6568,7 +6568,7 @@
     return summary;
   }
 
-  const chapterLabel$2 = chapter => {
+  const chapterLabel = chapter => {
     var _a, _b;
     const name = ((_b = (_a = chapter.element.parentElement) == null ? void 0 : _a.querySelector(courseConfig().chapterName)) == null ? void 0 : _b.textContent) ?? chapter.element.textContent;
     return (name ?? "").trim() || "\u4e0b\u4e00\u4e2a\u672a\u5b8c\u6210\u7ae0\u8282";
@@ -6583,7 +6583,7 @@
   }
 
   function courseCounter(documents) {
-    const chapters = chapterInfos$2(documents);
+    const chapters = chapterInfos(documents);
     if (chapters.length === 0) return null;
     if (counterElementCount(documents) === 0) return null;
     return {
@@ -6594,693 +6594,31 @@
   function createChaoxingCourseAdapter() {
     return {
       step: stepMediaTask,
-      survey: surveyTasks$2,
+      survey: surveyTasks,
       courseCounter: courseCounter,
-      simulateReading: simulateReading$2,
+      simulateReading: simulateReading,
       navigate: {
         tabs: taskTabs,
         advanceTab: advanceTaskTab,
-        sectionSignature: sectionSignature$2,
-        sectionCursor: sectionCursor$2,
-        chapters: chapterInfos$2,
-        nextUnfinishedChapter: nextUnfinishedChapter$2,
-        jumpToChapter: jumpToChapter$2,
-        isSpecialMode: isSpecialMode,
-        advanceSection: documents => advanceSectionViaSite(documents) || advanceSection$2(documents),
-        chapterLabel: chapterLabel$2
-      }
-    };
-  }
-
-  const COURSE_PATH_SUFFIX = "/ng";
-
-  const ACTIVITY_PATH_SUFFIX = "/learning-activity";
-
-  const KIND_BY_ACTIVITY_TYPE = {
-    "online-video": "media",
-    material: "document",
-    page: "document",
-    exam: "chapter-test"
-  };
-
-  const SITE_PLAY_TOGGLE = ".mvp-toggle-play";
-
-  const VIDEO_END_SLACK_SECONDS = 1;
-
-  const MAX_PLAYBACK_RATE$1 = 2;
-
-  const DOCUMENT_DWELL_MS$1 = 8e3;
-
-  const ATTEMPTED_KEY$1 = "aiask.guokai.attempted";
-
-  const attemptedIds$1 = doc => {
-    var _a, _b;
-    try {
-      const raw = (_b = (_a = doc.defaultView) == null ? void 0 : _a.sessionStorage) == null ? void 0 : _b.getItem(ATTEMPTED_KEY$1);
-      const parsed = raw ? JSON.parse(raw) : null;
-      return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
-    } catch {
-      return new Set;
-    }
-  };
-
-  const markAttempted$1 = (doc, id) => {
-    var _a, _b;
-    if (!id) return;
-    try {
-      const ids = attemptedIds$1(doc);
-      ids.add(id);
-      (_b = (_a = doc.defaultView) == null ? void 0 : _a.sessionStorage) == null ? void 0 : _b.setItem(ATTEMPTED_KEY$1, JSON.stringify([ ...ids ]));
-    } catch {}
-  };
-
-  const dwelled$1 = new Set;
-
-  const pageUrl$1 = doc => {
-    var _a;
-    try {
-      return new URL(((_a = doc == null ? void 0 : doc.location) == null ? void 0 : _a.href) ?? "");
-    } catch {
-      return null;
-    }
-  };
-
-  const courseIdFrom = url => {
-    var _a;
-    return ((_a = /\/course\/(\d+)\//u.exec((url == null ? void 0 : url.pathname) ?? "")) == null ? void 0 : _a[1]) ?? "";
-  };
-
-  const isCoursePage$1 = url => courseIdFrom(url) !== "" && ((url == null ? void 0 : url.pathname.endsWith(COURSE_PATH_SUFFIX)) ?? false);
-
-  const isActivityPage$1 = url => courseIdFrom(url) !== "" && ((url == null ? void 0 : url.pathname.includes(ACTIVITY_PATH_SUFFIX)) ?? false);
-
-  const activityIdFrom = url => {
-    var _a;
-    return ((_a = /^#\/(\d+)/u.exec((url == null ? void 0 : url.hash) ?? "")) == null ? void 0 : _a[1]) ?? "";
-  };
-
-  const firstDocument$1 = documents => documents[0] ?? null;
-
-  const activityRows = doc => Array.from(doc.querySelectorAll('div.learning-activity[id^="learning-activity-"]'));
-
-  const rowActivityId = row => {
-    var _a;
-    return ((_a = /^learning-activity-(\d+)$/u.exec(row.id)) == null ? void 0 : _a[1]) ?? "";
-  };
-
-  const rowActivityType = row => {
-    var _a, _b;
-    return ((_b = /font-syllabus-([a-z-]+)/u.exec(((_a = row.querySelector("i.activity-type-icon, i.font")) == null ? void 0 : _a.className) ?? "")) == null ? void 0 : _b[1]) ?? "";
-  };
-
-  const rowIsDone = row => row.querySelector(".completeness.full") !== null;
-
-  const rowName = row => {
-    var _a, _b;
-    return ((_b = (_a = row.querySelector(".activity-title .title")) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim()) ?? "\u4efb\u52a1\u70b9";
-  };
-
-  const toTask$1 = (doc, row) => {
-    const kind = KIND_BY_ACTIVITY_TYPE[rowActivityType(row)];
-    if (!kind) return null;
-    const id = rowActivityId(row);
-    if (!id) return null;
-    return {
-      document: doc,
-      kind: kind,
-      jobId: id,
-      name: rowName(row),
-      skip: rowIsDone(row) ? "passed" : attemptedIds$1(doc).has(id) ? "handled" : null,
-      dwellSeconds: 0,
-      key: id
-    };
-  };
-
-  function surveyTasks$1(documents) {
-    const doc = firstDocument$1(documents);
-    const url = pageUrl$1(doc);
-    if (!doc) return {
-      authoritative: false,
-      declared: 0,
-      tasks: []
-    };
-    if (isCoursePage$1(url)) {
-      const tasks = activityRows(doc).map(row => toTask$1(doc, row)).filter(task => task !== null);
-      return {
-        authoritative: true,
-        declared: tasks.length,
-        tasks: tasks
-      };
-    }
-    if (isActivityPage$1(url)) {
-      const id = activityIdFrom(url);
-      const kind = doc.querySelector("video,audio") ? "media" : "document";
-      return {
-        authoritative: false,
-        declared: 1,
-        tasks: [ {
-          document: doc,
-          kind: kind,
-          jobId: id || null,
-          name: doc.title || "\u4efb\u52a1\u70b9",
-          skip: dwelled$1.has(id) ? "handled" : null,
-          dwellSeconds: 0,
-          key: id
-        } ]
-      };
-    }
-    return {
-      authoritative: false,
-      declared: 0,
-      tasks: []
-    };
-  }
-
-  function mediaSatisfied(media) {
-    if (media.ended) return true;
-    const total = media.duration;
-    if (!Number.isFinite(total) || total <= 0) return false;
-    return media.currentTime >= total - VIDEO_END_SLACK_SECONDS;
-  }
-
-  function pressSitePlay(doc) {
-    const toggle = doc.querySelector(SITE_PLAY_TOGGLE);
-    if (!toggle) return false;
-    const view = doc.defaultView;
-    if (!view) return false;
-    const box = toggle.getBoundingClientRect();
-    const init = {
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-      view: view,
-      button: 0,
-      clientX: box.left + box.width / 2,
-      clientY: box.top + box.height / 2
-    };
-    for (const type of [ "pointerdown", "mousedown", "pointerup", "mouseup", "click" ]) {
-      const Ctor = type.startsWith("pointer") && "PointerEvent" in view ? view.PointerEvent : view.MouseEvent;
-      toggle.dispatchEvent(new Ctor(type, init));
-    }
-    return true;
-  }
-
-  function playMedia$1(doc, media, options) {
-    var _a;
-    const rate = Math.min(Math.max(options.playbackRate ?? 1, 1), MAX_PLAYBACK_RATE$1);
-    media.volume = options.volume ?? 0;
-    media.playbackRate = rate;
-    if (media.paused) {
-      if (!pressSitePlay(doc)) void ((_a = media.play()) == null ? void 0 : _a.catch(() => {}));
-    }
-    if (media.paused) return {
-      kind: "blocked",
-      reason: "not-playing"
-    };
-    return {
-      kind: "playing",
-      rate: rate
-    };
-  }
-
-  function stepTask$1(documents, options) {
-    var _a;
-    const doc = firstDocument$1(documents);
-    const url = pageUrl$1(doc);
-    if (!doc || !isActivityPage$1(url)) return {
-      kind: "idle"
-    };
-    const id = activityIdFrom(url);
-    const key = id || (url == null ? void 0 : url.pathname) || "activity";
-    if (dwelled$1.has(key) || ((_a = options.isHandled) == null ? void 0 : _a.call(options, key))) return {
-      kind: "idle",
-      taskKey: key
-    };
-    const media = doc.querySelector("video,audio");
-    if (media) {
-      if (mediaSatisfied(media)) {
-        if (!media.paused) media.pause();
-        dwelled$1.add(key);
-        markAttempted$1(doc, key);
-        return {
-          kind: "idle",
-          taskKey: key
-        };
-      }
-      return playMedia$1(doc, media, options);
-    }
-    dwelled$1.add(key);
-    markAttempted$1(doc, key);
-    return {
-      kind: "dwelling",
-      name: doc.title || "\u4efb\u52a1\u70b9",
-      remainingMs: DOCUMENT_DWELL_MS$1,
-      taskKey: key
-    };
-  }
-
-  const simulateReading$1 = () => ({
-    frames: 0,
-    scrolled: 0,
-    pagers: 0
-  });
-
-  function sectionCursor$1(documents) {
-    const doc = firstDocument$1(documents);
-    const url = pageUrl$1(doc);
-    if (!doc || !isCoursePage$1(url) && !isActivityPage$1(url)) return null;
-    const courseId = courseIdFrom(url);
-    if (!courseId) return null;
-    return {
-      courseId: courseId,
-      chapterId: activityIdFrom(url),
-      clazzId: "",
-      tabCount: 1,
-      document: doc
-    };
-  }
-
-  function chapterInfos$1(documents) {
-    const doc = firstDocument$1(documents);
-    const url = pageUrl$1(doc);
-    if (!doc || !isCoursePage$1(url)) return [];
-    return activityRows(doc).filter(row => KIND_BY_ACTIVITY_TYPE[rowActivityType(row)]).map(row => ({
-      element: row,
-      chapterId: rowActivityId(row) || null,
-      unfinishedCount: rowIsDone(row) ? 0 : 1,
-      active: false
-    }));
-  }
-
-  const nextUnfinishedChapter$1 = chapters => chapters.find(chapter => {
-    if (chapter.unfinishedCount <= 0) return false;
-    const doc = chapter.element.ownerDocument;
-    return !(chapter.chapterId && attemptedIds$1(doc).has(chapter.chapterId));
-  }) ?? null;
-
-  function activityUrlFrom$1(url, activityId2) {
-    const courseId = courseIdFrom(url);
-    if (!url || !courseId || !activityId2) return null;
-    const target = new URL(url.href);
-    target.pathname = `/course/${courseId}${ACTIVITY_PATH_SUFFIX}`;
-    target.search = "";
-    target.hash = `#/${activityId2}`;
-    return target.href;
-  }
-
-  function courseUrlFrom$1(url) {
-    const courseId = courseIdFrom(url);
-    if (!url || !courseId) return null;
-    const target = new URL(url.href);
-    target.pathname = `/course/${courseId}${COURSE_PATH_SUFFIX}`;
-    target.search = "";
-    target.hash = "#/";
-    return target.href;
-  }
-
-  function jumpToChapter$1(documents, chapter) {
-    const doc = firstDocument$1(documents);
-    const href = activityUrlFrom$1(pageUrl$1(doc), chapter.chapterId);
-    if (!doc || !href) return false;
-    markAttempted$1(doc, chapter.chapterId ?? "");
-    doc.location.href = href;
-    return true;
-  }
-
-  function hasDwelled$1(url) {
-    if (!url) return false;
-    return dwelled$1.has(activityIdFrom(url) || url.pathname);
-  }
-
-  function advanceSection$1(documents) {
-    const doc = firstDocument$1(documents);
-    const url = pageUrl$1(doc);
-    if (!doc || !url || !isActivityPage$1(url) || !hasDwelled$1(url)) return false;
-    const href = courseUrlFrom$1(url);
-    if (!href) return false;
-    doc.location.href = href;
-    return true;
-  }
-
-  const sectionSignature$1 = documents => {
-    const url = pageUrl$1(firstDocument$1(documents));
-    return url ? `${url.pathname}${url.hash}` : "";
-  };
-
-  const chapterLabel$1 = chapter => rowName(chapter.element);
-
-  function createGuokaiCourseAdapter() {
-    return {
-      step: stepTask$1,
-      survey: surveyTasks$1,
-      courseCounter: () => null,
-      simulateReading: simulateReading$1,
-      navigate: {
-        tabs: () => null,
-        advanceTab: () => false,
-        sectionSignature: sectionSignature$1,
-        sectionCursor: sectionCursor$1,
-        chapters: chapterInfos$1,
-        nextUnfinishedChapter: nextUnfinishedChapter$1,
-        jumpToChapter: jumpToChapter$1,
-        isSpecialMode: () => false,
-        advanceSection: advanceSection$1,
-        chapterLabel: chapterLabel$1
-      }
-    };
-  }
-
-  function isGuokaiCourseStudyUrl(location2) {
-    try {
-      const url = new URL(location2.href);
-      return isCoursePage$1(url) || isActivityPage$1(url);
-    } catch {
-      return false;
-    }
-  }
-
-  const COURSE_PATH = "/student/courseuser/courseContent";
-
-  const ACTIVITY_PATH = "/student/activity/display";
-
-  const KIND_BY_NODETYPE = {
-    2: "media",
-    7: "media",
-    3: "document",
-    4: "chapter-test",
-    5: "chapter-test"
-  };
-
-  const isDoneState = state => state.classList.contains("finished");
-
-  const DOCUMENT_DWELL_MS = 7e4;
-
-  const dwelled = new Set;
-
-  const ATTEMPTED_KEY = "aiask.wenhua.attempted";
-
-  const attemptedIds = doc => {
-    var _a, _b;
-    try {
-      const raw = (_b = (_a = doc.defaultView) == null ? void 0 : _a.sessionStorage) == null ? void 0 : _b.getItem(ATTEMPTED_KEY);
-      const parsed = raw ? JSON.parse(raw) : null;
-      return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
-    } catch {
-      return new Set;
-    }
-  };
-
-  const markAttempted = (doc, id) => {
-    var _a, _b;
-    if (!id) return;
-    try {
-      const ids = attemptedIds(doc);
-      ids.add(id);
-      (_b = (_a = doc.defaultView) == null ? void 0 : _a.sessionStorage) == null ? void 0 : _b.setItem(ATTEMPTED_KEY, JSON.stringify([ ...ids ]));
-    } catch {}
-  };
-
-  const pageUrl = doc => {
-    var _a;
-    try {
-      return new URL(((_a = doc == null ? void 0 : doc.location) == null ? void 0 : _a.href) ?? "");
-    } catch {
-      return null;
-    }
-  };
-
-  const isCoursePage = url => (url == null ? void 0 : url.pathname.endsWith(COURSE_PATH)) ?? false;
-
-  const isActivityPage = url => (url == null ? void 0 : url.pathname.endsWith(ACTIVITY_PATH)) ?? false;
-
-  const courseVersionId = url => (url == null ? void 0 : url.searchParams.get("courseVersionId")) ?? "";
-
-  const activityId = url => (url == null ? void 0 : url.searchParams.get("activityId")) ?? "";
-
-  const firstDocument = documents => documents[0] ?? null;
-
-  const activityElements = doc => Array.from(doc.querySelectorAll(".activity[nodetype]"));
-
-  const isDone = element => {
-    const state = element.querySelector(".activity-state");
-    return state != null && isDoneState(state);
-  };
-
-  const taskName = element => {
-    var _a, _b;
-    return ((_b = (_a = element.querySelector(".activity-name .name")) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim()) ?? "\u4efb\u52a1\u70b9";
-  };
-
-  const toTask = (doc, element) => {
-    const nodetype = element.getAttribute("nodetype") ?? "";
-    const kind = KIND_BY_NODETYPE[nodetype];
-    if (!kind) return null;
-    const id = element.id || "";
-    if (!id) return null;
-    const name = taskName(element);
-    const skip = isDone(element) ? "passed" : attemptedIds(doc).has(id) ? "handled" : null;
-    return {
-      document: doc,
-      kind: kind,
-      jobId: id,
-      name: name,
-      skip: skip,
-      dwellSeconds: 0,
-      key: id
-    };
-  };
-
-  function surveyTasks(documents) {
-    const doc = firstDocument(documents);
-    const url = pageUrl(doc);
-    if (!doc) return {
-      authoritative: false,
-      declared: 0,
-      tasks: []
-    };
-    if (isCoursePage(url)) {
-      const tasks = activityElements(doc).map(element => toTask(doc, element)).filter(task => task !== null);
-      return {
-        authoritative: true,
-        declared: tasks.length,
-        tasks: tasks
-      };
-    }
-    if (isActivityPage(url)) {
-      const id = activityId(url);
-      const kind = doc.querySelector("video,audio") ? "media" : "document";
-      return {
-        authoritative: false,
-        declared: 1,
-        tasks: [ {
-          document: doc,
-          kind: kind,
-          jobId: id || null,
-          name: doc.title || "\u4efb\u52a1\u70b9",
-          skip: dwelled.has(id) ? "handled" : null,
-          dwellSeconds: 0,
-          key: id
-        } ]
-      };
-    }
-    return {
-      authoritative: false,
-      declared: 0,
-      tasks: []
-    };
-  }
-
-  const MAX_PLAYBACK_RATE = 2;
-
-  function playMedia(media, options) {
-    var _a;
-    const rate = Math.min(Math.max(options.playbackRate ?? 1, 1), MAX_PLAYBACK_RATE);
-    media.volume = options.volume ?? 0;
-    media.playbackRate = rate;
-    void ((_a = media.play()) == null ? void 0 : _a.catch(() => {}));
-    if (media.paused) return {
-      kind: "blocked",
-      reason: "not-playing"
-    };
-    return {
-      kind: "playing",
-      rate: rate
-    };
-  }
-
-  const mediaEnded = media => {
-    if (media.ended) return true;
-    const total = media.duration;
-    return Number.isFinite(total) && total > 0 && media.currentTime >= total - 1;
-  };
-
-  function stepTask(documents, options) {
-    var _a;
-    const doc = firstDocument(documents);
-    const url = pageUrl(doc);
-    if (!doc || !isActivityPage(url)) return {
-      kind: "idle"
-    };
-    const id = activityId(url);
-    const key = id || (url == null ? void 0 : url.pathname) || "activity";
-    if (dwelled.has(key) || ((_a = options.isHandled) == null ? void 0 : _a.call(options, key))) return {
-      kind: "idle",
-      taskKey: key
-    };
-    const media = doc.querySelector("video,audio");
-    if (media) {
-      if (mediaEnded(media)) {
-        dwelled.add(key);
-        markAttempted(doc, key);
-        return {
-          kind: "idle",
-          taskKey: key
-        };
-      }
-      return playMedia(media, options);
-    }
-    dwelled.add(key);
-    markAttempted(doc, key);
-    return {
-      kind: "dwelling",
-      name: doc.title || "\u4efb\u52a1\u70b9",
-      remainingMs: DOCUMENT_DWELL_MS,
-      taskKey: key
-    };
-  }
-
-  const simulateReading = () => ({
-    frames: 0,
-    scrolled: 0,
-    pagers: 0
-  });
-
-  function sectionCursor(documents) {
-    const doc = firstDocument(documents);
-    const url = pageUrl(doc);
-    if (!doc || !isCoursePage(url) && !isActivityPage(url)) return null;
-    const courseId = courseVersionId(url);
-    if (!courseId) return null;
-    return {
-      courseId: courseId,
-      chapterId: activityId(url),
-      clazzId: "",
-      tabCount: 1,
-      document: doc
-    };
-  }
-
-  function chapterInfos(documents) {
-    const doc = firstDocument(documents);
-    const url = pageUrl(doc);
-    if (!doc || !isCoursePage(url)) return [];
-    return activityElements(doc).filter(element => KIND_BY_NODETYPE[element.getAttribute("nodetype") ?? ""]).map(element => ({
-      element: element,
-      chapterId: element.id || null,
-      unfinishedCount: isDone(element) ? 0 : 1,
-      active: false
-    }));
-  }
-
-  const nextUnfinishedChapter = chapters => chapters.find(chapter => {
-    if (chapter.unfinishedCount <= 0) return false;
-    const doc = chapter.element.ownerDocument;
-    return !(chapter.chapterId && attemptedIds(doc).has(chapter.chapterId));
-  }) ?? null;
-
-  function activityUrlFrom(url, activityIdValue) {
-    const courseId = courseVersionId(url);
-    if (!url || !courseId || !activityIdValue) return null;
-    const target = new URL(url.href);
-    target.pathname = url.pathname.replace(COURSE_PATH, ACTIVITY_PATH);
-    target.search = "";
-    target.searchParams.set("courseVersionId", courseId);
-    target.searchParams.set("activityId", activityIdValue);
-    return target.href;
-  }
-
-  function jumpToChapter(documents, chapter) {
-    const doc = firstDocument(documents);
-    const href = activityUrlFrom(pageUrl(doc), chapter.chapterId);
-    if (!doc || !href) return false;
-    markAttempted(doc, chapter.chapterId ?? "");
-    doc.location.href = href;
-    return true;
-  }
-
-  function courseUrlFrom(url) {
-    const courseId = courseVersionId(url);
-    if (!url || !courseId) return null;
-    const target = new URL(url.href);
-    target.pathname = url.pathname.replace(ACTIVITY_PATH, COURSE_PATH);
-    target.search = "";
-    target.searchParams.set("courseVersionId", courseId);
-    return target.href;
-  }
-
-  function hasDwelled(url) {
-    if (!url) return false;
-    return dwelled.has(activityId(url) || url.pathname);
-  }
-
-  function advanceSection(documents) {
-    const doc = firstDocument(documents);
-    const url = pageUrl(doc);
-    if (!doc || !url || !isActivityPage(url) || !hasDwelled(url)) return false;
-    const href = courseUrlFrom(url);
-    if (!href) return false;
-    doc.location.href = href;
-    return true;
-  }
-
-  const sectionSignature = documents => {
-    const url = pageUrl(firstDocument(documents));
-    return url ? `${url.pathname}?${url.searchParams.toString()}` : "";
-  };
-
-  const chapterLabel = chapter => taskName(chapter.element);
-
-  function createWenhuaCourseAdapter() {
-    return {
-      step: stepTask,
-      survey: surveyTasks,
-      courseCounter: () => null,
-      simulateReading: simulateReading,
-      navigate: {
-        tabs: () => null,
-        advanceTab: () => false,
         sectionSignature: sectionSignature,
         sectionCursor: sectionCursor,
         chapters: chapterInfos,
         nextUnfinishedChapter: nextUnfinishedChapter,
         jumpToChapter: jumpToChapter,
-        isSpecialMode: () => false,
-        advanceSection: advanceSection,
+        isSpecialMode: isSpecialMode,
+        advanceSection: documents => advanceSectionViaSite(documents) || advanceSection(documents),
         chapterLabel: chapterLabel
       }
     };
   }
 
-  function isWenhuaCourseStudyUrl(location2) {
-    try {
-      const url = new URL(location2.href);
-      return isCoursePage(url) || isActivityPage(url);
-    } catch {
-      return false;
-    }
-  }
-
   function courseAdapterFor(platform) {
     if (platform === "chaoxing") return createChaoxingCourseAdapter();
-    if (platform === "wenhua") return createWenhuaCourseAdapter();
-    if (platform === "guokai") return createGuokaiCourseAdapter();
     return null;
   }
 
   function isCourseStudyUrl(platform, location2) {
     if (platform === "chaoxing") return isNewCourseStudyUrl(location2);
-    if (platform === "wenhua") return isWenhuaCourseStudyUrl(location2);
-    if (platform === "guokai") return isGuokaiCourseStudyUrl(location2);
     return false;
   }
 
@@ -8523,8 +7861,8 @@
     wangxiao: Object.freeze([ "answer", "harvest" ]),
     aopeng: Object.freeze([ "harvest" ]),
     hubu: Object.freeze([ "answer", "harvest" ]),
-    wenhua: Object.freeze([ "answer", "harvest", "course-automation" ]),
-    guokai: Object.freeze([ "answer", "harvest", "course-automation" ])
+    wenhua: Object.freeze([ "answer", "harvest" ]),
+    guokai: Object.freeze([ "answer", "harvest" ])
   });
 
   const FALLBACK_FEATURES = Object.freeze([ "answer", "harvest" ]);
