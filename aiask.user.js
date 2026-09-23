@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.4.2
+// @version      3.5.0
 // @author       爱问答
-// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学】，更多平台持续适配中...
+// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学、广东开放大学】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
 // @homepage     https://www.aiask.site/
 // @supportURL   https://www.aiask.site/contact.html
@@ -12,12 +12,13 @@
 // @match        *://ctapp.hubuzkw.com/*
 // @match        *://xuexi.jsou.cn/*
 // @match        *://lms.ouchn.cn/*
+// @match        *://course.ougd.cn/*
 // @match        https://www.aiask.site/import.html
 // @match        https://www.aiask.site/import
 // @match        https://www.aiask.site/feedback.html
 // @match        https://www.aiask.site/feedback
 // @require      https://registry.npmmirror.com/vue/3.5.39/files/dist/vue.global.prod.js
-// @require      https://www.aiask.site/engine/aiask-engine-a2a02cfdd2472db6.js#sha256=a2a02cfdd2472db68c72624e347aa04d9096f67a8863da41586b15e9dd55ebc0
+// @require      https://www.aiask.site/engine/aiask-engine-6cda6faa637bd900.js#sha256=6cda6faa637bd9007e9eb8eb69af56f10e80c088bd1551bb79900080f56343c7
 // @resource     chaoxingFontTable  https://www.aiask.site/assets/chaoxing-font-table.json
 // @connect      www.aiask.site
 // @connect      cx.icodef.com
@@ -141,9 +142,9 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.4.2";
+  const SCRIPT_VERSION = "3.5.0";
 
-  const ENGINE_ID = "a2a02cfdd2472db6";
+  const ENGINE_ID = "6cda6faa637bd900";
 
   const DEFAULT_ROOT_PUBLIC_JWK = protocol.PRODUCTION_ROOT_PUBLIC_JWK;
 
@@ -5151,7 +5152,7 @@
 
   const RULE_EXPRESSION_SERVICES = createRuleExpressionServices();
 
-  const RULE_ENGINE_VERSION = "1.9.0";
+  const RULE_ENGINE_VERSION = "1.10.0";
 
   const RULE_LIMITS = Object.freeze({
     maxSteps: 5e4,
@@ -5205,9 +5206,14 @@
     packageId: "guokai-lms-exam",
     hosts: Object.freeze([ "lms.ouchn.cn" ]),
     policy: GENERIC_DOM_RULE_POLICY
+  }), Object.freeze({
+    platform: "ougd",
+    packageId: "ougd-course-quiz",
+    hosts: Object.freeze([ "course.ougd.cn" ]),
+    policy: GENERIC_DOM_RULE_POLICY
   }) ]);
 
-  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn)$/u;
+  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn)$/u;
 
   function trustedRemoteRulePlatformFor(hostname) {
     const host = normalizedHost(hostname);
@@ -7613,9 +7619,9 @@
     }
   }
 
-  const SENSITIVE_ATTR_PATTERN = /token|session|cookie|passwd|password|secret|sign|auth|uid|userid|studentid|ticket|jwt|enc$|^key$|^fid$/i;
+  const SENSITIVE_ATTR_PATTERN = /token|session|sesskey|cookie|passwd|password|secret|sign|auth|uid|user[-_]?id|studentid|ticket|jwt|enc$|^key$|^fid$/i;
 
-  const PERSONAL_TEXT_HOST_PATTERN = /realname|truename|stuname|studentname|nickname|username|loginname|user\w{0,12}name/i;
+  const PERSONAL_TEXT_HOST_PATTERN = /realname|truename|stuname|studentname|nickname|username|loginname|user\w{0,12}name|usertext/i;
 
   const INLINE_CODE_ATTR = /^(?:ng-init|data-init|on[a-z]+)$/iu;
 
@@ -7627,6 +7633,16 @@
 
   const NUMBER_MASK = "[\u6570\u5b57]";
 
+  const QUERY_PAIR = /(^|[?&;])([^=&;#\s]+)=([^&;#]*)/gu;
+
+  const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/gu;
+
+  const MAX_IDENTITY_LENGTH = 64;
+
+  const isAsciiValue = value => /^[\x20-\x7e]+$/u.test(value);
+
+  const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+
   const MAX_TEMPLATE_DEPTH = 5;
 
   const stripUrlQuery = raw => {
@@ -7637,6 +7653,15 @@
   function redactSnapshotHtml(html) {
     let redactions = 0;
     const doc = (new DOMParser).parseFromString(html, "text/html");
+    const identities = new Set;
+    const rememberIdentity = raw => {
+      const value = raw == null ? void 0 : raw.trim();
+      if (!value || value === MASK || value.length > MAX_IDENTITY_LENGTH) return;
+      if (isAsciiValue(value)) {
+        if (value.length < 6 || !/\d/u.test(value)) return;
+      } else if (value.length < 2) return;
+      identities.add(value);
+    };
     const redactRoot = (root, depth) => {
       var _a;
       const owner = root.ownerDocument ?? doc;
@@ -7683,6 +7708,7 @@
         if (personalHost) {
           for (const node of Array.from(el.childNodes)) {
             if (node.nodeType === 3 && ((_a = node.nodeValue) == null ? void 0 : _a.trim())) {
+              rememberIdentity(node.nodeValue);
               node.nodeValue = MASK;
               redactions += 1;
             }
@@ -7699,6 +7725,7 @@
           }
           if ((namedSecret || typedSecret || personalHost) && SECRET_HOST_VALUE_ATTR.test(attr.name)) {
             if (attr.value) {
+              rememberIdentity(attr.value);
               el.setAttribute(attr.name, MASK);
               redactions += 1;
             }
@@ -7706,17 +7733,31 @@
           }
           if (SENSITIVE_ATTR_PATTERN.test(attr.name)) {
             if (attr.value) {
+              rememberIdentity(attr.value);
               el.setAttribute(attr.name, MASK);
               redactions += 1;
             }
             continue;
           }
+          const unmailed = attr.value.replace(EMAIL, () => {
+            redactions += 1;
+            return MASK;
+          });
+          if (unmailed !== attr.value) el.setAttribute(attr.name, unmailed);
           if (/^(?:https?:)?\/\//iu.test(attr.value) || attr.value.includes("?")) {
             const stripped = stripUrlQuery(attr.value);
             if (stripped !== attr.value) {
               el.setAttribute(attr.name, stripped);
               redactions += 1;
             }
+          } else if (attr.value.includes("=")) {
+            const masked = attr.value.replace(QUERY_PAIR, (pair, sep, key, value) => {
+              if (!value || !SENSITIVE_ATTR_PATTERN.test(key)) return pair;
+              rememberIdentity(value);
+              redactions += 1;
+              return `${sep}${key}=${MASK}`;
+            });
+            if (masked !== attr.value) el.setAttribute(attr.name, masked);
           }
         }
       }
@@ -7725,6 +7766,10 @@
       while (textWalker.nextNode()) texts.push(textWalker.currentNode);
       for (const node of texts) {
         let next = node.data ?? "";
+        next = next.replace(EMAIL, () => {
+          redactions += 1;
+          return MASK;
+        });
         next = next.replace(/\d{6,}/gu, () => {
           redactions += 1;
           return NUMBER_MASK;
@@ -7744,6 +7789,35 @@
       }
     };
     redactRoot(doc, 0);
+    if (identities.size > 0) {
+      const patterns = [ ...identities ].sort((a, b) => b.length - a.length).map(value => isAsciiValue(value) ? new RegExp(`(?<![A-Za-z0-9])${escapeRegExp(value)}(?![A-Za-z0-9])`, "gu") : new RegExp(escapeRegExp(value), "gu"));
+      const maskIdentities = input => {
+        let out = input;
+        for (const pattern of patterns) out = out.replace(pattern, () => {
+          redactions += 1;
+          return MASK;
+        });
+        return out;
+      };
+      const propagateRoot = (root, depth) => {
+        const owner = root.ownerDocument ?? doc;
+        for (const el of Array.from(root.querySelectorAll("*"))) {
+          for (const attr of Array.from(el.attributes)) {
+            const next = maskIdentities(attr.value);
+            if (next !== attr.value) el.setAttribute(attr.name, next);
+          }
+          if (el.tagName.toLowerCase() === "template" && depth + 1 <= MAX_TEMPLATE_DEPTH) propagateRoot(el.content, depth + 1);
+        }
+        const walker = owner.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        const texts = [];
+        while (walker.nextNode()) texts.push(walker.currentNode);
+        for (const node of texts) {
+          const next = maskIdentities(node.data);
+          if (next !== node.data) node.data = next;
+        }
+      };
+      propagateRoot(doc, 0);
+    }
     return {
       html: doc.documentElement.outerHTML,
       redactions: redactions
@@ -7851,7 +7925,8 @@
     aopeng: "\u5965\u9e4f\u6559\u80b2",
     hubu: "\u6e56\u5317\u81ea\u8003",
     wenhua: "\u6c5f\u82cf\u5f00\u653e\u5927\u5b66",
-    guokai: "\u56fd\u5bb6\u5f00\u653e\u5927\u5b66"
+    guokai: "\u56fd\u5bb6\u5f00\u653e\u5927\u5b66",
+    ougd: "\u5e7f\u4e1c\u5f00\u653e\u5927\u5b66"
   });
 
   const platformLabelFor = platform => PLATFORM_LABEL[platform] ?? platform;
@@ -7862,7 +7937,8 @@
     aopeng: Object.freeze([ "harvest" ]),
     hubu: Object.freeze([ "answer", "harvest" ]),
     wenhua: Object.freeze([ "answer", "harvest" ]),
-    guokai: Object.freeze([ "answer", "harvest" ])
+    guokai: Object.freeze([ "answer", "harvest" ]),
+    ougd: Object.freeze([ "answer", "harvest" ])
   });
 
   const FALLBACK_FEATURES = Object.freeze([ "answer", "harvest" ]);
