@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.5.2
+// @version      3.5.3
 // @author       爱问答
 // @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学、广东开放大学、安徽继续教育在线新版】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
@@ -19,7 +19,7 @@
 // @match        https://www.aiask.site/feedback.html
 // @match        https://www.aiask.site/feedback
 // @require      https://registry.npmmirror.com/vue/3.5.39/files/dist/vue.global.prod.js
-// @require      https://www.aiask.site/engine/aiask-engine-30691d21cd9da3b3.js#sha256=30691d21cd9da3b3a723a37048cf34fee886f8b999b674544c40140087b7cf55
+// @require      https://www.aiask.site/engine/aiask-engine-fd068ab27041fed0.js#sha256=fd068ab27041fed061f77d442ef319e45c0e53b30d2a7dbf3e4db3220d03d9bb
 // @resource     chaoxingFontTable  https://www.aiask.site/assets/chaoxing-font-table.json
 // @connect      www.aiask.site
 // @connect      cx.icodef.com
@@ -143,9 +143,9 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.5.2";
+  const SCRIPT_VERSION = "3.5.3";
 
-  const ENGINE_ID = "30691d21cd9da3b3";
+  const ENGINE_ID = "fd068ab27041fed0";
 
   const DEFAULT_ROOT_PUBLIC_JWK = protocol.PRODUCTION_ROOT_PUBLIC_JWK;
 
@@ -185,6 +185,10 @@
     return Math.max(a ?? 0, b ?? 0) || void 0;
   }
 
+  function writeTime(value) {
+    return value.writtenAt ?? value.savedAt ?? 0;
+  }
+
   const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1e3;
 
   function parseOptions(input) {
@@ -211,7 +215,7 @@
     const text = key => typeof raw[key] === "string" && raw[key] ? String(raw[key]) : void 0;
     const stamp = key => {
       const at = raw[key];
-      return typeof at === "number" && at > 0 ? at : void 0;
+      return typeof at === "number" && Number.isFinite(at) && at > 0 ? at : void 0;
     };
     return {
       values: normalized,
@@ -220,6 +224,7 @@
       platform: text("platform"),
       options: parseOptions(raw.options),
       savedAt: stamp("savedAt"),
+      writtenAt: stamp("writtenAt"),
       importedAt: stamp("importedAt"),
       lastHitAt: stamp("lastHitAt"),
       aiGenerated: raw.aiGenerated === true ? true : void 0
@@ -308,14 +313,18 @@
     }
     write(unitHash, hit, meta) {
       if (!HASH_PATTERN$1.test(unitHash)) return false;
+      const verdict = this.mergeFromDisk();
       const prev = this.entries.get(unitHash);
+      const savedAt = Date.now();
+      const writtenAt = this.nextWriteAt(unitHash);
       const parsed = parseEntry({
         ...hit,
         stem: (meta == null ? void 0 : meta.stem) ?? (prev == null ? void 0 : prev.stem),
         itemType: (meta == null ? void 0 : meta.itemType) ?? (prev == null ? void 0 : prev.itemType),
         platform: (meta == null ? void 0 : meta.platform) ?? (this.platform || (prev == null ? void 0 : prev.platform)),
         options: (meta == null ? void 0 : meta.options) ?? (prev == null ? void 0 : prev.options),
-        savedAt: Date.now(),
+        savedAt: savedAt,
+        writtenAt: writtenAt === savedAt ? void 0 : writtenAt,
         importedAt: prev == null ? void 0 : prev.importedAt,
         lastHitAt: prev == null ? void 0 : prev.lastHitAt
       });
@@ -323,7 +332,7 @@
       this.entries.delete(unitHash);
       this.entries.set(unitHash, parsed);
       this.removedAt.delete(unitHash);
-      this.persist();
+      this.persist(verdict);
       return true;
     }
     list() {
@@ -340,9 +349,11 @@
       })).reverse();
     }
     remove(unitHash) {
+      const verdict = this.mergeFromDisk();
+      const writtenAt = this.nextWriteAt(unitHash);
       if (this.entries.delete(unitHash)) {
-        this.removedAt.set(unitHash, Date.now());
-        this.persist();
+        this.removedAt.set(unitHash, writtenAt);
+        this.persist(verdict);
       }
     }
     size() {
@@ -368,16 +379,20 @@
       return this.persistFailed;
     }
     clear() {
+      const verdict = this.mergeFromDisk();
+      let clearedAt = Math.max(Date.now(), this.clearedAt + 1);
+      for (const value of this.entries.values()) clearedAt = Math.max(clearedAt, writeTime(value) + 1);
       this.entries.clear();
       this.removedAt.clear();
-      this.clearedAt = Date.now();
-      this.persist();
+      this.clearedAt = clearedAt;
+      this.persist(verdict);
     }
     exportJson() {
       return JSON.stringify(this.snapshot(false), null, 2);
     }
     previewImport(text) {
       const {incoming: incoming, rawCount: rawCount, fillMissing: fillMissing} = this.parseImport(text);
+      this.mergeFromDisk();
       let added = 0;
       let replaced = 0;
       let kept = 0;
@@ -396,14 +411,17 @@
     parseImport(text) {
       var _a;
       const parsedRaw = JSON.parse(text);
+      const incoming = parseSnapshot$1(parsedRaw).entries;
+      for (const value of incoming.values()) value.writtenAt = void 0;
       return {
-        incoming: parseSnapshot$1(parsedRaw).entries,
+        incoming: incoming,
         rawCount: ((_a = parsedRaw.entries) == null ? void 0 : _a.length) ?? 0,
         fillMissing: parsedRaw.mode === "fill-missing"
       };
     }
     importJson(text) {
       const {incoming: incoming, rawCount: rawCount, fillMissing: fillMissing} = this.parseImport(text);
+      const verdict = this.mergeFromDisk();
       let added = 0;
       let replaced = 0;
       let kept = 0;
@@ -413,6 +431,7 @@
           kept += 1;
           continue;
         }
+        const writtenAt = this.nextWriteAt(key);
         if (prev) {
           replaced += 1;
           this.entries.delete(key);
@@ -421,12 +440,13 @@
         }
         this.entries.set(key, {
           ...value,
+          writtenAt: writtenAt,
           importedAt: laterOf(value.importedAt, prev == null ? void 0 : prev.importedAt),
           lastHitAt: laterOf(value.lastHitAt, prev == null ? void 0 : prev.lastHitAt)
         });
         this.removedAt.delete(key);
       }
-      this.persist();
+      this.persist(verdict);
       this.verifyLastPersist();
       return {
         added: added,
@@ -443,7 +463,14 @@
       } catch {}
     }
     snapshot(withTombstones) {
-      const entries = [ ...this.entries ].map(([key, value]) => [ key, value ]);
+      const entries = [ ...this.entries ].map(([key, value]) => {
+        if (withTombstones) return [ key, value ];
+        const exported = {
+          ...value
+        };
+        exported.writtenAt = void 0;
+        return [ key, exported ];
+      });
       if (!withTombstones) return {
         v: 4,
         entries: entries
@@ -467,20 +494,20 @@
       this.clearedAt = Math.max(this.clearedAt, disk.clearedAt);
       for (const [key, at] of disk.tombstones) if (at > (this.removedAt.get(key) ?? 0)) this.removedAt.set(key, at);
       for (const [key, mine] of this.entries) {
-        const savedAt = mine.savedAt ?? 0;
+        const writtenAt = writeTime(mine);
         const removedAt = this.removedAt.get(key);
-        const shadowed = this.clearedAt > 0 && savedAt <= this.clearedAt || removedAt !== void 0 && savedAt <= removedAt;
+        const shadowed = this.clearedAt > 0 && writtenAt <= this.clearedAt || removedAt !== void 0 && writtenAt <= removedAt;
         if (shadowed) this.entries.delete(key);
       }
       for (const [key, value] of disk.entries) {
-        const savedAt = value.savedAt ?? 0;
-        if (savedAt <= this.clearedAt) continue;
+        const writtenAt = writeTime(value);
+        if (this.clearedAt > 0 && writtenAt <= this.clearedAt) continue;
         const removedAt = this.removedAt.get(key);
-        if (removedAt !== void 0 && savedAt <= removedAt) continue;
+        if (removedAt !== void 0 && writtenAt <= removedAt) continue;
         const mine = this.entries.get(key);
         const importedAt = laterOf(value.importedAt, mine == null ? void 0 : mine.importedAt);
         const lastHitAt = laterOf(value.lastHitAt, mine == null ? void 0 : mine.lastHitAt);
-        if (mine && (mine.savedAt ?? 0) >= savedAt) {
+        if (mine && writeTime(mine) >= writtenAt) {
           mine.importedAt = importedAt;
           mine.lastHitAt = lastHitAt;
           continue;
@@ -499,26 +526,30 @@
       const sentinel = this.lastWrite;
       if (!sentinel) return "unknown";
       const onDisk = disk.entries.get(sentinel.key);
-      if (onDisk && (onDisk.savedAt ?? 0) >= sentinel.savedAt) return "landed";
+      if (onDisk && writeTime(onDisk) >= sentinel.writtenAt) return "landed";
       const removedAt = disk.tombstones.get(sentinel.key) ?? 0;
-      if (removedAt >= sentinel.savedAt || disk.clearedAt >= sentinel.savedAt) return "landed";
+      if (removedAt >= sentinel.writtenAt || disk.clearedAt >= sentinel.writtenAt) return "landed";
       return "lost";
     }
     newestWrite() {
       let best = null;
       for (const [key, value] of this.entries) {
-        const savedAt = value.savedAt ?? 0;
-        if (savedAt > 0 && (!best || savedAt > best.savedAt)) best = {
+        const writtenAt = writeTime(value);
+        if (writtenAt > 0 && (!best || writtenAt > best.writtenAt)) best = {
           key: key,
-          savedAt: savedAt
+          writtenAt: writtenAt
         };
       }
       return best;
     }
-    persist() {
+    nextWriteAt(key) {
+      const prev = this.entries.get(key);
+      return Math.max(Date.now(), this.clearedAt + 1, (this.removedAt.get(key) ?? 0) + 1, prev ? writeTime(prev) + 1 : 1);
+    }
+    persist(mergedVerdict) {
       this.hitsPendingPersist = false;
       try {
-        const verdict = this.mergeFromDisk();
+        const verdict = mergedVerdict ?? this.mergeFromDisk();
         this.storage.set(LOCAL_ANSWER_CACHE_KEY, this.snapshot(true));
         this.lastWrite = this.newestWrite();
         this.persistFailed = verdict === "lost";
@@ -7687,7 +7718,8 @@
   }
 
   async function autoSubmitRound(getDocuments, state) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    if ((_a = state.isCanceled) == null ? void 0 : _a.call(state)) return "off";
     if (!state.enabled) return "off";
     if (state.items.length === 0) return "no-items";
     if (!shouldAutoSubmit(state)) return hasUnrecognizedQuestions(state) ? "unrecognized-questions" : "below-threshold";
@@ -7698,39 +7730,45 @@
     if (!frame) return "no-page-window";
     if (pageSubmitQuotaExhausted(frame.win)) return "site-quota";
     if (pageSubmitLocked(frame.win)) return "site-locked";
-    (_a = state.onEntry) == null ? void 0 : _a.call(state, "click", entryHandlerSource(frame.win));
+    (_b = state.onEntry) == null ? void 0 : _b.call(state, "click", entryHandlerSource(frame.win));
     const siteMessage = captureSiteMessage(frame.win);
     try {
       try {
+        if ((_c = state.isCanceled) == null ? void 0 : _c.call(state)) return "off";
         target.click();
       } catch (error) {
-        (_b = state.onConfirmProbe) == null ? void 0 : _b.call(state, `\u70b9\u51fb\u63d0\u4ea4\u5165\u53e3\u629b ${String((error == null ? void 0 : error.message) ?? error).slice(0, 160)}`);
+        (_d = state.onConfirmProbe) == null ? void 0 : _d.call(state, `\u70b9\u51fb\u63d0\u4ea4\u5165\u53e3\u629b ${String((error == null ? void 0 : error.message) ?? error).slice(0, 160)}`);
         return "click-failed";
       }
-      const confirmButton = await pollFor$1(() => findConfirmButton(getDocuments()), state.confirmTimeoutMs ?? DEFAULT_CONFIRM_TIMEOUT_MS, state.pollMs ?? POLL_MS);
+      const confirmButton = await pollFor$1(() => {
+        var _a2;
+        return ((_a2 = state.isCanceled) == null ? void 0 : _a2.call(state)) ? "canceled" : findConfirmButton(getDocuments());
+      }, state.confirmTimeoutMs ?? DEFAULT_CONFIRM_TIMEOUT_MS, state.pollMs ?? POLL_MS);
+      if (confirmButton === "canceled" || ((_e = state.isCanceled) == null ? void 0 : _e.call(state))) return "confirm-unverified";
       if (!confirmButton) {
-        (_c = state.onConfirmProbe) == null ? void 0 : _c.call(state, `\u70b9\u4e86\u5165\u53e3\u4f46\u6ca1\u7b49\u5230\u786e\u8ba4\u6846 #${CONFIRM_OK_ID} \xb7 ${describeViews([ frame.win ])}`);
+        (_f = state.onConfirmProbe) == null ? void 0 : _f.call(state, `\u70b9\u4e86\u5165\u53e3\u4f46\u6ca1\u7b49\u5230\u786e\u8ba4\u6846 #${CONFIRM_OK_ID} \xb7 ${describeViews([ frame.win ])}`);
         return "clicked-entry";
       }
-      (_d = state.onConfirmProbe) == null ? void 0 : _d.call(state, `\u786e\u8ba4\u6846\u5df2\u51fa\u73b0 \xb7 ${answeredFieldSummary(frame.win)} \xb7 lock=${readScalar(frame.win, "submitLock")}`);
+      (_g = state.onConfirmProbe) == null ? void 0 : _g.call(state, `\u786e\u8ba4\u6846\u5df2\u51fa\u73b0 \xb7 ${answeredFieldSummary(frame.win)} \xb7 lock=${readScalar(frame.win, "submitLock")}`);
       await sleep(CONFIRM_SETTLE_MS);
       let clicked = false;
       for (let attempt = 0; attempt < CONFIRM_CLICK_ATTEMPTS; attempt += 1) {
+        if ((_h = state.isCanceled) == null ? void 0 : _h.call(state)) return "confirm-unverified";
         const button = findConfirmButton(getDocuments());
         if (!button) break;
         try {
           button.click();
         } catch (error) {
-          (_e = state.onConfirmProbe) == null ? void 0 : _e.call(state, `\u70b9\u786e\u8ba4\u6846\u629b ${String((error == null ? void 0 : error.message) ?? error).slice(0, 160)}`);
+          (_i = state.onConfirmProbe) == null ? void 0 : _i.call(state, `\u70b9\u786e\u8ba4\u6846\u629b ${String((error == null ? void 0 : error.message) ?? error).slice(0, 160)}`);
           return "confirm-unverified";
         }
-        if (!clicked) (_f = state.onConfirmCall) == null ? void 0 : _f.call(state, `#${CONFIRM_OK_ID}`);
+        if (!clicked) (_j = state.onConfirmCall) == null ? void 0 : _j.call(state, `#${CONFIRM_OK_ID}`);
         clicked = true;
         await sleep(CONFIRM_SETTLE_MS);
       }
-      if (!clicked) (_g = state.onConfirmProbe) == null ? void 0 : _g.call(state, "\u786e\u8ba4\u6846\u5728\u70b9\u5230\u4e4b\u524d\u5c31\u6d88\u5931\u4e86 \xb7 \u6ca1\u70b9\u6210\uff0c\u4e0d\u5f53\u4f5c\u5df2\u786e\u8ba4");
+      if (!clicked) (_k = state.onConfirmProbe) == null ? void 0 : _k.call(state, "\u786e\u8ba4\u6846\u5728\u70b9\u5230\u4e4b\u524d\u5c31\u6d88\u5931\u4e86 \xb7 \u6ca1\u70b9\u6210\uff0c\u4e0d\u5f53\u4f5c\u5df2\u786e\u8ba4");
       const confirmStuck = findConfirmButton(getDocuments()) !== null;
-      if (confirmStuck) (_h = state.onConfirmProbe) == null ? void 0 : _h.call(state, `\u70b9\u5b8c #${CONFIRM_OK_ID} \u540e\u6846\u4ecd\u5728 \xb7 \u5904\u7406\u5668\u6ca1\u63a5\u4f4f\u8fd9\u4e00\u4e0b`);
+      if (confirmStuck) (_l = state.onConfirmProbe) == null ? void 0 : _l.call(state, `\u70b9\u5b8c #${CONFIRM_OK_ID} \u540e\u6846\u4ecd\u5728 \xb7 \u5904\u7406\u5668\u6ca1\u63a5\u4f4f\u8fd9\u4e00\u4e0b`);
       const settled = () => clicked && !confirmStuck && !siteMessage.message() ? "confirm-accepted" : "confirm-unverified";
       if (!state.isSubmitted) return settled();
       const done = await pollFor$1(() => {
@@ -7738,7 +7776,7 @@
         return ((_a2 = state.isSubmitted) == null ? void 0 : _a2.call(state)) ? "submitted" : siteMessage.message() ? "refused" : null;
       }, state.verifyTimeoutMs ?? DEFAULT_VERIFY_TIMEOUT_MS, state.pollMs ?? POLL_MS);
       const refusal = siteMessage.message();
-      if (refusal) (_i = state.onConfirmProbe) == null ? void 0 : _i.call(state, `\u7ad9\u70b9\u62d2\u7edd\u63d0\u4ea4 \xb7 ${refusal}`);
+      if (refusal) (_m = state.onConfirmProbe) == null ? void 0 : _m.call(state, `\u7ad9\u70b9\u62d2\u7edd\u63d0\u4ea4 \xb7 ${refusal}`);
       return done === "submitted" ? "submitted" : settled();
     } finally {
       siteMessage.restore();
@@ -8275,20 +8313,29 @@
     return buttons[0] ?? null;
   }
 
-  function hubuPaperComplete(doc) {
-    var _a, _b;
-    let text;
+  function hubuPaperProgress(doc) {
+    var _a, _b, _c;
     try {
-      text = (((_a = doc.body) == null ? void 0 : _a.innerText) ?? ((_b = doc.body) == null ? void 0 : _b.textContent) ?? "").replace(/\s+/gu, "");
+      const progress = doc.querySelectorAll(".left_top");
+      if (progress.length !== 1) return null;
+      const text = (((_a = progress[0]) == null ? void 0 : _a.textContent) ?? "").replace(/\s+/gu, "");
+      const completed = [ ...text.matchAll(/\u5df2\u5b8c\u6210(\d+)\u9898/gu) ];
+      const totals = [ ...text.matchAll(/\u5171(\d+)\u9898/gu) ];
+      if (completed.length !== 1 || totals.length !== 1) return null;
+      const answered = Number((_b = completed[0]) == null ? void 0 : _b[1]);
+      const total = Number((_c = totals[0]) == null ? void 0 : _c[1]);
+      return Number.isSafeInteger(total) && total > 0 && Number.isSafeInteger(answered) && answered >= 0 && answered <= total ? {
+        answered: answered,
+        total: total
+      } : null;
     } catch {
-      return false;
+      return null;
     }
-    const done = text.match(/\u5df2\u5b8c\u6210(\d+)\u9898/u);
-    const total = text.match(/\u5171(\d+)\u9898/u);
-    if (!done || !total) return false;
-    const answered = Number(done[1]);
-    const all = Number(total[1]);
-    return all > 0 && answered === all;
+  }
+
+  function hubuPaperComplete(doc) {
+    const progress = hubuPaperProgress(doc);
+    return !!progress && progress.answered === progress.total;
   }
 
   const isHubuExamPaper = doc => {
@@ -8300,41 +8347,170 @@
     }
   };
 
-  async function hubuAutoSubmitRound(getDocuments, state) {
-    var _a, _b, _c, _d, _e;
-    if (!state.enabled) return "off";
+  async function hubuAutoSubmitRound(getDocuments, state, trust) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    if (!state.enabled || ((_a = state.isCanceled) == null ? void 0 : _a.call(state))) return "off";
     if (state.items.length === 0) return "no-items";
-    if (!shouldAutoSubmit(state)) return hasUnrecognizedQuestions(state) ? "unrecognized-questions" : "below-threshold";
-    const paper = getDocuments().find(doc => isHubuExamPaper(doc));
+    const documents = getDocuments();
+    const paper = documents.find(doc => isHubuExamPaper(doc));
     if (!paper) return "no-entry";
+    const paperRound = trust == null ? void 0 : trust.capture(documents);
+    const recorded = trust == null ? void 0 : trust.snapshot(documents);
+    if (!paperRound || !recorded || !shouldAutoSubmit({
+      ...state,
+      ...recorded
+    })) return "below-threshold";
     if (!hubuPaperComplete(paper)) return "below-threshold";
     const entry = hubuSubmitEntry(paper);
     if (!entry) return "no-entry";
-    (_a = state.onEntry) == null ? void 0 : _a.call(state, "click", "");
+    if ((_b = state.isCanceled) == null ? void 0 : _b.call(state)) return "off";
+    (_c = state.onEntry) == null ? void 0 : _c.call(state, "click", "");
     try {
       entry.click();
     } catch (error) {
-      (_b = state.onConfirmProbe) == null ? void 0 : _b.call(state, `\u70b9\u51fb\u63d0\u4ea4\u5165\u53e3\u629b ${String((error == null ? void 0 : error.message) ?? error).slice(0, 160)}`);
+      (_d = state.onConfirmProbe) == null ? void 0 : _d.call(state, `\u70b9\u51fb\u63d0\u4ea4\u5165\u53e3\u629b ${String((error == null ? void 0 : error.message) ?? error).slice(0, 160)}`);
       return "click-failed";
     }
-    const confirm = await pollFor(() => hubuSubmitConfirm(paper), 8e3);
+    const confirm = await pollFor(() => {
+      var _a2;
+      return ((_a2 = state.isCanceled) == null ? void 0 : _a2.call(state)) ? "canceled" : hubuSubmitConfirm(paper);
+    }, 8e3);
+    if (confirm === "canceled" || ((_e = state.isCanceled) == null ? void 0 : _e.call(state))) return "confirm-unverified";
     if (!confirm) {
-      (_c = state.onConfirmProbe) == null ? void 0 : _c.call(state, "\u6ca1\u7b49\u5230\u300c\u662f\u5426\u63d0\u4ea4\u8bd5\u5377\u300d\u786e\u8ba4\u6846");
+      (_f = state.onConfirmProbe) == null ? void 0 : _f.call(state, "\u6ca1\u7b49\u5230\u300c\u662f\u5426\u63d0\u4ea4\u8bd5\u5377\u300d\u786e\u8ba4\u6846");
       return "clicked-entry";
     }
-    (_d = state.onConfirmProbe) == null ? void 0 : _d.call(state, `\u786e\u8ba4\u6846\u5df2\u51fa\u73b0\uff0c\u6309\u94ae\u6587\u6848\u300c${textOf(confirm)}\u300d`);
+    (_g = state.onConfirmProbe) == null ? void 0 : _g.call(state, `\u786e\u8ba4\u6846\u5df2\u51fa\u73b0\uff0c\u6309\u94ae\u6587\u6848\u300c${textOf(confirm)}\u300d`);
+    if ((_h = state.isCanceled) == null ? void 0 : _h.call(state)) return "confirm-unverified";
+    const currentDocuments = getDocuments();
+    const current = trust == null ? void 0 : trust.snapshot(currentDocuments);
+    if (!(trust == null ? void 0 : trust.isCurrent(paperRound, currentDocuments)) || !current || !shouldAutoSubmit({
+      ...state,
+      ...current
+    }) || !hubuPaperComplete(paper)) {
+      (_i = state.onConfirmProbe) == null ? void 0 : _i.call(state, "\u5377\u9762\u6216\u53ef\u4fe1\u6765\u6e90\u5df2\u53d8\u5316\uff0c\u62d2\u7edd\u786e\u8ba4\u63d0\u4ea4");
+      return "below-threshold";
+    }
     try {
       confirm.click();
     } catch (error) {
-      (_e = state.onConfirmProbe) == null ? void 0 : _e.call(state, `\u70b9\u51fb\u786e\u8ba4\u629b ${String((error == null ? void 0 : error.message) ?? error).slice(0, 160)}`);
+      (_j = state.onConfirmProbe) == null ? void 0 : _j.call(state, `\u70b9\u51fb\u786e\u8ba4\u629b ${String((error == null ? void 0 : error.message) ?? error).slice(0, 160)}`);
       return "click-failed";
     }
     if (!state.isSubmitted) return "confirm-unverified";
     const done = await pollFor(() => {
-      var _a2;
-      return ((_a2 = state.isSubmitted) == null ? void 0 : _a2.call(state)) === true ? true : null;
+      var _a2, _b2;
+      return ((_a2 = state.isCanceled) == null ? void 0 : _a2.call(state)) ? "canceled" : ((_b2 = state.isSubmitted) == null ? void 0 : _b2.call(state)) === true ? "submitted" : null;
     }, 12e3);
-    return done ? "submitted" : "confirm-unverified";
+    return done === "submitted" ? "submitted" : "confirm-unverified";
+  }
+
+  const MAX_PAPER_QUESTIONS = 256;
+
+  function readPaper(documents) {
+    var _a, _b, _c, _d, _e, _f;
+    const papers = documents.filter(isHubuExamPaper);
+    if (papers.length !== 1) return null;
+    const document2 = papers[0];
+    if (!document2) return null;
+    try {
+      const url = new URL(((_a = document2.defaultView) == null ? void 0 : _a.location.href) ?? "");
+      const params = new URLSearchParams(url.hash.split("?")[1] ?? "");
+      const examKeys = params.getAll("exam_key");
+      if (url.hostname !== "ctapp.hubuzkw.com" || params.getAll("practiceType").length !== 1 || params.get("practiceType") !== "2" || examKeys.length !== 1 || !((_b = examKeys[0]) == null ? void 0 : _b.trim())) return null;
+      const progress = hubuPaperProgress(document2);
+      if (!progress || progress.total > MAX_PAPER_QUESTIONS) return null;
+      const {answered: answered, total: total} = progress;
+      const cards = document2.querySelectorAll(".card_center");
+      if (cards.length !== 1) return null;
+      const cells = [ ...((_c = cards[0]) == null ? void 0 : _c.children) ?? [] ];
+      if (cells.length !== total || cells.some((cell, index) => {
+        var _a2;
+        return cell.tagName !== "DIV" || ((_a2 = cell.textContent) == null ? void 0 : _a2.trim()) !== String(index + 1);
+      })) return null;
+      const current = cells.filter(cell => cell.classList.contains("status4"));
+      const stems = document2.querySelectorAll(".topic_style_title");
+      if (current.length !== 1 || stems.length !== 1) return null;
+      const stem = ((_d = stems[0]) == null ? void 0 : _d.innerHTML) ?? "";
+      if (!stem.trim()) return null;
+      return {
+        document: document2,
+        identity: `${url.origin}${url.pathname}${url.search}${url.hash}`,
+        total: total,
+        answered: answered,
+        questionId: ((_f = (_e = current[0]) == null ? void 0 : _e.textContent) == null ? void 0 : _f.trim()) ?? "",
+        stem: stem
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  class HubuPaperTrustTracker {
+    constructor() {
+      __publicField(this, "generation", 0);
+      __publicField(this, "context", null);
+      __publicField(this, "records", new Map);
+    }
+    clear() {
+      this.generation += 1;
+      this.context = null;
+      this.records.clear();
+    }
+    sync(documents) {
+      const next = readPaper(documents);
+      if (!next) {
+        this.clear();
+        return null;
+      }
+      if (!this.context || this.context.document !== next.document || this.context.identity !== next.identity || this.context.total !== next.total || next.answered < this.context.answered) this.clear();
+      this.context = next;
+      return next;
+    }
+    synchronize(documents) {
+      this.sync(documents);
+    }
+    capture(documents) {
+      const context = this.sync(documents);
+      return context ? {
+        generation: this.generation,
+        context: context
+      } : null;
+    }
+    isCurrent(round, documents) {
+      const context = this.sync(documents);
+      return !!context && round.generation === this.generation && round.context.document === context.document && round.context.identity === context.identity && round.context.questionId === context.questionId && round.context.stem === context.stem;
+    }
+    record(round, documents, items) {
+      var _a;
+      const context = this.sync(documents);
+      if (!round || !context || round.generation !== this.generation) return;
+      if (round.context.document !== context.document || round.context.identity !== context.identity || round.context.questionId !== context.questionId || round.context.stem !== context.stem) return;
+      const item = items[0];
+      const hash = (_a = item == null ? void 0 : item.unit) == null ? void 0 : _a.unitHash;
+      if (items.length !== 1 || !item || !hash) {
+        this.records.delete(context.questionId);
+        return;
+      }
+      const previous = this.records.get(context.questionId);
+      if (previous && previous.hash !== hash) this.records.clear();
+      this.records.set(context.questionId, {
+        hash: hash,
+        item: {
+          filled: item.filled,
+          random: item.random,
+          aiGenerated: item.aiGenerated
+        }
+      });
+    }
+    snapshot(documents) {
+      const context = this.sync(documents);
+      if (!context) return null;
+      return {
+        items: [ ...this.records.values() ].map(record => record.item),
+        answerableCount: context.total
+      };
+    }
   }
 
   function formatTime(d = new Date) {
@@ -11467,6 +11643,8 @@
       }
       const courseStopReporter = createCourseStopReporter(trackUsage);
       function onPageHide() {
+        cancelAnswerRound();
+        hubuTrust.clear();
         localAnswerCache.flush();
         usageEvents.persist();
       }
@@ -11955,17 +12133,21 @@
       }
       async function aiAnswerCurrent() {
         const active2 = session;
-        if (!active2) return;
+        if (!active2 || busy.value) return;
+        const epoch = ++answerEpoch;
+        answerCanceled = false;
+        const round = hubuTrust.capture(readableDocuments(document));
         running.value = true;
         try {
           const summary = await active2.aiAnswerOne(curInx.value, {
             cache: settings.ai.cache
           });
-          if (session !== active2) return;
+          if (!answerRoundCurrent(active2, epoch)) return;
+          hubuTrust.record(round, readableDocuments(document), active2.list);
           list.value = [ ...active2.list ];
           pushLog(summary.hit > 0 ? "AI \u7b54\u8fd9\u9898 \xb7 \u5df2\u56de\u586b" : `AI \u7b54\u8fd9\u9898 \xb7 \u672a\u7b54\u4e0a${skippedText(summary)}`, summary.hit > 0 ? "info" : "warning");
         } finally {
-          running.value = false;
+          if (session === active2) running.value = false;
         }
       }
       let mediaRunner = null;
@@ -12388,8 +12570,28 @@
       let stopDomChanges = null;
       let stopUrlChanges = null;
       let pageChangeScheduler = null;
-      let completing = false;
+      const completing = vue.ref(false);
+      const busy = vue.computed(() => running.value || completing.value);
+      let answerEpoch = 0;
+      let answerCanceled = false;
+      let completionOwner = null;
+      const hubuTrust = new HubuPaperTrustTracker;
+      let hubuRound = null;
       let pendingPageChange = false;
+      function answerRoundCurrent(active2, epoch) {
+        return session === active2 && answerEpoch === epoch && !answerCanceled && !(ctx == null ? void 0 : ctx.signal.aborted);
+      }
+      function cancelAnswerRound() {
+        var _a2;
+        answerEpoch += 1;
+        answerCanceled = true;
+        session == null ? void 0 : session.pause();
+        hubuRound = null;
+        if (completing.value) {
+          void ((_a2 = adapter == null ? void 0 : adapter.dispose) == null ? void 0 : _a2.call(adapter));
+          pendingPageChange = true;
+        }
+      }
       function refreshRuleDiagnostic() {
         var _a2;
         const loadStatus = (_a2 = ruleDiag.value) == null ? void 0 : _a2.loadStatus;
@@ -12437,7 +12639,7 @@
         unqueried: list.value.filter(it => it.answerNode && PAID_BLOCKED_STATUSES.has(it.answerNode.status)).length,
         skipped: list.value.filter(it => it.status === "decodeFail" || it.status === "unsupported").length
       }));
-      const runDone = vue.computed(() => roundStarted.value && list.value.length > 0 && !running.value && list.value.every(it => it.status !== "pending"));
+      const runDone = vue.computed(() => roundStarted.value && list.value.length > 0 && !busy.value && list.value.every(it => it.status !== "pending"));
       const detectedCount = vue.computed(() => list.value.length);
       const features = vue.computed(() => platformFeatures(platform.value));
       const visibleSystemSegs = vue.computed(() => SYSTEM_SEGS.filter(seg => !seg.feature || hasFeature(seg.feature)));
@@ -12500,6 +12702,12 @@
       });
       function discard() {
         var _a2;
+        const wasCanceled = answerCanceled;
+        cancelAnswerRound();
+        answerCanceled = wasCanceled;
+        completionOwner = null;
+        completing.value = false;
+        pendingPageChange = false;
         const discarded = loaded || list.value.length > 0;
         pageChangeScheduler == null ? void 0 : pageChangeScheduler.cancel();
         stopPageChanges == null ? void 0 : stopPageChanges();
@@ -12528,8 +12736,8 @@
         tip.value = "\u7a7a\u95f2";
         if (discarded && tab.value === "ask") tab.value = "home";
       }
-      async function detectQuestions(allowAutoStart = true) {
-        if (loaded || running.value) return;
+      async function detectQuestions(allowAutoStart = !answerCanceled) {
+        if (loaded || busy.value) return;
         if (detecting) {
           detectAgain = true;
           return;
@@ -12567,13 +12775,17 @@
                 tab.value = "ask";
                 pushLog(`\u547d\u4e2d${platformLabel.value} \xb7 \u6293\u5230 ${n} \u9898`, "info");
                 const storage = examSessionStorage();
-                if (!autoResumeStarted && storage && shouldAutoResumeChaoxingExam(location, storage)) {
+                if (allowAutoStart && !autoResumeStarted && storage && shouldAutoResumeChaoxingExam(location, storage)) {
                   autoResumeStarted = true;
                   pushLog("\u5df2\u8fdb\u5165\u6574\u5377\u9884\u89c8 \xb7 \u81ea\u52a8\u7ee7\u7eed\u7b54\u9898", "info");
-                  queueMicrotask(() => void start());
-                } else if (allowAutoStart && settings.autoStart && !running.value && hasFeature("answer")) {
+                  queueMicrotask(() => {
+                    if (!answerCanceled) void start();
+                  });
+                } else if (allowAutoStart && settings.autoStart && !busy.value && hasFeature("answer")) {
                   pushLog(`\u81ea\u52a8\u5f00\u59cb\u7b54\u9898 \xb7 ${n} \u9898`, "info");
-                  queueMicrotask(() => void start());
+                  queueMicrotask(() => {
+                    if (!answerCanceled) void start();
+                  });
                 }
               } else {
                 const readout = zeroQuestionReadout(platformLabel.value, lastCaptureFailure.value);
@@ -12591,6 +12803,10 @@
       }
       async function onFrameReady() {
         var _a2;
+        if (completing.value) {
+          pendingPageChange = true;
+          return;
+        }
         if (running.value) return;
         (_a2 = adapter == null ? void 0 : adapter.emitLifecycleEvent) == null ? void 0 : _a2.call(adapter, {
           event: "frame-ready",
@@ -12602,6 +12818,7 @@
         }
         if (!(session == null ? void 0 : session.isStale())) return;
         const previous = session.list;
+        const allowAutoStart = !answerCanceled;
         discard();
         await detectQuestions(false);
         if (session == null ? void 0 : session.adoptResults(previous)) {
@@ -12611,21 +12828,24 @@
           pushLog("\u9875\u9762\u5df2\u91cd\u8f7d \xb7 \u4fdd\u7559\u672c\u8f6e\u7ed3\u679c", "info");
         } else {
           pushLog("\u9875\u9762\u5df2\u5207\u6362 \xb7 \u91cd\u65b0\u8bc6\u522b", "info");
-          if (settings.autoStart && !running.value && hasFeature("answer") && loaded) {
+          if (allowAutoStart && settings.autoStart && !busy.value && hasFeature("answer") && loaded) {
             pushLog(`\u81ea\u52a8\u5f00\u59cb\u7b54\u9898 \xb7 ${list.value.length} \u9898`, "info");
-            queueMicrotask(() => void start());
+            queueMicrotask(() => {
+              if (!answerCanceled) void start();
+            });
           }
         }
       }
       vue.onMounted(() => {
         pageChangeScheduler = createPageChangeScheduler(window, () => {
           if (running.value) return;
-          if (completing) {
+          if (completing.value) {
             pendingPageChange = true;
             return;
           }
+          const allowAutoStart = !answerCanceled;
           discard();
-          void detectQuestions();
+          void detectQuestions(allowAutoStart);
         });
         const fontStatus = chaoxingFontTableStatus();
         if (fontStatus !== "ok") pushLog(fontStatus === "unavailable" ? "\u5b57\u4f53\u8868\u672a\u4e0b\u8f7d \xb7 \u5e26\u52a0\u5bc6\u5b57\u4f53\u7684\u9898\u76ee\u65e0\u6cd5\u8bc6\u522b \xb7 \u8bf7\u91cd\u88c5\u811a\u672c\u4ee5\u91cd\u65b0\u4e0b\u8f7d\u8d44\u6e90" : "\u5b57\u4f53\u8868\u5185\u5bb9\u6821\u9a8c\u672a\u901a\u8fc7 \xb7 \u5df2\u5b89\u5168\u62d2\u7528 \xb7 \u5e26\u52a0\u5bc6\u5b57\u4f53\u7684\u9898\u76ee\u65e0\u6cd5\u8bc6\u522b", "warning");
@@ -12638,7 +12858,8 @@
           pageChangeScheduler == null ? void 0 : pageChangeScheduler.notify();
         });
         stopUrlChanges = subscribeUrlChanges(window, () => {
-          if (running.value) return;
+          hubuTrust.synchronize(readableDocuments(document));
+          if (busy.value) cancelAnswerRound();
           pageChangeScheduler == null ? void 0 : pageChangeScheduler.notify();
         });
         stopRuleStoreUpdates = subscribeRuleStoreUpdates(result => {
@@ -12646,14 +12867,14 @@
           if (readout) pushLog(readout.log, readout.level);
           refreshRuleStoreVersions();
           if (result.status !== "updated") return;
-          if (running.value) return;
+          if (busy.value) return;
           discard();
           void detectQuestions();
         });
         stopRuleStoreRestored = subscribeRuleStoreRestored(() => {
           rulesRestoring.value = false;
           refreshRuleStoreVersions();
-          if (running.value) return;
+          if (busy.value) return;
           discard();
           void detectQuestions();
         });
@@ -12672,6 +12893,9 @@
       });
       vue.onBeforeUnmount(() => {
         var _a2;
+        cancelAnswerRound();
+        hubuTrust.clear();
+        completionOwner = null;
         if (captchaRequest) captchaRequest.cancel(); else if (captchaPending) finishCaptcha(new Error("cancelled"));
         stopFrameReady == null ? void 0 : stopFrameReady();
         stopFrameReady = null;
@@ -12704,6 +12928,8 @@
       async function finishRound() {
         const active2 = session;
         if (!active2) return;
+        const epoch = answerEpoch;
+        const roundCurrent = () => answerRoundCurrent(active2, epoch);
         let aiOutcome = {
           ran: false,
           why: "disabled"
@@ -12720,7 +12946,7 @@
         } catch (error) {
           pushLog(`AI \u8865\u7b54\u5f02\u5e38 \xb7 ${error instanceof Error ? error.message.slice(0, 80) : String(error ?? "")}`, "error");
         }
-        if (session !== active2) return;
+        if (!roundCurrent()) return;
         if (aiOutcome.ran) {
           list.value = [ ...active2.list ];
           if (aiOutcome.event) trackUsage({
@@ -12735,7 +12961,8 @@
           let picked = 0;
           const skipped = [];
           for (let i = 0; i < active2.list.length; i += 1) {
-            if (session !== active2) return;
+            if (!roundCurrent()) return;
+            if (active2.isStale()) break;
             const reason = await active2.fillRandomWithReason(i);
             if (reason === "ok") picked += 1; else if (reason !== "already-filled") skipped.push(reason);
           }
@@ -12746,20 +12973,24 @@
             if (skipped.length > 0) pushLog(`\u968f\u673a\u4f5c\u7b54\u672a\u89e6\u53d1 \xb7 ${skipped.length} \u9898 \xb7 \u539f\u56e0 ${[ ...new Set(skipped) ].join("/")}`, "warning");
           }
         }
-        if (session !== active2) return;
+        if (!roundCurrent()) return;
         if (stats.value.charged > 0) authStale.value = false;
-        const answerableCount = countAnswerable();
-        const ratio = Math.round(trustedRatio(active2.list, answerableCount, settings.ai.countTowardSubmit) * 100);
         const submitDocs = () => readableDocuments(document);
-        let outcome;
         const onHubuPaper = submitDocs().some(doc => isHubuExamPaper(doc));
-        const submitRound = onHubuPaper ? hubuAutoSubmitRound : autoSubmitRound;
+        if ((hubuRound == null ? void 0 : hubuRound.session) === active2) hubuTrust.record(hubuRound.round, submitDocs(), active2.list);
+        const wholePaper = onHubuPaper ? hubuTrust.snapshot(submitDocs()) : null;
+        const submitItems = onHubuPaper ? (wholePaper == null ? void 0 : wholePaper.items) ?? [] : active2.list;
+        const answerableCount = onHubuPaper ? wholePaper == null ? void 0 : wholePaper.answerableCount : countAnswerable();
+        const ratio = Math.round(trustedRatio(submitItems, answerableCount, settings.ai.countTowardSubmit) * 100);
+        let outcome;
+        const submitRound = onHubuPaper ? (docs, state) => hubuAutoSubmitRound(docs, state, hubuTrust) : autoSubmitRound;
         const isSubmittedProbe = onHubuPaper ? () => !readableDocuments(document).some(doc => isHubuExamPaper(doc)) : () => readableDocuments(document).some(doc => chapterTestDone(doc) === true);
         try {
           outcome = await submitRound(submitDocs, {
             enabled: settings.autoSubmit,
             items: active2.list,
             answerableCount: answerableCount,
+            isCanceled: () => !roundCurrent(),
             countAi: settings.ai.countTowardSubmit,
             threshold: settings.autoSubmitThreshold,
             isSubmitted: isSubmittedProbe,
@@ -12774,6 +13005,7 @@
           pushLog(`\u81ea\u52a8\u63d0\u4ea4\u5f02\u5e38 \xb7 ${error instanceof Error ? error.message.slice(0, 80) : String(error ?? "")}`, "error");
           outcome = "click-failed";
         }
+        if (session !== active2 || answerEpoch !== epoch) return;
         submitOutcome.value = outcome;
         const submitEventOutcome = toSubmitEventOutcome(outcome);
         if (submitEventOutcome) trackUsage({
@@ -12808,6 +13040,11 @@
         }
       }
       function onEvent(e) {
+        if (answerCanceled && (e.kind === "ai-progress" || e.kind === "ai-done")) return;
+        if (answerCanceled && e.kind === "done") {
+          running.value = false;
+          return;
+        }
         if (session) list.value = [ ...session.list ];
         if (e.kind === "question") curInx.value = e.inx; else if (e.kind === "progress") tip.value = `\u67e5\u9898\u4e2d ${e.inx + 1}/${e.total}`; else if (e.kind === "ai-progress") tip.value = `AI \u8865\u7b54\u4e2d ${e.done}/${e.total}`; else if (e.kind === "ai-done" && e.requested > 0) tip.value = `AI \u8865\u7b54\u5b8c\u6210 \xb7 ${e.hit}/${e.requested} \u547d\u4e2d`; else if (e.kind === "done") {
           clearExamAutoResume();
@@ -12827,16 +13064,26 @@
             }
           };
           const completedAdapter = adapter;
-          completing = true;
+          const active2 = session;
+          const epoch = answerEpoch;
+          completionOwner = epoch;
+          completing.value = true;
           void finishRound().finally(async () => {
             var _a2;
             try {
-              await ((_a2 = completedAdapter == null ? void 0 : completedAdapter.emitLifecycleEvent) == null ? void 0 : _a2.call(completedAdapter, completed));
+              if (active2 && answerRoundCurrent(active2, epoch)) {
+                completed.payload.filled = active2.list.filter(item => item.filled).length;
+                completed.payload.refused = active2.list.filter(item => item.status === "unsafe").length;
+                await ((_a2 = completedAdapter == null ? void 0 : completedAdapter.emitLifecycleEvent) == null ? void 0 : _a2.call(completedAdapter, completed));
+              }
             } finally {
-              completing = false;
-              if (pendingPageChange) {
-                pendingPageChange = false;
-                pageChangeScheduler == null ? void 0 : pageChangeScheduler.notify();
+              if (completionOwner === epoch) {
+                completionOwner = null;
+                completing.value = false;
+                if (pendingPageChange) {
+                  pendingPageChange = false;
+                  pageChangeScheduler == null ? void 0 : pageChangeScheduler.notify();
+                }
               }
             }
           }).catch(error => {
@@ -12878,6 +13125,7 @@
       function build() {
         var _a2, _b;
         if (session && ctx) return true;
+        let createdSession = null;
         const r = createSession({
           transport: gmTransport,
           backendTransport: aiaskTransport,
@@ -12896,7 +13144,9 @@
             if (!getToken()) return;
             void contributeHarvest(aiaskTransport, BACKEND_BASE_URL, platform.value || "unknown", items).catch(() => void 0);
           },
-          emit: onEvent
+          emit: event => {
+            if (createdSession && session === createdSession) onEvent(event);
+          }
         });
         if (!r.session) {
           if (rulesRestoring.value) {
@@ -12907,6 +13157,7 @@
           tip.value = !missing ? "\u5f53\u524d\u9875\u9762\u672a\u8bc6\u522b\u5230\u9898\u76ee" : missing.routed ? "\u89c4\u5219\u5305\u5c1a\u672a\u4e0b\u8f7d \xb7 \u8bf7\u70b9\u300c\u68c0\u67e5\u66f4\u65b0\u300d" : "\u672c\u9875\u6682\u672a\u652f\u6301";
           return false;
         }
+        createdSession = r.session;
         session = r.session;
         ctx = r.ctx;
         adapter = r.adapter;
@@ -12952,7 +13203,7 @@
       }
       async function updateRules() {
         var _a2;
-        if (running.value || ruleUpdating.value) return;
+        if (busy.value || ruleUpdating.value) return;
         ruleUpdating.value = true;
         ruleUpdateNote.value = "\u68c0\u67e5\u4e2d\u2026";
         const result = await checkRuleUpdates(true);
@@ -12963,7 +13214,9 @@
       }
       async function start() {
         var _a2;
-        if (running.value) return;
+        if (busy.value) return;
+        const epoch = ++answerEpoch;
+        answerCanceled = false;
         if (!hasFeature("answer")) {
           pushLog("\u672c\u5e73\u53f0\u4ec5\u6536\u5f55\u7b54\u6848 \xb7 \u4e0d\u652f\u6301\u81ea\u52a8\u7b54\u9898", "info");
           return;
@@ -12978,8 +13231,13 @@
           pushLog("\u5f53\u524d\u9875\u672a\u8bc6\u522b\u5230\u9898\u76ee", "warning");
           return;
         }
+        const active2 = session;
         if (!loaded) {
-          await session.load(ctx);
+          await active2.load(ctx);
+          if (!answerRoundCurrent(active2, epoch)) {
+            if (session === active2) running.value = false;
+            return;
+          }
           refreshRuleDiagnostic();
           syncCacheCount();
           list.value = session.list;
@@ -12997,6 +13255,10 @@
         pushLog("\u5f00\u59cb\u7b54\u9898", "info");
         roundStarted.value = true;
         submitOutcome.value = null;
+        hubuRound = {
+          session: active2,
+          round: hubuTrust.capture(readableDocuments(document))
+        };
         session.setOptions({
           autoFill: true,
           delayMs: settings.delayMs,
@@ -13005,13 +13267,17 @@
         await session.start(curInx.value);
       }
       async function reAnswerCurrent() {
-        if (running.value || !session || !cur.value) return;
+        if (busy.value || !session || !cur.value) return;
         if (cur.value.status === "unsupported") {
           tip.value = "\u9898\u76ee\u5185\u5bb9\u89e3\u6790\u5931\u8d25\uff0c\u5df2\u8df3\u8fc7";
           pushLog(tip.value, "warning");
           return;
         }
         running.value = true;
+        const active2 = session;
+        const epoch = ++answerEpoch;
+        answerCanceled = false;
+        const round = hubuTrust.capture(readableDocuments(document));
         tip.value = `\u91cd\u7b54\u7b2c ${curInx.value + 1} \u9898\u2026`;
         session.setOptions({
           autoFill: true,
@@ -13020,17 +13286,24 @@
         });
         pushLog(`\u91cd\u7b54\u7b2c ${curInx.value + 1} \u9898`, "info");
         try {
-          await session.reAnswer(curInx.value);
+          await active2.reAnswer(curInx.value);
+          if (!answerRoundCurrent(active2, epoch)) return;
+          hubuTrust.record(round, readableDocuments(document), active2.list);
           list.value = [ ...session.list ];
           const item = list.value[curInx.value];
           tip.value = (item == null ? void 0 : item.status) === "hit" && item.filled ? "\u672c\u9898\u91cd\u7b54\u5b8c\u6210" : (item == null ? void 0 : item.status) === "hit" ? "\u672c\u9898\u6709\u7b54\u6848\u4f46\u672a\u56de\u586b" : "\u672c\u9898\u6682\u672a\u547d\u4e2d";
           pushLog(tip.value, (item == null ? void 0 : item.status) === "hit" && item.filled ? "info" : "warning");
         } finally {
-          running.value = false;
+          if (session === active2) running.value = false;
         }
       }
-      const pause = () => session == null ? void 0 : session.pause();
+      const pause = () => {
+        cancelAnswerRound();
+        tip.value = "\u5df2\u6682\u505c";
+        pushLog("\u5df2\u6682\u505c", "info");
+      };
       const restart = () => {
+        if (busy.value) return;
         discard();
         start();
       };
@@ -13372,13 +13645,13 @@
         }, [ vue.createElementVNode("div", _hoisted_68, [ vue.createElementVNode("span", _hoisted_69, "\u7b2c " + vue.toDisplayString(curInx.value + 1) + " \u9898", 1), vue.createElementVNode("div", _hoisted_70, [ cur.value.treeProgress && cur.value.treeProgress.total > 1 ? (vue.openBlock(), 
         vue.createElementBlock("span", _hoisted_71, " \u7236\u9898 " + vue.toDisplayString(cur.value.treeProgress.hit) + "/" + vue.toDisplayString(cur.value.treeProgress.total) + " \xb7 " + vue.toDisplayString(treeStatusLabel(cur.value.treeProgress.status)), 1)) : vue.createCommentVNode("", true), vue.createElementVNode("button", {
           class: "btn ghost sm sub",
-          disabled: running.value,
+          disabled: busy.value,
           onClick: reAnswerCurrent
         }, "\u91cd\u7b54\u672c\u9898", 8, _hoisted_72), settings.ai.enabled && aiHasCredential.value ? (vue.openBlock(), 
         vue.createElementBlock("button", {
           key: 1,
           class: "btn ghost sm sub",
-          disabled: running.value,
+          disabled: busy.value,
           onClick: aiAnswerCurrent
         }, "AI \u7b54\u8fd9\u9898", 8, _hoisted_73)) : vue.createCommentVNode("", true) ]) ]), vue.createElementVNode("div", _hoisted_74, [ vue.createElementVNode("span", _hoisted_75, "[" + vue.toDisplayString(currentTypeLabel.value) + "]", 1), vue.createVNode(_sfc_main$1, {
           content: cur.value.q.stem,
@@ -13573,7 +13846,7 @@
           class: "cap-mute"
         }, "\u6bcf 24 \u5c0f\u65f6\u81ea\u52a8\u68c0\u67e5 \xb7 \u6bcf\u4e2a\u89c4\u5219\u5305\u72ec\u7acb\u9a8c\u7b7e") ], -1)), vue.createElementVNode("button", {
           class: "btn ghost sm",
-          disabled: running.value || ruleUpdating.value,
+          disabled: busy.value || ruleUpdating.value,
           onClick: updateRules
         }, vue.toDisplayString(ruleUpdating.value ? "\u68c0\u67e5\u4e2d\u2026" : "\u68c0\u67e5\u66f4\u65b0"), 9, _hoisted_124) ]), ruleUpdateNote.value ? (vue.openBlock(), 
         vue.createElementBlock("div", _hoisted_125, vue.toDisplayString(ruleUpdateNote.value), 1)) : vue.createCommentVNode("", true) ]) ], 64)) : tab.value === "system" && systemSub.value === "ai" ? (vue.openBlock(), 
@@ -13895,7 +14168,7 @@
           key: 0
         }, [ vue.createElementVNode("button", {
           class: "btn ghost sm",
-          disabled: running.value,
+          disabled: busy.value,
           onClick: runDiag
         }, "\u8fd0\u884c\u8bca\u65ad", 8, _hoisted_206), diag.value ? (vue.openBlock(), vue.createElementBlock("div", _hoisted_207, [ vue.createTextVNode(vue.toDisplayString(diag.value.matched ? `\u547d\u4e2d${platformLabel.value} \xb7 \u6293\u5230 ${diag.value.count} \u9898 \xb7 \u56fe\u7247 ${diag.value.imageCount} \u5f20 \xb7 \u6536\u5f55 ${diag.value.harvestedCount} \u9898` : "\u672a\u547d\u4e2d\u5f53\u524d\u9875") + " ", 1), (vue.openBlock(true), 
         vue.createElementBlock(vue.Fragment, null, vue.renderList(diag.value.items, (it, i) => (vue.openBlock(), 
@@ -13947,12 +14220,12 @@
         vue.createElementBlock("button", {
           key: 1,
           class: "btn block",
-          disabled: running.value,
+          disabled: busy.value,
           onClick: start
         }, "\u5f00\u59cb\u7b54\u9898", 8, _hoisted_225)) : (vue.openBlock(), vue.createElementBlock("button", {
           key: 2,
           class: "btn ghost block",
-          disabled: running.value,
+          disabled: busy.value,
           onClick: _cache[18] || (_cache[18] = $event => detectQuestions())
         }, "\u91cd\u65b0\u8bc6\u522b\u672c\u9875", 8, _hoisted_226)) ], 64)) : tab.value === "ask" ? (vue.openBlock(), 
         vue.createElementBlock(vue.Fragment, {
@@ -13970,9 +14243,9 @@
           style: {
             flex: "1"
           },
-          disabled: running.value,
+          disabled: busy.value,
           onClick: start
-        }, "\u5f00\u59cb\u7b54\u9898", 8, _hoisted_231), running.value ? (vue.openBlock(), vue.createElementBlock("button", {
+        }, "\u5f00\u59cb\u7b54\u9898", 8, _hoisted_231), busy.value ? (vue.openBlock(), vue.createElementBlock("button", {
           key: 0,
           class: "btn ghost",
           style: {
