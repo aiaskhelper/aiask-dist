@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.5.3
+// @version      3.5.4
 // @author       爱问答
 // @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学、广东开放大学、安徽继续教育在线新版】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
 // @homepage     https://www.aiask.site/
 // @supportURL   https://www.aiask.site/contact.html
 // @match        *://*.chaoxing.com/*
+// @match        *://mooc1.ceduacad.ahut.edu.cn/*
 // @match        *://xatu.168wangxiao.com/*
 // @match        *://ctapp.hubuzkw.com/*
 // @match        *://xuexi.jsou.cn/*
@@ -19,7 +20,7 @@
 // @match        https://www.aiask.site/feedback.html
 // @match        https://www.aiask.site/feedback
 // @require      https://registry.npmmirror.com/vue/3.5.39/files/dist/vue.global.prod.js
-// @require      https://www.aiask.site/engine/aiask-engine-fd068ab27041fed0.js#sha256=fd068ab27041fed061f77d442ef319e45c0e53b30d2a7dbf3e4db3220d03d9bb
+// @require      https://www.aiask.site/engine/aiask-engine-93a78a3eb6fff718.js#sha256=93a78a3eb6fff71883ae241ac33cf566c0da21a78622c25e69ffcd4e2683e4b0
 // @resource     chaoxingFontTable  https://www.aiask.site/assets/chaoxing-font-table.json
 // @connect      www.aiask.site
 // @connect      cx.icodef.com
@@ -143,9 +144,9 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.5.3";
+  const SCRIPT_VERSION = "3.5.4";
 
-  const ENGINE_ID = "fd068ab27041fed0";
+  const ENGINE_ID = "93a78a3eb6fff718";
 
   const DEFAULT_ROOT_PUBLIC_JWK = protocol.PRODUCTION_ROOT_PUBLIC_JWK;
 
@@ -169,7 +170,9 @@
     }
   }
 
-  const LOCAL_ANSWER_CACHE_KEY = "aiask_local_answers_v1";
+  const LEGACY_LOCAL_ANSWER_CACHE_KEY = "aiask_local_answers_v1";
+
+  const LOCAL_ANSWER_CACHE_KEY = "aiask_local_answers_v2";
 
   const CACHE_WARN_ENTRIES = 5e3;
 
@@ -272,10 +275,11 @@
       __publicField(this, "lastWrite", null);
       __publicField(this, "lastHitPersistAt", 0);
       __publicField(this, "hitsPendingPersist", false);
+      __publicField(this, "namespaceEstablished", false);
       this.storage = storage;
       let loaded;
       try {
-        loaded = parseSnapshot$1(this.storage.get(LOCAL_ANSWER_CACHE_KEY));
+        loaded = this.loadSnapshot();
       } catch {
         loaded = {
           entries: new Map,
@@ -289,6 +293,21 @@
     }
     setPlatform(label) {
       this.platform = label;
+    }
+    loadSnapshot() {
+      const current = this.storage.get(LOCAL_ANSWER_CACHE_KEY);
+      if (current != null) {
+        this.namespaceEstablished = true;
+        return parseSnapshot$1(current);
+      }
+      if (this.namespaceEstablished) return parseSnapshot$1(void 0);
+      const legacy = this.storage.get(LEGACY_LOCAL_ANSWER_CACHE_KEY);
+      const established = this.storage.get(LOCAL_ANSWER_CACHE_KEY);
+      if (established != null) {
+        this.namespaceEstablished = true;
+        return parseSnapshot$1(established);
+      }
+      return parseSnapshot$1(legacy);
     }
     read(unitHash) {
       const stored = this.entries.get(unitHash);
@@ -366,7 +385,7 @@
       this.flush();
       let loaded;
       try {
-        loaded = parseSnapshot$1(this.storage.get(LOCAL_ANSWER_CACHE_KEY));
+        loaded = this.loadSnapshot();
       } catch {
         return;
       }
@@ -486,9 +505,9 @@
     mergeFromDisk() {
       let disk;
       try {
-        disk = parseSnapshot$1(this.storage.get(LOCAL_ANSWER_CACHE_KEY));
+        disk = this.loadSnapshot();
       } catch {
-        return "unknown";
+        return "unreadable";
       }
       const verdict = this.judgeLastWrite(disk);
       this.clearedAt = Math.max(this.clearedAt, disk.clearedAt);
@@ -546,13 +565,43 @@
       const prev = this.entries.get(key);
       return Math.max(Date.now(), this.clearedAt + 1, (this.removedAt.get(key) ?? 0) + 1, prev ? writeTime(prev) + 1 : 1);
     }
+    verifyMigrationPersist(expected2) {
+      const raw = this.storage.get(LOCAL_ANSWER_CACHE_KEY);
+      if (raw == null) {
+        return false;
+      }
+      this.namespaceEstablished = true;
+      if (typeof raw !== "object" || !Array.isArray(raw.entries)) {
+        return false;
+      }
+      const disk = parseSnapshot$1(raw);
+      if (disk.clearedAt < (expected2.clearedAt ?? 0)) return false;
+      for (const [key, value] of expected2.entries) {
+        const at = writeTime(value);
+        const stored = disk.entries.get(key);
+        const removed = disk.tombstones.get(key);
+        if (!(stored && writeTime(stored) >= at) && !(disk.clearedAt > 0 && disk.clearedAt >= at) && !(removed !== void 0 && removed >= at)) return false;
+      }
+      for (const [key, at] of expected2.tombstones ?? []) {
+        const stored = disk.entries.get(key);
+        if (disk.clearedAt < at && (disk.tombstones.get(key) ?? 0) < at && !(stored && writeTime(stored) > at)) return false;
+      }
+      return true;
+    }
     persist(mergedVerdict) {
       this.hitsPendingPersist = false;
       try {
         const verdict = mergedVerdict ?? this.mergeFromDisk();
-        this.storage.set(LOCAL_ANSWER_CACHE_KEY, this.snapshot(true));
+        if (verdict === "unreadable") {
+          this.persistFailed = true;
+          return;
+        }
+        const migrating = !this.namespaceEstablished;
+        const snapshot = this.snapshot(true);
+        this.storage.set(LOCAL_ANSWER_CACHE_KEY, snapshot);
         this.lastWrite = this.newestWrite();
         this.persistFailed = verdict === "lost";
+        if (migrating) this.persistFailed = !this.verifyMigrationPersist(snapshot);
       } catch {
         this.persistFailed = true;
       }
@@ -4338,6 +4387,12 @@
     dowork: "chaoxing-dowork"
   });
 
+  const CHA0XING_RULE_HOSTS = Object.freeze([ "chaoxing.com", "mooc1.ceduacad.ahut.edu.cn" ]);
+
+  function isChaoxingRuleHost(hostname) {
+    return CHA0XING_RULE_HOSTS.some(host => hostname === host || host === "chaoxing.com" && hostname.endsWith(".chaoxing.com"));
+  }
+
   const CHA0XING_ANSWERABLE_PATH = /work\/(doHomeWork|dowork|view)|studentstudy|exam|test\//iu;
 
   const CHA0XING_STUDENTSTUDY_PATHS = [ "/mycourse/studentstudy", "/mooc-ans/mycourse/studentstudy" ];
@@ -5512,7 +5567,7 @@
     [CHA0XING_PACKAGE_IDS.newChapter]: Object.freeze([ "noSubmit" ])
   });
 
-  const CHA0XING_PRIMITIVE_IDS = Object.freeze([ "chaoxing.normalizeTitle", "chaoxing.decodeFont", "chaoxing.harvestAnswerValues", "chaoxing.ueditorBodies", "chaoxing.examRegisterQuestion", "chaoxing.examPreparePlan", "chaoxing.examCommitPlan", CHA0XING_PAGE_SAVE_HOOK_IDS.noSubmit, CHA0XING_PAGE_SAVE_HOOK_IDS.saveWork ]);
+  const CHA0XING_PRIMITIVE_IDS = Object.freeze([ "chaoxing.normalizeTitle", "chaoxing.decodeFont", "chaoxing.harvestAnswerValues", "chaoxing.readReviewQuestion", "chaoxing.ueditorBodies", "chaoxing.examRegisterQuestion", "chaoxing.examPreparePlan", "chaoxing.examCommitPlan", CHA0XING_PAGE_SAVE_HOOK_IDS.noSubmit, CHA0XING_PAGE_SAVE_HOOK_IDS.saveWork ]);
 
   function registerPageSaveVerificationStub(registry, id) {
     core.registerLocalHook(registry, {
@@ -5590,7 +5645,7 @@
 
   const RULE_EXPRESSION_SERVICES = createRuleExpressionServices();
 
-  const RULE_ENGINE_VERSION = "1.11.0";
+  const RULE_ENGINE_VERSION = "1.12.0";
 
   const RULE_LIMITS = Object.freeze({
     maxSteps: 5e4,
@@ -5660,7 +5715,7 @@
     policy: GENERIC_DOM_RULE_POLICY
   }) ]);
 
-  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn)$/u;
+  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|mooc1\.ceduacad\.ahut\.edu\.cn|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn)$/u;
 
   function trustedRemoteRulePlatformFor(hostname) {
     const host = normalizedHost(hostname);
@@ -5673,7 +5728,8 @@
 
   function validatedRulePackageIdFor(location2) {
     const page = new URL(location2.href);
-    if (page.hostname !== "chaoxing.com" && !page.hostname.endsWith(".chaoxing.com")) return null;
+    if (!isChaoxingRuleHost(page.hostname)) return null;
+    if (page.hostname === "mooc1.ceduacad.ahut.edu.cn" && ![ "/mooc-ans/work/selectWorkQuestionYiPiYue", "/work/selectWorkQuestionYiPiYue", "/mooc-ans/work/doHomeWorkNew", "/mooc-ans/mooc2/work/dowork", "/mooc-ans/mooc2/work/view" ].includes(page.pathname)) return null;
     if (CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page.pathname) && page.searchParams.get("mooc2") === "1") return CHA0XING_PACKAGE_IDS.studentstudy;
     if (page.pathname === "/mooc-ans/work/selectWorkQuestionYiPiYue" || page.pathname === "/work/selectWorkQuestionYiPiYue") return CHA0XING_PACKAGE_IDS.studentstudy;
     if (page.pathname === "/exam-ans/exam/test/reVersionTestStartNew" || page.pathname === CHA0XING_EXAM_PREVIEW_PATH) return CHA0XING_PACKAGE_IDS.examStudent;
@@ -5709,7 +5765,7 @@
     return {
       platform: "chaoxing",
       packageId: packageId,
-      hosts: [ "chaoxing.com" ],
+      hosts: CHA0XING_RULE_HOSTS,
       store: store,
       policy: CHA0XING_RULE_POLICY,
       services: services,
@@ -14543,7 +14599,7 @@
 
   if (bridgeMode) installImportBridge(bridgeMode === "full" ? localAnswerCache : null);
 
-  if (SUPPORTED_HOST_PATTERN.test(location.hostname)) {
+  if (SUPPORTED_HOST_PATTERN.test(location.hostname) && (location.hostname !== "mooc1.ceduacad.ahut.edu.cn" || validatedRulePackageIdFor(location) !== null)) {
     claimPageForNewLine();
     const highest = findHighestSameOriginWindow(window);
     const isTop = window === window.top;
