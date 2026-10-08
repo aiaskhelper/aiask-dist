@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.5.4
+// @version      3.5.5
 // @author       爱问答
 // @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学、广东开放大学、安徽继续教育在线新版】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
@@ -144,7 +144,7 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.5.4";
+  const SCRIPT_VERSION = "3.5.5";
 
   const ENGINE_ID = "93a78a3eb6fff718";
 
@@ -4704,14 +4704,14 @@
   function pageWindowsInFrameTree() {
     const root = unsafePageWindow();
     if (!root) return [];
-    const roots = [ root ];
+    const roots2 = [ root ];
     try {
       const top = root.top;
-      if (top && top !== root) roots.unshift(top);
+      if (top && top !== root) roots2.unshift(top);
     } catch {}
     const out = [];
     const seen = new Set;
-    const queue = roots.map(window2 => ({
+    const queue = roots2.map(window2 => ({
       window: window2,
       depth: 0
     }));
@@ -5407,8 +5407,8 @@
           return r.node.id.slice(1) === ((_a2 = native == null ? void 0 : native.topicObjCc) == null ? void 0 : _a2.Id);
         });
         const cards = [ ...doc.querySelectorAll(".option>#answer-card-area a") ];
-        const published = (_b = (_a = doc.querySelector(".topic_answer>span:last-child")) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim();
-        if (!current || !currentChoices(doc, current.node, true) || published !== current.indices.map(i => "ABCD"[i]).join(",") || new Set(raw.map(q => q.Id)).size !== raw.length || cards.length !== raw.length || cards.some((c, i) => c.id !== `number_${i + 1}`)) return 0;
+        const published2 = (_b = (_a = doc.querySelector(".topic_answer>span:last-child")) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim();
+        if (!current || !currentChoices(doc, current.node, true) || published2 !== current.indices.map(i => "ABCD"[i]).join(",") || new Set(raw.map(q => q.Id)).size !== raw.length || cards.length !== raw.length || cards.some((c, i) => c.id !== `number_${i + 1}`)) return 0;
         for (const row of rows) environment.capture.registerHarvestLeaf(row.node, row.values);
         return rows.length;
       }
@@ -5567,6 +5567,254 @@
     [CHA0XING_PACKAGE_IDS.newChapter]: Object.freeze([ "noSubmit" ])
   });
 
+  const WENCAI_HOOK_IDS = [ "wencai.paperReady", "wencai.capturePaper", "wencai.harvestPaper" ];
+
+  const TYPES = [ "single", "multiple", "judge", "fill" ];
+
+  const REFERENCE = /^\[\u53c2\u8003\u7b54\u6848[\uff1a:]([^\[\]]*)\](?:\s*\u5206\u503c[\uff1a:]\s*\d+(?:\.\d+)?)?$/u;
+
+  const JUDGE_TRUE = /^(?:\u5bf9|\u6b63\u786e|\u662f|\u221a|true|T)$/iu;
+
+  const JUDGE_FALSE = /^(?:\u9519|\u9519\u8bef|\u5426|\xd7|false|F)$/iu;
+
+  function workLocation(location2, review) {
+    const url = new URL(location2.href);
+    return url.origin === "https://learning.wencaischool.net" && url.pathname === `/openlearning/exam/portal/${review ? "view_answer" : "exam"}.jsp` && url.searchParams.getAll("type").length >= 1 && url.searchParams.getAll("type").length <= 2 && url.searchParams.getAll("type").every(value => value === "work");
+  }
+
+  function roots(document2, review) {
+    const list = [ ...document2.querySelectorAll(review ? 'tr[id^="trScore_"]' : 'table[id^="tblItem_"][islabel="0"]') ];
+    if (!list.length || list.length > 256 || new Set(list.map(e => e.id)).size !== list.length) return [];
+    return list.every(e => (review ? /^trScore_\d{1,20}$/u : /^tblItem_\d{1,20}$/u).test(e.id)) ? list : [];
+  }
+
+  function paperDocument(document2, review, signal) {
+    var _a;
+    const queue = [ {
+      document: document2,
+      depth: 0
+    } ];
+    const seen = new Set;
+    let found = null;
+    let frames = 0;
+    while (queue.length && !signal.aborted) {
+      const current = queue.shift();
+      if (!current || seen.has(current.document)) continue;
+      seen.add(current.document);
+      try {
+        const location2 = (_a = current.document.defaultView) == null ? void 0 : _a.location;
+        if (!location2 || location2.hostname !== "learning.wencaischool.net") continue;
+        if (workLocation(location2, review) && roots(current.document, review).length) {
+          if (found) return null;
+          found = current.document;
+        }
+        if (current.depth >= 8) continue;
+        for (const frame of current.document.querySelectorAll("iframe, frame")) {
+          if (++frames > 64) return null;
+          try {
+            const child = frame.contentDocument;
+            if (child) queue.push({
+              document: child,
+              depth: current.depth + 1
+            });
+          } catch {}
+        }
+      } catch {}
+    }
+    return signal.aborted ? null : found;
+  }
+
+  function parse(root, index, review, signal) {
+    var _a;
+    if (signal.aborted || !root.isConnected || !root.ownerDocument.defaultView) throw new Error("inactive paper");
+    const tables = root.querySelectorAll('table[isitem="1"]');
+    if (tables.length !== 1) throw new Error("ambiguous question");
+    const table = tables[0];
+    if (table.querySelectorAll("*").length > 5e3) throw new Error("question exceeds DOM budget");
+    const title = (_a = table.rows[0]) == null ? void 0 : _a.cells[0];
+    if (!title) throw new Error("missing stem");
+    const copy = title.cloneNode(true);
+    for (const e of copy.querySelectorAll("input, textarea, script")) e.remove();
+    for (const e of copy.querySelectorAll("font, nobr")) {
+      if (/\[\u53c2\u8003\u7b54\u6848[\uff1a:]/u.test(e.textContent ?? "")) e.remove();
+    }
+    const content = element => core.serializeDomQuestionContent(element, {
+      signal: signal,
+      maxNodes: 2e3
+    });
+    const stem = content(copy);
+    const optionTables = table.querySelectorAll('table[isitemoption="1"]');
+    if (optionTables.length > 1) throw new Error("ambiguous options");
+    const optionTable = optionTables[0];
+    const labels = [ ...(optionTable == null ? void 0 : optionTable.querySelectorAll("label")) ?? [] ];
+    const slots = [ ...title.querySelectorAll('input[type="text"],input:not([type])') ];
+    const inputs = labels.map(label => {
+      const row = label.closest("tr");
+      const controls = row == null ? void 0 : row.querySelectorAll('input[type="radio"],input[type="checkbox"]');
+      if (!controls || controls.length !== 1) throw new Error("ambiguous option control");
+      return controls[0];
+    });
+    const options = labels.map((label, i) => ({
+      id: `option-${inputs[i].value}`,
+      content: content(label)
+    }));
+    let type;
+    if (optionTable) {
+      const nativeType = optionTable.getAttribute("optiontype");
+      if (![ "radio", "checkbox" ].includes(nativeType ?? "") || slots.length || labels.length < 2 || labels.length > 64 || inputs.some(i => i.type !== nativeType || !/^[A-Z]$/u.test(i.value)) || optionTable.querySelectorAll("input").length !== inputs.length || new Set(inputs).size !== inputs.length || new Set(options.map(o => o.id)).size !== options.length || options.some(o => !o.content.trim()) || new Set(options.map(o => o.content)).size !== options.length) throw new Error("invalid options");
+      const judge = options.length === 2 && options.some(o => JUDGE_TRUE.test(o.content)) && options.some(o => JUDGE_FALSE.test(o.content));
+      type = nativeType === "checkbox" ? "multiple" : judge ? "judge" : "single";
+      if (!review && inputs.some((input, i) => input.disabled || labels[i].control !== input)) throw new Error("unbound choice");
+    } else {
+      if (!slots.length || slots.length > 64 || !review && slots.some(i => i.disabled || i.readOnly)) throw new Error("unsupported question");
+      type = "fill";
+    }
+    const node = protocol.LeafQuestionNodeSchema.parse({
+      kind: "leaf",
+      id: `question-${index}`,
+      path: `/question-${index}`,
+      type: type,
+      stem: stem,
+      options: options,
+      slots: slots.map((_, i) => ({
+        id: `slot-${i}`
+      })),
+      fillPolicy: "atomic",
+      metadata: {
+        platform: "wencai",
+        variant: `wencai-homework-${review ? "review" : "attempt"}`,
+        ruleVersion: "1.0.0"
+      }
+    });
+    return {
+      node: node,
+      table: table,
+      labels: labels,
+      inputs: inputs,
+      slots: slots
+    };
+  }
+
+  function published(parsed) {
+    const markers = [ ...parsed.table.querySelectorAll("div, font") ].filter(e => {
+      var _a;
+      return !e.querySelector("div, font") && /^\[\u53c2\u8003\u7b54\u6848[\uff1a:]/u.test(((_a = e.textContent) == null ? void 0 : _a.trim()) ?? "");
+    });
+    if (markers.some(e => {
+      var _a, _b;
+      if (!REFERENCE.test(((_a = e.textContent) == null ? void 0 : _a.trim()) ?? "")) return true;
+      let ancestor = e;
+      for (let depth = 0; ancestor && depth < 32; depth++, ancestor = ancestor.parentElement) {
+        const style = (_b = ancestor.ownerDocument.defaultView) == null ? void 0 : _b.getComputedStyle(ancestor);
+        if (ancestor.hasAttribute("hidden") || ancestor.getAttribute("aria-hidden") === "true" || (style == null ? void 0 : style.display) === "none" || (style == null ? void 0 : style.visibility) === "hidden") return true;
+      }
+      return ancestor !== null;
+    })) return null;
+    const values = markers.map(e => {
+      var _a, _b, _c;
+      return ((_c = (_b = (_a = e.textContent) == null ? void 0 : _a.trim().match(REFERENCE)) == null ? void 0 : _b[1]) == null ? void 0 : _c.trim()) ?? "";
+    });
+    if (parsed.node.type === "fill") return values.length === parsed.slots.length && values.every(v => v && v.length <= 12e3) ? values : null;
+    if (values.length !== 1 || !/^[A-Z]+$/u.test(values[0])) return null;
+    const codes = [ ...values[0] ];
+    if (new Set(codes).size !== codes.length || parsed.node.type !== "multiple" && codes.length !== 1) return null;
+    const answers = codes.map(code => {
+      var _a;
+      return (_a = parsed.node.options.find(o => o.id === `option-${code}`)) == null ? void 0 : _a.content;
+    });
+    return answers.every(v => v !== void 0) ? answers : null;
+  }
+
+  function registerWencaiHooks(registry, environment) {
+    core.registerLocalHook(registry, {
+      id: "wencai.paperReady",
+      phases: [ "match" ],
+      capability: "runtime-read",
+      parseArgs: args => {
+        if (Object.keys(args).length !== 1 || typeof args.review !== "boolean") throw new Error("expected review flag");
+        return args.review;
+      },
+      validateResult: v => typeof v === "boolean",
+      execute: review => !!environment && paperDocument(environment.ctx.document, review, environment.ctx.signal) !== null
+    });
+    for (const id of [ "wencai.capturePaper", "wencai.harvestPaper" ]) {
+      const review = id === "wencai.harvestPaper";
+      core.registerLocalHook(registry, {
+        id: id,
+        phases: [ "capture" ],
+        capability: "runtime-read",
+        parseArgs: args => {
+          if (Object.keys(args).length !== 1 || !Array.isArray(args.leaves) || args.leaves.length !== TYPES.length || args.leaves.some((entry, i) => !entry || entry.kind !== "leaf" || entry.type !== TYPES[i])) throw new Error("expected four leaf descriptors");
+          return void 0;
+        },
+        validateResult: v => Number.isInteger(v) && Number(v) >= 0 && Number(v) <= 256,
+        execute: () => {
+          var _a;
+          if (!environment) return 0;
+          const {signal: signal} = environment.ctx;
+          const document2 = paperDocument(environment.ctx.document, review, signal);
+          const location2 = (_a = document2 == null ? void 0 : document2.defaultView) == null ? void 0 : _a.location;
+          if (!document2 || !location2) return 0;
+          const original = roots(document2, review);
+          const deadline = Date.now() + 4e3;
+          let registered = 0;
+          for (let index = 0; index < original.length; index++) {
+            if (signal.aborted || Date.now() >= deadline) break;
+            try {
+              const root = original[index];
+              const parsed = parse(root, index, review, signal);
+              if (review) {
+                const values = published(parsed);
+                if (values) {
+                  environment.capture.registerHarvestLeaf(parsed.node, values);
+                  registered++;
+                }
+                continue;
+              }
+              const fingerprint = protocol.questionNodeHash(parsed.node);
+              const controls = [ ...parsed.inputs, ...parsed.slots ];
+              const identities = controls.map(i => [ i.id, i.name, i.type, i.getAttribute("value") ]);
+              const live = () => {
+                try {
+                  if (signal.aborted || paperDocument(environment.ctx.document, false, signal) !== document2 || !workLocation(location2, false)) return false;
+                  const currentRoots = roots(document2, false);
+                  if (currentRoots.length !== original.length || currentRoots.some((e, i) => e !== original[i])) return false;
+                  const current = parse(root, index, false, signal);
+                  return current.table === parsed.table && protocol.questionNodeHash(current.node) === fingerprint && [ ...current.inputs, ...current.slots ].every((e, i) => e === controls[i] && e.id === identities[i][0] && e.name === identities[i][1] && e.type === identities[i][2] && e.getAttribute("value") === identities[i][3]) && current.labels.every((e, i) => e === parsed.labels[i]);
+                } catch {
+                  return false;
+                }
+              };
+              const targets = parsed.inputs.length ? parsed.inputs.map((input, i) => core.createDomChoiceBindingTarget({
+                optionId: parsed.node.options[i].id,
+                clickTarget: parsed.labels[i],
+                readTarget: input,
+                selected: {
+                  kind: "checked"
+                },
+                location: location2
+              })) : parsed.slots.map((element, i) => core.createDomWriteBindingTarget({
+                slotId: parsed.node.slots[i].id,
+                element: element
+              }));
+              environment.capture.registerLeaf(parsed.node, {
+                readCurrentFingerprint: () => live() ? fingerprint : "wencai-page-changed",
+                targets: targets.map(target => ({
+                  ...target,
+                  isConnected: () => live() && target.isConnected(),
+                  apply: (operation, abort) => live() ? target.apply(operation, abort) : Promise.resolve(false),
+                  verify: (operation, abort) => live() ? target.verify(operation, abort) : Promise.resolve(false)
+                }))
+              });
+              registered++;
+            } catch {}
+          }
+          return registered;
+        }
+      });
+    }
+  }
+
   const CHA0XING_PRIMITIVE_IDS = Object.freeze([ "chaoxing.normalizeTitle", "chaoxing.decodeFont", "chaoxing.harvestAnswerValues", "chaoxing.readReviewQuestion", "chaoxing.ueditorBodies", "chaoxing.examRegisterQuestion", "chaoxing.examPreparePlan", "chaoxing.examCommitPlan", CHA0XING_PAGE_SAVE_HOOK_IDS.noSubmit, CHA0XING_PAGE_SAVE_HOOK_IDS.saveWork ]);
 
   function registerPageSaveVerificationStub(registry, id) {
@@ -5588,6 +5836,11 @@
   }
 
   const PLATFORM_PRIVATE_HOOKS = Object.freeze({
+    wencai: Object.freeze({
+      primitiveIds: WENCAI_HOOK_IDS,
+      registerForVerification: registry => registerWencaiHooks(registry),
+      registerForRuntime: registerWencaiHooks
+    }),
     anhui: Object.freeze({
       primitiveIds: ANHUI_HOOK_IDS,
       registerForVerification: registry => registerAnhuiHooks(registry),
@@ -5645,7 +5898,7 @@
 
   const RULE_EXPRESSION_SERVICES = createRuleExpressionServices();
 
-  const RULE_ENGINE_VERSION = "1.12.0";
+  const RULE_ENGINE_VERSION = "1.13.0";
 
   const RULE_LIMITS = Object.freeze({
     maxSteps: 5e4,
@@ -5679,6 +5932,11 @@
   const CHA0XING_RULE_POLICY = platformRulePolicy("chaoxing");
 
   const TRUSTED_REMOTE_RULE_PLATFORMS = Object.freeze([ Object.freeze({
+    platform: "wencai",
+    packageId: "wencai-homework-online",
+    hosts: Object.freeze([ "learning.wencaischool.net" ]),
+    policy: platformRulePolicy("wencai")
+  }), Object.freeze({
     platform: "anhui",
     packageId: "anhui-homework-online",
     hosts: Object.freeze([ "jxjynew.ahjxjy.cn" ]),
@@ -5715,7 +5973,7 @@
     policy: GENERIC_DOM_RULE_POLICY
   }) ]);
 
-  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|mooc1\.ceduacad\.ahut\.edu\.cn|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn)$/u;
+  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|mooc1\.ceduacad\.ahut\.edu\.cn|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn|learning\.wencaischool\.net)$/u;
 
   function trustedRemoteRulePlatformFor(hostname) {
     const host = normalizedHost(hostname);
@@ -8936,6 +9194,7 @@
 
   const PLATFORM_LABEL = Object.freeze({
     anhui: "\u5b89\u5fbd\u7ee7\u7eed\u6559\u80b2\u5728\u7ebf\u65b0\u7248",
+    wencai: "\u67e0\u6aac\u6587\u91c7",
     chaoxing: "\u8d85\u661f",
     wangxiao: "168 \u7f51\u6821",
     aopeng: "\u5965\u9e4f\u6559\u80b2",
@@ -8948,6 +9207,7 @@
   const platformLabelFor = platform => PLATFORM_LABEL[platform] ?? platform;
 
   const PLATFORM_CEILING = Object.freeze({
+    wencai: Object.freeze([ "answer", "harvest" ]),
     anhui: Object.freeze([ "answer", "harvest", "course-automation" ]),
     chaoxing: Object.freeze([ "answer", "harvest", "course-automation" ]),
     wangxiao: Object.freeze([ "answer", "harvest" ]),
@@ -11704,7 +11964,8 @@
         localAnswerCache.flush();
         usageEvents.persist();
       }
-      const loggedIn = vue.ref(!!getToken());
+      let accountToken = getToken();
+      const loggedIn = vue.ref(!!accountToken);
       const authStale = vue.ref(false);
       const SUBMIT_SKIP_REASON = {
         "clicked-entry": "\u70b9\u5f00\u4e86\u63d0\u4ea4\uff0c\u4f46\u6ca1\u7b49\u5230\u7ad9\u70b9\u7684\u786e\u8ba4\u6846",
@@ -11844,8 +12105,12 @@
       const accountOpen = vue.ref(false);
       const toggleAccount = () => {
         accountOpen.value = !accountOpen.value;
-        if (accountOpen.value) void refreshMe();
       };
+      vue.watch(accountOpen, open => {
+        if (!open) return;
+        syncStoredAccount();
+        void refreshMe();
+      });
       const closeAccount = () => {
         accountOpen.value = false;
       };
@@ -11963,9 +12228,7 @@
           setToken(r.token);
           setUsername(username.value.trim());
           setCardSession(false);
-          accountName.value = username.value.trim();
-          cardSession.value = false;
-          loggedIn.value = true;
+          syncStoredAccount();
           authStale.value = false;
           password.value = "";
           email.value = "";
@@ -11990,9 +12253,7 @@
           setToken(r.token);
           setUsername("\u5361\u5bc6");
           setCardSession(true);
-          accountName.value = "\u5361\u5bc6";
-          cardSession.value = true;
-          loggedIn.value = true;
+          syncStoredAccount();
           authStale.value = false;
           cardLoginCode.value = "";
           tab.value = loaded && list.value.length > 0 ? "ask" : "home";
@@ -12015,6 +12276,7 @@
       };
       const logout = () => {
         clearToken();
+        accountToken = "";
         setCardSession(false);
         clearLastBalance();
         balance.value = null;
@@ -12032,10 +12294,27 @@
       const redeeming = vue.ref(false);
       const balance = vue.ref(getLastBalance());
       const emailBound = vue.ref(null);
+      function syncStoredAccount() {
+        const token = getToken();
+        if (token === accountToken) return false;
+        accountToken = token;
+        loggedIn.value = !!token;
+        accountName.value = getUsername();
+        cardSession.value = !!token && getCardSession();
+        balance.value = null;
+        emailBound.value = null;
+        authStale.value = false;
+        authMsg.value = "";
+        return true;
+      }
+      const onWindowFocus = () => {
+        if (syncStoredAccount() && accountOpen.value) void refreshMe();
+      };
       async function refreshMe() {
-        if (!getToken()) return;
+        const token = getToken();
+        if (!token) return;
         const snapshot = await fetchMe(aiaskTransport, BACKEND_BASE_URL);
-        if (!snapshot) return;
+        if (!snapshot || getToken() !== token) return;
         balance.value = snapshot.balance;
         setLastBalance(snapshot.balance);
         accountName.value = snapshot.username;
@@ -12942,6 +13221,7 @@
         void loadAnnouncement();
         void loadUpdate();
         window.addEventListener("resize", onWindowResize);
+        window.addEventListener("focus", onWindowFocus);
         document.addEventListener("keydown", onPanelKeydown);
         if (settings.reportUsage) usageEvents.restore(); else usageEvents.disable();
         window.addEventListener("pagehide", onPageHide);
@@ -12980,6 +13260,7 @@
         document.removeEventListener("keydown", onPanelKeydown);
         window.removeEventListener("pagehide", onPageHide);
         document.removeEventListener("visibilitychange", onVisibilityChange);
+        window.removeEventListener("focus", onWindowFocus);
       });
       async function finishRound() {
         const active2 = session;
@@ -13393,6 +13674,7 @@
       });
       const onVisibilityChange = () => {
         if (document.visibilityState !== "visible") return;
+        onWindowFocus();
         if (tab.value !== "system" || systemSub.value !== "cache") return;
         reloadCacheView();
       };
