@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.5.8
+// @version      3.5.9
 // @author       爱问答
-// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学、广东开放大学、安徽继续教育在线新版、柠檬文采、UMU 互动平台】，更多平台持续适配中...
+// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学、广东开放大学、安徽继续教育在线新版、柠檬文采、UMU 互动平台、青书学堂】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
 // @homepage     https://www.aiask.site/
 // @supportURL   https://www.aiask.site/contact.html
@@ -19,6 +19,9 @@
 // @match        *://learning.wencaischool.net/openlearning/console/*
 // @match        https://m.umu.cn/session/quiz/*
 // @match        https://m.umu.cn/session/video/*
+// @match        https://degree.qingshuxuetang.com/nnsf/Student/ExercisePaper*
+// @match        https://degree.qingshuxuetang.com/nnsf/Student/ViewQuiz*
+// @match        https://degree.qingshuxuetang.com/nnsf/Student/Course/CourseShow*
 // @match        https://www.aiask.site/import.html
 // @match        https://www.aiask.site/import
 // @match        https://www.aiask.site/feedback.html
@@ -148,7 +151,7 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.5.8";
+  const SCRIPT_VERSION = "3.5.9";
 
   const ENGINE_ID = "1255dc3dd0510681";
 
@@ -671,11 +674,11 @@
     if (input === null || typeof input !== "object" || Array.isArray(input)) {
       return null;
     }
-    const record = input;
-    if (record.schemaVersion !== 1) {
+    const record2 = input;
+    if (record2.schemaVersion !== 1) {
       return null;
     }
-    const {x: x, y: y} = record;
+    const {x: x, y: y} = record2;
     if (typeof x !== "number" || typeof y !== "number") {
       return null;
     }
@@ -692,11 +695,11 @@
     if (input === null || typeof input !== "object" || Array.isArray(input)) {
       return null;
     }
-    const record = input;
-    if (record.schemaVersion !== 1) {
+    const record2 = input;
+    if (record2.schemaVersion !== 1) {
       return null;
     }
-    const {w: w, h: h} = record;
+    const {w: w, h: h} = record2;
     if (typeof w !== "number" || typeof h !== "number") {
       return null;
     }
@@ -1249,7 +1252,7 @@
     }, debounceMs, maxWaitMs);
     const observer = new view2.MutationObserver(records => {
       const host = document2.getElementById("aiask-host");
-      if (host && records.every(record => host.contains(record.target))) return;
+      if (host && records.every(record2 => host.contains(record2.target))) return;
       scheduler.notify();
     });
     observer.observe(document2.documentElement, {
@@ -4039,7 +4042,7 @@
   });
 
   async function fetchAnnouncement(transport, baseUrl, options = {}) {
-    const attempt2 = async () => {
+    const attempt = async () => {
       let body;
       try {
         const response = await transport.send({
@@ -4076,10 +4079,10 @@
         retry: false
       };
     };
-    const first = await attempt2();
+    const first = await attempt();
     if (!first.retry) return first.result;
     await new Promise(resolve => setTimeout(resolve, options.retryDelayMs ?? RETRY_DELAY_MS));
-    return (await attempt2()).result;
+    return (await attempt()).result;
   }
 
   const MESSAGE$1 = {
@@ -4309,9 +4312,9 @@
       if (!question2.querySelector("h3.mark_name")) return false;
       const type = questionType(question2);
       if (type === "0" || type === "1" || type === "3") {
-        const targets = question2.querySelectorAll(CHOICE_SELECTOR);
+        const targets2 = question2.querySelectorAll(CHOICE_SELECTOR);
         const contents = question2.querySelectorAll(".stem_answer .answerBg .answer_p");
-        if (targets.length === 0 || targets.length !== contents.length) return false;
+        if (targets2.length === 0 || targets2.length !== contents.length) return false;
         continue;
       }
       if (type !== "2" && type !== "4") return false;
@@ -4390,16 +4393,16 @@
       if (!(question2 == null ? void 0 : question2.target.isConnected)) return false;
       if (question2.mode !== "preview") return true;
       if (plan.operations.every(operation => operation.kind === "write")) return plan.operations.length > 0 && (questionType(question2.target) === "2" || questionType(question2.target) === "4");
-      const targets = choiceTargets(question2.target);
-      const desired = desiredChoiceIndexes(plan, targets.length);
+      const targets2 = choiceTargets(question2.target);
+      const desired = desiredChoiceIndexes(plan, targets2.length);
       const type = questionType(question2.target);
       if (!desired || type !== "0" && type !== "1" && type !== "3") return false;
       if (type === "0" || type === "3") return desired.length === 1;
       const desiredSet = new Set(desired);
-      for (const [index, target] of targets.entries()) {
+      for (const [index, target] of targets2.entries()) {
         if (selected(target) && !desiredSet.has(index) && !clickElement(target)) return false;
       }
-      return targets.every((target, index) => !selected(target) || desiredSet.has(index));
+      return targets2.every((target, index) => !selected(target) || desiredSet.has(index));
     }
     async commitPlan(plan, signal) {
       if (signal.aborted) return false;
@@ -4415,12 +4418,12 @@
         for (const save of saves) if (!clickElement(save)) return false;
         return (this.options.delay ?? defaultDelay)(250, signal);
       }
-      const targets = choiceTargets(question2.target);
-      const desired = desiredChoiceIndexes(plan, targets.length);
+      const targets2 = choiceTargets(question2.target);
+      const desired = desiredChoiceIndexes(plan, targets2.length);
       const type = questionType(question2.target);
       if (!desired || type !== "0" && type !== "1" && type !== "3") return false;
       const desiredSet = new Set(desired);
-      if (!targets.every((target, index) => selected(target) === desiredSet.has(index))) return false;
+      if (!targets2.every((target, index) => selected(target) === desiredSet.has(index))) return false;
       return (this.options.delay ?? defaultDelay)(type === "1" ? 600 : 250, signal);
     }
     dispose() {
@@ -4526,10 +4529,10 @@
     }
   }
 
-  function resolveUeditorBodies(targets, document2) {
+  function resolveUeditorBodies(targets2, document2) {
     const fallbackApi = ueditorApi(document2);
     const apis = new Map;
-    return targets.map(target => {
+    return targets2.map(target => {
       const ownerDocument = target.ownerDocument;
       if (!apis.has(ownerDocument)) apis.set(ownerDocument, ueditorApi(ownerDocument) ?? fallbackApi);
       const api = apis.get(ownerDocument);
@@ -4672,7 +4675,7 @@
   function safeNoSubmitSaveTargets(document2) {
     const documents = sameOriginDocuments(document2);
     if (!documents) return null;
-    const targets = [];
+    const targets2 = [];
     for (const current of documents) {
       let answerable = false;
       try {
@@ -4686,9 +4689,9 @@
       if (candidates.length === 0) continue;
       if (candidates.length > 1) return null;
       if (!validNoSubmitTarget(candidates[0])) return null;
-      targets.push(candidates[0]);
+      targets2.push(candidates[0]);
     }
-    return targets.length > 0 ? targets : null;
+    return targets2.length > 0 ? targets2 : null;
   }
 
   const ANSWERABLE_QUESTION_SELECTOR = '.TiMu input[name^="answertype"]';
@@ -4855,15 +4858,15 @@
       return typeof element.querySelector === "function" ? element.querySelector(SAVE_TOAST_SELECTOR) : null;
     };
     const toastObserver = toastHost && ObserverCtor ? new ObserverCtor(records => {
-      for (const record of records) {
-        for (const added of record.addedNodes) {
+      for (const record2 of records) {
+        for (const added of record2.addedNodes) {
           const toast = toastOf(added);
           if (toast && isSuccessText(toast.textContent)) {
             onSuccessObserved();
             return;
           }
         }
-        const changed = toastOf(record.target);
+        const changed = toastOf(record2.target);
         if (changed && isSuccessText(changed.textContent)) {
           onSuccessObserved();
           return;
@@ -4935,10 +4938,10 @@
 
   function syncUeditorAnswers(document2, pageWindow) {
     var _a;
-    const targets = [ ...document2.querySelectorAll('textarea[name^="answerEditor"], textarea[name^="answer"]:not([name^="answerEditor"])') ];
-    if (targets.length === 0) return true;
+    const targets2 = [ ...document2.querySelectorAll('textarea[name^="answerEditor"], textarea[name^="answer"]:not([name^="answerEditor"])') ];
+    if (targets2.length === 0) return true;
     const api = objectValue(pageWindow.UE) ? pageWindow.UE : ueditorApi(document2);
-    for (const textarea of targets) {
+    for (const textarea of targets2) {
       const editor = api ? resolveUeditorEditor(textarea, api) : null;
       const body = editor ? bodyFromEditor(editor) : null;
       const text2 = ((_a = body == null ? void 0 : body.textContent) == null ? void 0 : _a.trim()) ?? "";
@@ -4978,10 +4981,10 @@
           const target = safeDoworkSaveTarget(document2);
           return target ? runSaveWork(target, signal) : false;
         }
-        const targets = safeNoSubmitSaveTargets(document2);
-        if (!targets) return false;
-        const budget = Math.max(1, Math.floor(NO_SUBMIT_CONFIRM_TIMEOUT_MS / targets.length));
-        for (const target of targets) if (!(await runNoSubmitSave(target, signal, textWrites, budget))) return false;
+        const targets2 = safeNoSubmitSaveTargets(document2);
+        if (!targets2) return false;
+        const budget = Math.max(1, Math.floor(NO_SUBMIT_CONFIRM_TIMEOUT_MS / targets2.length));
+        for (const target of targets2) if (!(await runNoSubmitSave(target, signal, textWrites, budget))) return false;
         return true;
       }
     });
@@ -5031,6 +5034,82 @@
     return text2.length > MAX_TEXT ? `${text2.slice(0, MAX_TEXT)}\u2026\uff08\u5df2\u622a\u65ad\uff09` : text2;
   }
 
+  const object$1 = v => v !== null && typeof v === "object" && !Array.isArray(v) ? v : null;
+
+  const id$3 = v => typeof v === "string" && /^[a-f0-9]{24}$/u.test(v);
+
+  function projectQingshuPaper(payload, context) {
+    var _a;
+    const root = object$1(payload);
+    const data = object$1(root == null ? void 0 : root.data);
+    const raw = (_a = object$1(data == null ? void 0 : data.paperDetail)) == null ? void 0 : _a.questions;
+    if (context !== void 0 && (context.url.pathname !== "/nnsf/Student/DetailData" || context.url.searchParams.getAll("quizId").length !== 1 || context.url.searchParams.get("quizId") !== (data == null ? void 0 : data.id)) || (root == null ? void 0 : root.hr) !== 0 || !id$3(data == null ? void 0 : data.id) || !Array.isArray(raw) || !raw.length || raw.length > 500) return {
+      id: "",
+      questions: []
+    };
+    const questions = raw.map(value => {
+      const q = object$1(value);
+      const options = Array.isArray(q == null ? void 0 : q.options) && q.options.length <= 26 ? q.options.map(value2 => {
+        const o = object$1(value2);
+        return {
+          label: typeof (o == null ? void 0 : o.label) === "string" && o.label.length <= 1 ? o.label : "",
+          description: typeof (o == null ? void 0 : o.description) === "string" && o.description.length <= 64e3 ? o.description : ""
+        };
+      }) : [];
+      return {
+        questionId: id$3(q == null ? void 0 : q.questionId) ? q.questionId : "",
+        description: typeof (q == null ? void 0 : q.description) === "string" && q.description.length <= 64e3 ? q.description : "",
+        typeDesc: typeof (q == null ? void 0 : q.typeDesc) === "string" && q.typeDesc.length <= 32 ? q.typeDesc : "",
+        solution: typeof (q == null ? void 0 : q.solution) === "string" && q.solution.length <= 64 ? q.solution : "",
+        options: options
+      };
+    });
+    return {
+      id: data.id,
+      questions: questions
+    };
+  }
+
+  const object = value => value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;
+
+  const numeric = value => (typeof value === "string" || typeof value === "number") && /^[1-9]\d{0,18}$/u.test(String(value)) ? String(value) : "";
+
+  const record = value => typeof value === "string" && /^[a-f0-9]{24}$/u.test(value) ? value : numeric(value);
+
+  const qingshuNodeId = value => typeof value === "string" && /^[\w-]{1,80}$/u.test(value);
+
+  function projectQingshuStudyBegin(payload, context) {
+    const root = object(payload);
+    if (context.url.pathname !== "/nnsf/Student/Course/UploadStudyRecordBegin" || (root == null ? void 0 : root.hr) !== 0 || typeof context.requestBody !== "string" || context.requestBody.length > 4096) return {};
+    try {
+      const body = object(JSON.parse(context.requestBody));
+      const recordId = record(root.data);
+      const courseId = numeric(body == null ? void 0 : body.courseId);
+      const periodId = numeric(body == null ? void 0 : body.periodId);
+      return (body == null ? void 0 : body.contentType) === 11 && recordId && courseId && periodId && qingshuNodeId(body.contentId) ? {
+        recordId: recordId,
+        courseId: courseId,
+        periodId: periodId,
+        nodeId: body.contentId
+      } : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function projectQingshuStudyEnd(payload, context) {
+    const root = object(payload);
+    const body = context.requestBody;
+    if (context.url.pathname !== "/nnsf/Student/Course/UploadStudyRecordContinue" || (root == null ? void 0 : root.hr) !== 0 || typeof (body == null ? void 0 : body.get) !== "function") return {};
+    const recordId = record(body.get("recordId"));
+    const position = Number(body.get("position"));
+    return recordId && typeof body.get("position") === "string" && /^\d{1,6}$/u.test(String(body.get("position"))) && Number.isSafeInteger(position) ? {
+      recordId: recordId,
+      position: position,
+      ended: body.get("end") === "true"
+    } : {};
+  }
+
   function projectUmuLearningState(input) {
     if (!input || typeof input !== "object") return null;
     const response = input;
@@ -5048,7 +5127,23 @@
     };
   }
 
-  const XHR_CAPTURE_TABLE = Object.freeze([ Object.freeze({
+  const XHR_CAPTURE_TABLE = Object.freeze([ ...[ {
+    pathIncludes: "/nnsf/Student/Course/UploadStudyRecordBegin",
+    slot: "qingshu-study-begin",
+    projectPayload: projectQingshuStudyBegin
+  }, {
+    pathIncludes: "/nnsf/Student/Course/UploadStudyRecordContinue",
+    slot: "qingshu-study-end",
+    projectPayload: projectQingshuStudyEnd
+  } ].map(entry => Object.freeze({
+    host: "degree.qingshuxuetang.com",
+    ...entry
+  })), Object.freeze({
+    host: "degree.qingshuxuetang.com",
+    pathIncludes: "/nnsf/Student/DetailData",
+    slot: "qingshu-paper",
+    projectPayload: projectQingshuPaper
+  }), Object.freeze({
     host: "m.umu.cn",
     pathIncludes: "/api/session/makeweikestatus",
     slot: "umu-learning-status",
@@ -5142,14 +5237,17 @@
       const match = rules.find(rule => rule.host === host && url.pathname.includes(rule.pathIncludes) && !(rule.pathExcludes && url.pathname.includes(rule.pathExcludes)));
       return match ?? null;
     };
-    const consume = xhr => {
+    const consume = (xhr, requestBody) => {
       try {
         if (xhr.readyState !== 4 || xhr.status !== 200) return;
         const rule = ruleFor(xhr.responseURL || "");
         if (!rule) return;
         const slot = rule.slot;
         const raw = readPayload(xhr);
-        const payload = rule.projectPayload ? rule.projectPayload(raw) : raw;
+        const payload = rule.projectPayload ? rule.projectPayload(raw, {
+          url: new URL(xhr.responseURL),
+          requestBody: requestBody
+        }) : raw;
         if (payload == null) return;
         store.set(slot, payload);
         for (const listener of [ ...listeners2 ]) {
@@ -5177,7 +5275,7 @@
         const originalSend = currentSend;
         const hookedSend = function(body) {
           try {
-            this.addEventListener("readystatechange", () => consume(this));
+            this.addEventListener("readystatechange", () => consume(this, body));
           } catch {}
           return originalSend.call(this, body);
         };
@@ -5195,7 +5293,7 @@
         const original = target.fetch;
         const flag = "__aiaskHookedFetch";
         if (typeof original !== "function" || Object.hasOwn(original, flag)) return false;
-        const capture = async response => {
+        const capture = async (response, requestBody) => {
           var _a;
           if (response.status !== 200 || !ruleFor(response.url)) return;
           if (Number(response.headers.get("content-length")) > MAX_CAPTURE_CHARS) return;
@@ -5220,7 +5318,7 @@
                   status: response.status,
                   responseURL: response.url,
                   responseText: text2
-                });
+                }, requestBody);
                 return;
               }
               bytes += part.value.byteLength;
@@ -5239,7 +5337,10 @@
         };
         const hooked = function(...args) {
           const pending = original.apply(this, args);
-          void pending.then(capture).catch(() => {});
+          void pending.then(response => {
+            var _a;
+            return capture(response, (_a = args[1]) == null ? void 0 : _a.body);
+          }).catch(() => {});
           return pending;
         };
         Object.defineProperty(hooked, flag, {
@@ -5316,7 +5417,7 @@
   const ANHUI_HOOK_IDS = [ "anhui.ready", "anhui.reviewReady", "anhui.harvestPaper", "anhui.capturePaper", "anhui.applyPlan" ];
 
   function parseQuestion(input) {
-    const object = value => {
+    const object2 = value => {
       if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid question model");
       return value;
     };
@@ -5328,7 +5429,7 @@
       if (typeof value !== "string" || !value.trim() || value.length > 12e3) throw new Error("invalid title");
       return value;
     };
-    const q = object(input);
+    const q = object2(input);
     if (q.QuestionType !== 1 && q.QuestionType !== 2 && q.QuestionType !== 3) throw new Error("unsupported type");
     const options = q.CourseQuestionOptionList;
     if (!Array.isArray(options) || options.length < 2 || options.length > 4) throw new Error("invalid options");
@@ -5337,7 +5438,7 @@
       QuestionType: q.QuestionType,
       Title: title(q.Title),
       CourseQuestionOptionList: options.map(value => {
-        const option = object(value);
+        const option = object2(value);
         return {
           Id: identity2(option.Id),
           Title: title(option.Title)
@@ -5369,8 +5470,8 @@
   function reviewReady(document2) {
     var _a, _b, _c, _d, _e, _f;
     const native = view(document2);
-    const answers = document2.querySelectorAll(".topic_answer");
-    const answer = answers[0];
+    const answers2 = document2.querySelectorAll(".topic_answer");
+    const answer = answers2[0];
     let element = answer ?? null;
     let visible2 = !!element;
     for (let depth = 0; element && depth < 32; depth++, element = element.parentElement) {
@@ -5381,7 +5482,7 @@
       }
     }
     if (element) visible2 = false;
-    return (native == null ? void 0 : native.workState) === 2 && ((_b = native.workRule) == null ? void 0 : _b.isShowAnswers) === 1 && native.isFaceModel !== true && native.isFaceModelR !== true && answers.length === 1 && visible2 && ((_d = (_c = answer == null ? void 0 : answer.querySelector("span")) == null ? void 0 : _c.textContent) == null ? void 0 : _d.trim()) === "\u3010\u7b54\u6848\u3011" && !answer.closest('[hidden], [aria-hidden="true"]') && ((_e = document2.defaultView) == null ? void 0 : _e.getComputedStyle(answer).display) !== "none" && ((_f = document2.defaultView) == null ? void 0 : _f.getComputedStyle(answer).visibility) !== "hidden";
+    return (native == null ? void 0 : native.workState) === 2 && ((_b = native.workRule) == null ? void 0 : _b.isShowAnswers) === 1 && native.isFaceModel !== true && native.isFaceModelR !== true && answers2.length === 1 && visible2 && ((_d = (_c = answer == null ? void 0 : answer.querySelector("span")) == null ? void 0 : _c.textContent) == null ? void 0 : _d.trim()) === "\u3010\u7b54\u6848\u3011" && !answer.closest('[hidden], [aria-hidden="true"]') && ((_e = document2.defaultView) == null ? void 0 : _e.getComputedStyle(answer).display) !== "none" && ((_f = document2.defaultView) == null ? void 0 : _f.getComputedStyle(answer).visibility) !== "hidden";
   }
 
   function waitBeforeWrite(document2, identity2) {
@@ -5672,32 +5773,32 @@
       execute: async (safety, {signal: signal}) => {
         if (!environment || signal.aborted) return false;
         const plan = core.safetyPlanForCapability(safety);
-        const record = records.get(plan.path);
-        if (!record || !record.live() || plan.operations.length > 4 || plan.operations.some(op => op.kind !== "choose")) return false;
+        const record2 = records.get(plan.path);
+        if (!record2 || !record2.live() || plan.operations.length > 4 || plan.operations.some(op => op.kind !== "choose")) return false;
         const doc = environment.ctx.document;
-        if (!currentChoices(doc, record.node)) {
-          const card = record.card();
+        if (!currentChoices(doc, record2.node)) {
+          const card = record2.card();
           if (!card) return false;
           core.assertNavClickTarget(card, environment.ctx.location, {
             bindings: environment.capture.bindings,
             commitEntryText: () => null
           }).click();
-          if (!(await core.waitUntil(() => !!currentChoices(doc, record.node), {
+          if (!(await core.waitUntil(() => !!currentChoices(doc, record2.node), {
             timeout: 1200,
             interval: 50,
             signal: signal
           }))) return false;
         }
-        const choices2 = currentChoices(doc, record.node);
-        if (!choices2 || !record.live()) return false;
-        const selected2 = choices2.flatMap((e, i) => e.classList.contains("on") ? [ record.node.options[i].id ] : []);
-        if (record.node.type === "multiple" && selected2.some(id2 => !plan.operations.some(op => op.kind === "choose" && op.optionId === id2))) return false;
+        const choices2 = currentChoices(doc, record2.node);
+        if (!choices2 || !record2.live()) return false;
+        const selected2 = choices2.flatMap((e, i) => e.classList.contains("on") ? [ record2.node.options[i].id ] : []);
+        if (record2.node.type === "multiple" && selected2.some(id2 => !plan.operations.some(op => op.kind === "choose" && op.optionId === id2))) return false;
         const writes = plan.operations.filter(op => op.kind === "choose" && !selected2.includes(op.optionId)).length;
-        if (writes && waitBeforeWrite(doc, record.node.id.slice(1)) + (writes - 1) * 2100 > 11e3) return false;
+        if (writes && waitBeforeWrite(doc, record2.node.id.slice(1)) + (writes - 1) * 2100 > 11e3) return false;
         if (!(await environment.writer.applyPlan(plan, signal)) || !(await environment.writer.verifyPlan(plan, signal))) return false;
-        const finalChoices = currentChoices(doc, record.node);
+        const finalChoices = currentChoices(doc, record2.node);
         const expected2 = new Set(plan.operations.flatMap(op => op.kind === "choose" ? [ op.optionId ] : []));
-        return !!finalChoices && record.live() && finalChoices.every((choice, index) => choice.classList.contains("on") === expected2.has(record.node.options[index].id));
+        return !!finalChoices && record2.live() && finalChoices.every((choice, index) => choice.classList.contains("on") === expected2.has(record2.node.options[index].id));
       }
     });
   }
@@ -5711,14 +5812,234 @@
     [CHA0XING_PACKAGE_IDS.newChapter]: Object.freeze([ "noSubmit" ])
   });
 
-  const UMU_HOOK_IDS = [ "umu.ready", "umu.reviewReady", "umu.capturePaper", "umu.harvestPaper", "umu.applyPlan" ];
+  const QINGSHU_HOOK_IDS = [ "qingshu.ready", "qingshu.capture", "qingshu.harvest", "qingshu.applyPlan" ];
+
+  const id$2 = v => typeof v === "string" && /^[a-f0-9]{24}$/u.test(v);
+
+  function isQingshuHomework(location2, review2) {
+    const url = new URL(location2.href);
+    return url.origin === "https://degree.qingshuxuetang.com" && url.pathname === `/nnsf/Student/${review2 ? "ViewQuiz" : "ExercisePaper"}` && url.searchParams.getAll("quizId").length === 1 && id$2(url.searchParams.get("quizId"));
+  }
+
+  function paper(doc) {
+    var _a;
+    const location2 = (_a = doc.defaultView) == null ? void 0 : _a.location;
+    if (!location2 || !isQingshuHomework(location2, true) && !isQingshuHomework(location2, false)) return null;
+    const value = readCapturedSlot("qingshu-paper");
+    return (value == null ? void 0 : value.id) === new URL(location2.href).searchParams.get("quizId") ? value : null;
+  }
+
+  function content(doc, html) {
+    if (typeof html !== "string" || html.length > 64e3) throw new Error("invalid qingshu content");
+    const span = doc.createElement("span");
+    const template = doc.createElement("template");
+    template.innerHTML = html;
+    for (const e of template.content.querySelectorAll("script,style,noscript,iframe,object,embed,link,meta")) e.remove();
+    for (const e of template.content.querySelectorAll("*")) for (const attr of [ ...e.attributes ]) if (!(e.tagName === "IMG" && attr.name === "src")) e.removeAttribute(attr.name);
+    span.append(template.content);
+    for (const br of span.querySelectorAll("br")) br.replaceWith("\n");
+    for (const block of span.querySelectorAll("p,div")) {
+      block.before("\n");
+      block.after("\n");
+    }
+    return core.serializeDomQuestionContent(span);
+  }
+
+  function parse$1(doc, raw) {
+    var _a;
+    if (!id$2(raw.questionId) || !Array.isArray(raw.options) || raw.options.length < 2 || raw.options.length > 26) throw new Error("invalid qingshu question");
+    const type = raw.typeDesc === "\u5355\u9009\u9898" ? "single" : raw.typeDesc === "\u591a\u9009\u9898" ? "multiple" : null;
+    if (!type || raw.options.some(o => !/^[A-Z]$/u.test(o.label)) || new Set(raw.options.map(o => o.label)).size !== raw.options.length) throw new Error("unsupported or ambiguous qingshu question");
+    return protocol.LeafQuestionNodeSchema.parse({
+      kind: "leaf",
+      id: raw.questionId,
+      path: `/${raw.questionId}`,
+      type: type,
+      stem: content(doc, raw.description),
+      options: raw.options.map(o => ({
+        id: o.label,
+        content: content(doc, o.description)
+      })),
+      slots: [],
+      fillPolicy: "atomic",
+      metadata: {
+        platform: "qingshu",
+        variant: isQingshuHomework((_a = doc.defaultView) == null ? void 0 : _a.location, true) ? "qingshu-homework-review" : "qingshu-homework-attempt",
+        ruleVersion: "1.0.0"
+      }
+    });
+  }
+
+  function roots$1(doc, node) {
+    const matches = [ ...doc.querySelectorAll(".paper-container > .question-detail-container") ].filter(e => e.id === node.id);
+    const root = matches[0];
+    const stem = root == null ? void 0 : root.querySelector(".question-detail-description");
+    return matches.length === 1 && stem && content(doc, stem.innerHTML) === node.stem ? root : null;
+  }
+
+  function targets(doc, node) {
+    const root = roots$1(doc, node);
+    if (!root) return null;
+    const choices2 = [ ...root.querySelectorAll(".question-detail-options > .question-detail-option") ];
+    if (choices2.length !== node.options.length) return null;
+    const ordered = node.options.map(o => {
+      const matches = choices2.filter(e2 => {
+        var _a;
+        return ((_a = e2.querySelector("input.option-input")) == null ? void 0 : _a.getAttribute("value")) === o.id;
+      });
+      const e = matches[0];
+      const input = e == null ? void 0 : e.querySelector("input.option-input");
+      const label = e == null ? void 0 : e.querySelector("label.option-label");
+      const text2 = e == null ? void 0 : e.querySelector(".option-description");
+      return matches.length === 1 && input && label && text2 && !input.disabled && input.type === (node.type === "multiple" ? "checkbox" : "radio") && content(doc, text2.innerHTML) === o.content ? {
+        input: input,
+        label: label
+      } : null;
+    });
+    return ordered.every(v => v !== null) ? ordered : null;
+  }
+
+  function answers(raw, node) {
+    var _a;
+    const letters = ((_a = raw.solution) == null ? void 0 : _a.trim().toUpperCase()) ?? "";
+    if (!/^[A-Z]+$/u.test(letters) || new Set(letters).size !== letters.length || node.type === "single" && letters.length !== 1) return [];
+    const values = [ ...letters ].map(label => {
+      var _a2;
+      return (_a2 = node.options.find(o => o.id === label)) == null ? void 0 : _a2.content;
+    });
+    return values.every(v => !!v) ? values : [];
+  }
+
+  function registerQingshuHooks(registry, environment) {
+    core.registerLocalHook(registry, {
+      id: "qingshu.applyPlan",
+      phases: [ "fill" ],
+      capability: "answer-write",
+      requiresSafetyCapability: true,
+      parseArgs: args => args.safety,
+      validateResult: value => typeof value === "boolean",
+      execute: async (safety, {signal: signal}) => {
+        var _a;
+        if (!environment || signal.aborted || !isQingshuHomework(environment.ctx.location, false)) return false;
+        const plan = core.safetyPlanForCapability(safety);
+        const doc = environment.ctx.document;
+        const rows = (_a = paper(doc)) == null ? void 0 : _a.questions.filter(q => `/${q.questionId}` === plan.path);
+        if ((rows == null ? void 0 : rows.length) !== 1) return false;
+        const node = parse$1(doc, rows[0]);
+        const wanted = new Set(plan.operations.flatMap(op => op.kind === "choose" ? [ op.optionId ] : []));
+        if (plan.fingerprint !== protocol.questionNodeHash(node) || wanted.size !== plan.operations.length || wanted.size === 0 || node.type === "single" && wanted.size !== 1 || ![ ...wanted ].every(id2 => node.options.some(o => o.id === id2))) return false;
+        const current = () => {
+          const binding = environment.capture.bindings.get(plan.path);
+          return !signal.aborted && (binding == null ? void 0 : binding.connected) && binding.currentFingerprint === plan.fingerprint && binding.capturedFingerprint === plan.fingerprint ? targets(doc, node) : null;
+        };
+        const choices2 = current();
+        if (!choices2) return false;
+        const before = choices2.map(c => c.input.checked);
+        let success = false;
+        try {
+          if (node.type === "multiple") for (const choice of choices2) {
+            if (!current()) return false;
+            if (choice.input.checked && !wanted.has(choice.input.value)) choice.label.click();
+          }
+          if (!(await environment.writer.applyPlan(plan, signal)) || !(await environment.writer.verifyPlan(plan, signal))) return false;
+          const after = current();
+          success = !!after && after.every(c => c.input.checked === wanted.has(c.input.value));
+          return success;
+        } finally {
+          if (!success && current()) for (const [i, choice] of choices2.entries()) {
+            if (!current()) break;
+            if (choice.input.checked !== before[i] && (node.type === "multiple" || before[i])) choice.label.click();
+          }
+        }
+      }
+    });
+    core.registerLocalHook(registry, {
+      id: "qingshu.ready",
+      phases: [ "match" ],
+      capability: "runtime-read",
+      parseArgs: args => {
+        if (Object.keys(args).length !== 1 || typeof args.review !== "boolean") throw new Error("expected review flag");
+        return args.review;
+      },
+      validateResult: v => typeof v === "boolean",
+      execute: review2 => !!environment && isQingshuHomework(environment.ctx.location, review2)
+    });
+    for (const harvest of [ false, true ]) core.registerLocalHook(registry, {
+      id: harvest ? "qingshu.harvest" : "qingshu.capture",
+      phases: [ "capture" ],
+      capability: "runtime-read",
+      parseArgs: args => {
+        if (!Array.isArray(args.leaves) || JSON.stringify(args.leaves) !== JSON.stringify([ {
+          kind: "leaf",
+          type: "single"
+        }, {
+          kind: "leaf",
+          type: "multiple"
+        } ])) throw new Error("expected choice leaves");
+        return args;
+      },
+      validateResult: v => Number.isInteger(v),
+      execute: () => {
+        if (!environment || environment.ctx.signal.aborted) return 0;
+        const doc = environment.ctx.document;
+        const source = paper(doc);
+        if (!source || !isQingshuHomework(environment.ctx.location, harvest)) return 0;
+        const counts = new Map;
+        for (const q of source.questions) counts.set(q.questionId, (counts.get(q.questionId) ?? 0) + 1);
+        let count = 0;
+        for (const raw of source.questions) {
+          if (environment.ctx.signal.aborted) break;
+          try {
+            if (counts.get(raw.questionId) !== 1) continue;
+            const node = parse$1(doc, raw);
+            if (!roots$1(doc, node)) continue;
+            if (harvest) {
+              const values = answers(raw, node);
+              if (!values.length) continue;
+              environment.capture.registerHarvestLeaf(node, values);
+            } else {
+              const choices2 = targets(doc, node);
+              if (!choices2) continue;
+              const fingerprint = protocol.questionNodeHash(node);
+              const live = () => {
+                var _a;
+                try {
+                  const current = (_a = paper(doc)) == null ? void 0 : _a.questions.filter(q => q.questionId === raw.questionId);
+                  return !environment.ctx.signal.aborted && isQingshuHomework(environment.ctx.location, false) && (current == null ? void 0 : current.length) === 1 && JSON.stringify(parse$1(doc, current[0]).options) === JSON.stringify(node.options) && protocol.questionNodeHash(parse$1(doc, current[0])) === fingerprint && !!targets(doc, node);
+                } catch {
+                  return false;
+                }
+              };
+              environment.capture.registerLeaf(node, {
+                readCurrentFingerprint: () => live() ? fingerprint : "qingshu-page-changed",
+                targets: choices2.map(({input: input, label: label}, i) => core.createDomChoiceBindingTarget({
+                  optionId: node.options[i].id,
+                  clickTarget: label,
+                  readTarget: input,
+                  selected: {
+                    kind: "checked"
+                  },
+                  location: environment.ctx.location
+                }))
+              });
+            }
+            count++;
+          } catch {}
+        }
+        return count;
+      }
+    });
+  }
+
+  const UMU_HOOK_IDS = [ "umu.ready", "umu.listReady", "umu.reviewReady", "umu.capturePaper", "umu.harvestPaper", "umu.applyPlan" ];
 
   const id$1 = v => (typeof v === "string" || typeof v === "number" && Number.isSafeInteger(v)) && /^[1-9]\d{0,15}$/u.test(String(v)) ? String(v) : "";
 
   function umuNative(document2) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const page = (_a = pageWindowForDocument(document2)) == null ? void 0 : _a.document;
-    const root = page == null ? void 0 : page.querySelector(".controller-panel");
+    const layout = page && attemptRoot(page);
+    const root = (layout == null ? void 0 : layout.classList.contains("single-quiz")) ? layout : layout == null ? void 0 : layout.querySelector(".controller-panel");
     if (!root) return null;
     let f = root[Object.keys(root).find(k => k.startsWith("__reactFiber$")) ?? ""];
     let controller;
@@ -5728,11 +6049,16 @@
       if (typeof (n == null ? void 0 : n.displayCard) === "function" && Array.isArray((_b = n.props) == null ? void 0 : _b.sections)) controller = n;
       if (typeof (n == null ? void 0 : n.saveQuiz) === "function" && n.oldSaveData && typeof n.oldSaveData === "object") exam = n;
     }
-    return controller && exam ? {
+    return exam && ((layout == null ? void 0 : layout.classList.contains("single-quiz")) ? Array.isArray((_d = (_c = exam.props) == null ? void 0 : _c.pageData) == null ? void 0 : _d.sectionArr) : !!controller) ? {
       controller: controller,
       exam: exam
     } : null;
   }
+
+  const sections = native => {
+    var _a, _b, _c;
+    return ((_a = native.controller) == null ? void 0 : _a.props.sections) ?? ((_c = (_b = native.exam.props) == null ? void 0 : _b.pageData) == null ? void 0 : _c.sectionArr) ?? [];
+  };
 
   function text(document2, html) {
     if (typeof html !== "string" || !html.trim() || html.length > 12e3) throw new Error("invalid UMU content");
@@ -5745,7 +6071,7 @@
   }
 
   function question(document2, raw) {
-    var _a, _b;
+    var _a, _b, _c;
     const qid = id$1((_a = raw == null ? void 0 : raw.questionInfo) == null ? void 0 : _a.questionId);
     const options = raw == null ? void 0 : raw.answerArr;
     if (!qid || ((_b = raw.questionInfo) == null ? void 0 : _b.domType) !== "radio" || !Array.isArray(options) || options.length < 2 || options.length > 26) throw new Error("unsupported UMU question");
@@ -5765,16 +6091,21 @@
       fillPolicy: "atomic",
       metadata: {
         platform: "umu",
-        variant: "umu-quiz-attempt",
-        ruleVersion: "1.0.0"
+        variant: ((_c = attemptRoot(document2)) == null ? void 0 : _c.classList.contains("single-quiz")) ? "umu-quiz-list-attempt" : "umu-quiz-attempt",
+        ruleVersion: "1.1.0"
       }
     });
   }
 
-  function attempt(document2) {
+  function attemptRoot(document2) {
     var _a;
     const location2 = (_a = document2.defaultView) == null ? void 0 : _a.location;
-    return (location2 == null ? void 0 : location2.protocol) === "https:" && location2.hostname === "m.umu.cn" && /^\/session\/quiz\/(?!result\/?$)[\w-]+\/?$/u.test(location2.pathname) && document2.querySelectorAll(".card-quiz .question-section").length === 1;
+    if ((location2 == null ? void 0 : location2.protocol) !== "https:" || location2.hostname !== "m.umu.cn" || !/^\/session\/quiz\/(?!result\/?$)[\w-]+\/?$/u.test(location2.pathname)) return null;
+    const roots2 = document2.querySelectorAll(".card-quiz, .single-quiz");
+    if (roots2.length !== 1) return null;
+    const root = roots2[0];
+    const count = root.querySelectorAll(".question-section").length;
+    return count > 0 && count <= 500 && (root.classList.contains("single-quiz") || count === 1) ? root : null;
   }
 
   function review(document2) {
@@ -5784,8 +6115,9 @@
 
   function choices(document2, node) {
     var _a;
-    if (!attempt(document2)) return null;
-    const roots2 = [ ...document2.querySelectorAll(".card-quiz .question-section") ].filter(e => e.querySelector(`input[name="radio_${node.id.slice(1)}"]`));
+    const layout = attemptRoot(document2);
+    if (!layout) return null;
+    const roots2 = [ ...layout.querySelectorAll(".question-section") ].filter(e => e.querySelector(`input[name="radio_${node.id.slice(1)}"]`));
     const root = roots2[0];
     if (roots2.length !== 1 || !/\uff08\u5355\u9009[\uff0c,]/u.test(((_a = root.querySelector(".titleTypeDesc")) == null ? void 0 : _a.textContent) ?? "")) return null;
     const title = root.querySelector(".question-title-content .title");
@@ -5797,14 +6129,14 @@
       return ((_a2 = e.querySelector("input")) == null ? void 0 : _a2.value) === o.id.slice("answer-".length);
     }));
     if (ordered.some(e => e.length !== 1)) return null;
-    const targets = ordered.map(e => e[0]);
-    return targets.every((e, i) => {
+    const targets2 = ordered.map(e => e[0]);
+    return targets2.every((e, i) => {
       var _a2, _b;
       const input = e.querySelector("input");
-      const content = (_a2 = e.querySelector(".option-detail")) == null ? void 0 : _a2.cloneNode(true);
-      (_b = content == null ? void 0 : content.querySelector(".letter-index")) == null ? void 0 : _b.remove();
-      return (input == null ? void 0 : input.type) === "radio" && input.name === `radio_${node.id.slice(1)}` && !!content && core.serializeDomQuestionContent(content) === node.options[i].content;
-    }) ? targets : null;
+      const content2 = (_a2 = e.querySelector(".option-detail")) == null ? void 0 : _a2.cloneNode(true);
+      (_b = content2 == null ? void 0 : content2.querySelector(".letter-index")) == null ? void 0 : _b.remove();
+      return (input == null ? void 0 : input.type) === "radio" && input.name === `radio_${node.id.slice(1)}` && !!content2 && core.serializeDomQuestionContent(content2) === node.options[i].content;
+    }) ? targets2 : null;
   }
 
   function registerUmuHooks(registry, environment) {
@@ -5813,7 +6145,13 @@
       if (Object.keys(args).length) throw new Error("expected empty args");
       return args;
     };
-    for (const [hook, ready2] of [ [ "umu.ready", attempt ], [ "umu.reviewReady", review ] ]) core.registerLocalHook(registry, {
+    for (const [hook, ready2] of [ [ "umu.ready", doc => {
+      var _a;
+      return !!((_a = attemptRoot(doc)) == null ? void 0 : _a.classList.contains("card-quiz"));
+    } ], [ "umu.listReady", doc => {
+      var _a;
+      return !!((_a = attemptRoot(doc)) == null ? void 0 : _a.classList.contains("single-quiz"));
+    } ], [ "umu.reviewReady", review ] ]) core.registerLocalHook(registry, {
       id: hook,
       phases: [ "match" ],
       capability: "runtime-read",
@@ -5832,10 +6170,10 @@
       },
       validateResult: v => Number.isInteger(v),
       execute: () => {
-        if (!environment || !attempt(environment.ctx.document)) return 0;
+        if (!environment || !attemptRoot(environment.ctx.document)) return 0;
         const doc = environment.ctx.document;
         const native = umuNative(doc);
-        const raw = native == null ? void 0 : native.controller.props.sections;
+        const raw = native && sections(native);
         if (!native || !Array.isArray(raw) || !raw.length || raw.length > 500) return 0;
         const ids = raw.map(q => {
           var _a;
@@ -5850,12 +6188,12 @@
             if (counts.get(node.id.slice(1)) !== 1) continue;
             const fingerprint = protocol.questionNodeHash(node);
             const live = () => {
-              var _a;
               try {
-                if (environment.ctx.signal.aborted || !attempt(doc) || ((_a = umuNative(doc)) == null ? void 0 : _a.controller) !== native.controller) return false;
-                const matches = native.controller.props.sections.filter(q => {
-                  var _a2;
-                  return id$1((_a2 = q == null ? void 0 : q.questionInfo) == null ? void 0 : _a2.questionId) === node.id.slice(1);
+                const currentNative = umuNative(doc);
+                if (environment.ctx.signal.aborted || !attemptRoot(doc) || (currentNative == null ? void 0 : currentNative.exam) !== native.exam || (currentNative == null ? void 0 : currentNative.controller) !== native.controller) return false;
+                const matches = sections(native).filter(q => {
+                  var _a;
+                  return id$1((_a = q == null ? void 0 : q.questionInfo) == null ? void 0 : _a.questionId) === node.id.slice(1);
                 });
                 if (matches.length !== 1) return false;
                 const current = question(doc, matches[0]);
@@ -5960,21 +6298,21 @@
       parseArgs: args => args.safety,
       validateResult: v => typeof v === "boolean",
       execute: async (safety, {signal: signal}) => {
-        var _a;
+        var _a, _b;
         if (!environment || signal.aborted) return false;
         const plan = core.safetyPlanForCapability(safety);
-        const record = records.get(plan.path);
+        const record2 = records.get(plan.path);
         const op = plan.operations[0];
-        if (!(record == null ? void 0 : record.live()) || plan.operations.length !== 1 || (op == null ? void 0 : op.kind) !== "choose" || !record.node.options.some(o => o.id === op.optionId)) return false;
+        if (!(record2 == null ? void 0 : record2.live()) || plan.operations.length !== 1 || (op == null ? void 0 : op.kind) !== "choose" || !record2.node.options.some(o => o.id === op.optionId)) return false;
         const doc = environment.ctx.document;
-        const {node: node, native: native} = record;
-        const index = native.controller.props.sections.findIndex(q => {
+        const {node: node, native: native} = record2;
+        const index = sections(native).findIndex(q => {
           var _a2;
           return id$1((_a2 = q == null ? void 0 : q.questionInfo) == null ? void 0 : _a2.questionId) === node.id.slice(1);
         });
         if (index < 0) return false;
-        native.controller.displayCard(index);
-        if (!(await core.waitUntil(() => record.live() && !!choices(doc, node), {
+        (_a = native.controller) == null ? void 0 : _a.displayCard(index);
+        if (!(await core.waitUntil(() => record2.live() && !!choices(doc, node), {
           timeout: 1500,
           interval: 50,
           signal: signal
@@ -5996,8 +6334,8 @@
           timeout: 5e3,
           interval: 50,
           signal: signal
-        })) || !saved || !record.live()) return false;
-        const receipt = (_a = native.exam.oldSaveData[node.id.slice(1)]) == null ? void 0 : _a.answer_ids;
+        })) || !saved || !record2.live()) return false;
+        const receipt = (_b = native.exam.oldSaveData[node.id.slice(1)]) == null ? void 0 : _b.answer_ids;
         const current = choices(doc, node);
         return Array.isArray(receipt) && receipt.length === 1 && String(receipt[0]) === op.optionId.slice("answer-".length) && !!current && current.every((e, i) => e.classList.contains("checked") === (node.options[i].id === op.optionId));
       }
@@ -6075,11 +6413,11 @@
     for (const e of copy.querySelectorAll("font, nobr")) {
       if (/\[\u53c2\u8003\u7b54\u6848[\uff1a:]/u.test(e.textContent ?? "")) e.remove();
     }
-    const content = element => core.serializeDomQuestionContent(element, {
+    const content2 = element => core.serializeDomQuestionContent(element, {
       signal: signal,
       maxNodes: 2e3
     });
-    const stem = content(copy);
+    const stem = content2(copy);
     const optionTables = table.querySelectorAll('table[isitemoption="1"]');
     if (optionTables.length > 1) throw new Error("ambiguous options");
     const optionTable = optionTables[0];
@@ -6093,7 +6431,7 @@
     });
     const options = labels.map((label, i) => ({
       id: `option-${inputs[i].value}`,
-      content: content(label)
+      content: content2(label)
     }));
     let type;
     if (optionTable) {
@@ -6155,11 +6493,11 @@
     if (values.length !== 1 || !/^[A-Z]+$/u.test(values[0])) return null;
     const codes = [ ...values[0] ];
     if (new Set(codes).size !== codes.length || parsed.node.type !== "multiple" && codes.length !== 1) return null;
-    const answers = codes.map(code => {
+    const answers2 = codes.map(code => {
       var _a;
       return (_a = parsed.node.options.find(o => o.id === `option-${code}`)) == null ? void 0 : _a.content;
     });
-    return answers.every(v => v !== void 0) ? answers : null;
+    return answers2.every(v => v !== void 0) ? answers2 : null;
   }
 
   function registerWencaiHooks(registry, environment) {
@@ -6222,7 +6560,7 @@
                   return false;
                 }
               };
-              const targets = parsed.inputs.length ? parsed.inputs.map((input, i) => core.createDomChoiceBindingTarget({
+              const targets2 = parsed.inputs.length ? parsed.inputs.map((input, i) => core.createDomChoiceBindingTarget({
                 optionId: parsed.node.options[i].id,
                 clickTarget: parsed.labels[i],
                 readTarget: input,
@@ -6236,7 +6574,7 @@
               }));
               environment.capture.registerLeaf(parsed.node, {
                 readCurrentFingerprint: () => live() ? fingerprint : "wencai-page-changed",
-                targets: targets.map(target => ({
+                targets: targets2.map(target => ({
                   ...target,
                   isConnected: () => live() && target.isConnected(),
                   apply: (operation, abort) => live() ? target.apply(operation, abort) : Promise.resolve(false),
@@ -6273,6 +6611,11 @@
   }
 
   const PLATFORM_PRIVATE_HOOKS = Object.freeze({
+    qingshu: Object.freeze({
+      primitiveIds: QINGSHU_HOOK_IDS,
+      registerForVerification: registry => registerQingshuHooks(registry),
+      registerForRuntime: registerQingshuHooks
+    }),
     umu: Object.freeze({
       primitiveIds: UMU_HOOK_IDS,
       registerForVerification: registry => registerUmuHooks(registry),
@@ -6297,7 +6640,7 @@
           typr: typr,
           table: fontTable,
           refs: refs,
-          resolveUeditorBodies: targets => targets,
+          resolveUeditorBodies: targets2 => targets2,
           ...on("registerExamQuestion") ? {
             registerExamQuestion: () => void 0
           } : {},
@@ -6340,7 +6683,7 @@
 
   const RULE_EXPRESSION_SERVICES = createRuleExpressionServices();
 
-  const RULE_ENGINE_VERSION = "1.14.0";
+  const RULE_ENGINE_VERSION = "1.16.0";
 
   const RULE_LIMITS = Object.freeze({
     maxSteps: 5e4,
@@ -6378,6 +6721,11 @@
   const CHA0XING_RULE_POLICY = platformRulePolicy("chaoxing");
 
   const TRUSTED_REMOTE_RULE_PLATFORMS = Object.freeze([ Object.freeze({
+    platform: "qingshu",
+    packageId: "qingshu-degree-homework",
+    hosts: Object.freeze([ "degree.qingshuxuetang.com" ]),
+    policy: platformRulePolicy("qingshu")
+  }), Object.freeze({
     platform: "umu",
     packageId: "umu-learning-quiz",
     hosts: Object.freeze([ "m.umu.cn" ]),
@@ -6424,7 +6772,7 @@
     policy: GENERIC_DOM_RULE_POLICY
   }) ]);
 
-  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|mooc1\.ceduacad\.ahut\.edu\.cn|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn|learning\.wencaischool\.net|m\.umu\.cn)$/u;
+  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|mooc1\.ceduacad\.ahut\.edu\.cn|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn|learning\.wencaischool\.net|m\.umu\.cn|degree\.qingshuxuetang\.com)$/u;
 
   function trustedRemoteRulePlatformFor(hostname) {
     const host = normalizedHost(hostname);
@@ -6509,7 +6857,7 @@
         typr: typr,
         table: table,
         refs: environment.refs,
-        resolveUeditorBodies: targets => resolveUeditorBodies(targets, environment.ctx.document),
+        resolveUeditorBodies: targets2 => resolveUeditorBodies(targets2, environment.ctx.document),
         registerExamQuestion: registration => examRuntime.registerQuestion(registration),
         prepareExamPlan: (plan, signal) => examRuntime.preparePlan(plan, signal),
         commitExamPlan: (plan, signal) => examRuntime.commitPlan(plan, signal)
@@ -6519,7 +6867,7 @@
     }
     async captureTrees(ctx) {
       this.examRuntime.beginCapture();
-      if (ctx.location.pathname === CHA0XING_EXAM_PREVIEW_PATH && !(await core.waitUntil(() => isChaoxingExamPreviewReady(ctx.document, targets => resolveUeditorBodies(targets, ctx.document)), {
+      if (ctx.location.pathname === CHA0XING_EXAM_PREVIEW_PATH && !(await core.waitUntil(() => isChaoxingExamPreviewReady(ctx.document, targets2 => resolveUeditorBodies(targets2, ctx.document)), {
         timeout: 5e3,
         interval: 50,
         signal: ctx.signal
@@ -6543,7 +6891,7 @@
           typr: typr,
           table: table,
           refs: environment.refs,
-          resolveUeditorBodies: targets => resolveUeditorBodies(targets, environment.ctx.document)
+          resolveUeditorBodies: targets2 => resolveUeditorBodies(targets2, environment.ctx.document)
         });
         const which = CHA0XING_PAGE_SAVE_HOOK[packageId];
         if (which) registerChaoxingPageSaveHooks(registry, {
@@ -6594,7 +6942,7 @@
     return location2.protocol === "https:" && location2.hostname === "jxjynew.ahjxjy.cn" && location2.pathname === "/app/jxjy-student-space-web" && /^#\/myCourse\/courseStudy(?:\?|$)/u.test(location2.hash);
   }
 
-  function read$1(documents) {
+  function read$2(documents) {
     var _a, _b;
     for (const doc of documents) {
       if (!doc.defaultView || !isAnhuiCourseStudyUrl(doc.defaultView.location)) continue;
@@ -6730,7 +7078,7 @@
       step(documents, given) {
         var _a, _b, _c;
         options = given;
-        const state = read$1(documents);
+        const state = read$2(documents);
         if (!state) return {
           kind: "blocked",
           reason: "locked"
@@ -6865,7 +7213,7 @@
         };
       },
       survey(documents) {
-        const state = read$1(documents);
+        const state = read$2(documents);
         return state ? {
           authoritative: true,
           declared: 1,
@@ -6885,7 +7233,7 @@
         };
       },
       courseCounter(documents) {
-        const state = read$1(documents);
+        const state = read$2(documents);
         return state ? {
           unfinished: state.resources.filter(r => !done(state, r.cell)).length
         } : null;
@@ -6899,11 +7247,11 @@
         tabs: () => null,
         advanceTab: () => false,
         sectionSignature: documents => {
-          const s = read$1(documents);
+          const s = read$2(documents);
           return s ? key(s.native.courseId, s.native.cellId) : "";
         },
         sectionCursor: documents => {
-          const s = read$1(documents);
+          const s = read$2(documents);
           return s ? {
             courseId: s.native.courseId,
             chapterId: s.native.cellId,
@@ -6913,7 +7261,7 @@
           } : null;
         },
         chapters: documents => {
-          const s = read$1(documents);
+          const s = read$2(documents);
           if (!s) return [];
           const chapters = s.native.designList.map(module => {
             const element = unique(s.doc, ".course-directory .module-name", module.title);
@@ -6932,7 +7280,7 @@
         chapterLabel: c => c.chapterId ?? "",
         advanceSection(documents) {
           var _a;
-          const state = read$1(documents);
+          const state = read$2(documents);
           if (!state || pending || blocked(state.native) || state.native.loading || !done(state, state.current.cell) && ((_a = options.isKindEnabled) == null ? void 0 : _a.call(options, kind(state.current.cell))) !== false) return false;
           const resource = next(state);
           if (!resource || resource.cell.id === state.native.cellId || kind(resource.cell) === "unknown") return false;
@@ -8195,6 +8543,209 @@
     };
   }
 
+  function isQingshuCourseStudyUrl(location2) {
+    const url = new URL(location2.href);
+    return url.origin === "https://degree.qingshuxuetang.com" && url.pathname === "/nnsf/Student/Course/CourseShow" && [ "courseId", "teachPlanId", "periodId" ].every(k => url.searchParams.getAll(k).length === 1 && /^[1-9]\d{0,15}$/u.test(url.searchParams.get(k) ?? "")) && url.searchParams.getAll("nodeId").length === 1 && qingshuNodeId(url.searchParams.get("nodeId"));
+  }
+
+  function read$1(documents) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    for (const doc of documents) {
+      if (!doc.defaultView || !isQingshuCourseStudyUrl(doc.defaultView.location)) continue;
+      const params = new URL(doc.defaultView.location.href).searchParams;
+      const nodeId = params.get("nodeId") ?? "";
+      const video = doc.querySelectorAll("#playerContainer video");
+      const menu = [ ...doc.querySelectorAll('#lessonMenu a[id^="courseware-"]') ];
+      if (video.length !== 1 || menu.length > 500 || menu.filter(x => x.id === `courseware-${nodeId}`).length !== 1 || new Set(menu.map(x => x.id)).size !== menu.length) continue;
+      const page = pageWindowForDocument(doc);
+      if (((_e = (_d = (_c = (_b = (_a = page == null ? void 0 : page.CoursewarePlayer) == null ? void 0 : _a.videoPlayer) == null ? void 0 : _b.player) == null ? void 0 : _c.el) == null ? void 0 : _d.call(_c)) == null ? void 0 : _e.querySelector("video")) !== video[0]) continue;
+      return {
+        doc: doc,
+        nodeId: nodeId,
+        courseId: params.get("courseId"),
+        periodId: params.get("periodId"),
+        video: video[0],
+        menu: menu,
+        page: page,
+        name: ((_g = (_f = doc.querySelector(".learn-title")) == null ? void 0 : _f.textContent) == null ? void 0 : _g.trim()) || nodeId,
+        key: `${params.get("courseId")}/${params.get("periodId")}/${nodeId}`
+      };
+    }
+    return null;
+  }
+
+  function modal(doc) {
+    return [ ...doc.querySelectorAll('.modal,[role="dialog"],.face-detect-container') ].some(e => {
+      var _a, _b;
+      return !e.hidden && e.getAttribute("aria-hidden") !== "true" && ((_a = doc.defaultView) == null ? void 0 : _a.getComputedStyle(e).display) !== "none" && ((_b = doc.defaultView) == null ? void 0 : _b.getComputedStyle(e).visibility) !== "hidden";
+    });
+  }
+
+  function createQingshuCourseAdapter() {
+    let observed = "";
+    let started = 0;
+    let clicked = 0;
+    let endedAt = 0;
+    let advancing = "";
+    const done = s => {
+      const begin = readCapturedSlot("qingshu-study-begin");
+      const end = readCapturedSlot("qingshu-study-end");
+      return s.video.ended && Number.isFinite(s.video.duration) && s.video.duration > 0 && (begin == null ? void 0 : begin.courseId) === s.courseId && begin.periodId === s.periodId && begin.nodeId === s.nodeId && !!begin.recordId && (end == null ? void 0 : end.recordId) === begin.recordId && end.ended === true && end.position >= Math.floor(s.video.duration) - 1;
+    };
+    return {
+      resetRun() {
+        clicked = 0;
+        advancing = "";
+      },
+      step(documents, options) {
+        var _a, _b;
+        const s = read$1(documents);
+        if (!s) return {
+          kind: "blocked",
+          reason: "locked"
+        };
+        if (modal(s.doc)) return {
+          kind: "blocked",
+          reason: "face-recognition"
+        };
+        if (observed !== s.key) {
+          observed = s.key;
+          started = Date.now();
+          clicked = 0;
+          endedAt = 0;
+        }
+        if (done(s)) return {
+          kind: "finished"
+        };
+        if (((_a = options.isKindEnabled) == null ? void 0 : _a.call(options, "media")) === false) return {
+          kind: "all-done",
+          declared: 1
+        };
+        const video = s.video;
+        if (video.error) return {
+          kind: "blocked",
+          reason: "media-error"
+        };
+        if (video.ended) {
+          endedAt || (endedAt = Date.now());
+          return Date.now() - endedAt < 18e4 ? {
+            kind: "starting",
+            name: s.name,
+            taskKey: s.key
+          } : {
+            kind: "blocked",
+            reason: "advance-failed"
+          };
+        }
+        if (!Number.isFinite(video.duration) || video.duration <= 0 || !video.readyState) return Date.now() - started < 2e4 ? {
+          kind: "loading",
+          taskKey: s.key
+        } : {
+          kind: "blocked",
+          reason: "media-error"
+        };
+        if (!video.paused) return {
+          kind: "playing",
+          rate: video.playbackRate
+        };
+        if (clicked) return Date.now() - clicked < 5e3 ? {
+          kind: "starting",
+          name: s.name,
+          taskKey: s.key
+        } : {
+          kind: "blocked",
+          reason: "not-playing"
+        };
+        if (typeof ((_b = s.page.CoursewarePlayer) == null ? void 0 : _b.play) !== "function") return {
+          kind: "blocked",
+          reason: "media-error"
+        };
+        video.playbackRate = 1;
+        video.volume = Math.max(0, Math.min(1, options.volume ?? 0));
+        video.muted = video.volume === 0;
+        try {
+          s.page.CoursewarePlayer.play();
+          clicked = Date.now();
+        } catch {
+          return {
+            kind: "blocked",
+            reason: "media-error"
+          };
+        }
+        return {
+          kind: "starting",
+          name: s.name,
+          taskKey: s.key
+        };
+      },
+      survey(documents) {
+        const s = read$1(documents);
+        return s ? {
+          authoritative: true,
+          declared: 1,
+          tasks: [ {
+            document: s.doc,
+            kind: "media",
+            jobId: s.nodeId,
+            name: s.name,
+            skip: done(s) ? "passed" : null,
+            dwellSeconds: 0,
+            key: s.key
+          } ]
+        } : {
+          authoritative: false,
+          declared: 0,
+          tasks: []
+        };
+      },
+      courseCounter: () => null,
+      simulateReading: () => ({
+        frames: 0,
+        scrolled: 0,
+        pagers: 0
+      }),
+      navigate: {
+        tabs: () => null,
+        advanceTab: () => false,
+        sectionSignature: documents => {
+          var _a;
+          return ((_a = read$1(documents)) == null ? void 0 : _a.key) ?? "";
+        },
+        sectionCursor: documents => {
+          const s = read$1(documents);
+          return s ? {
+            document: s.doc,
+            courseId: s.courseId ?? "",
+            chapterId: s.nodeId,
+            clazzId: "",
+            tabCount: 1
+          } : null;
+        },
+        chapters: () => [],
+        nextUnfinishedChapter: () => null,
+        jumpToChapter: () => false,
+        isSpecialMode: () => false,
+        chapterLabel: () => "",
+        advanceSection(documents) {
+          var _a, _b;
+          const s = read$1(documents);
+          if (!s || advancing === s.key || modal(s.doc) || !done(s)) return false;
+          const index = s.menu.findIndex(e => e.id === `courseware-${s.nodeId}`);
+          const next = s.menu[index + 1];
+          const nodeId = next == null ? void 0 : next.id.slice("courseware-".length);
+          if (!qingshuNodeId(nodeId) || typeof ((_a = s.page.CoursewareNodesManager) == null ? void 0 : _a.onMenuClick) !== "function" || ((_b = next.getAttribute("href")) == null ? void 0 : _b.trim()) !== `javascript: CoursewareNodesManager.onMenuClick('${nodeId}');`) return false;
+          try {
+            s.page.CoursewareNodesManager.onMenuClick(nodeId);
+            advancing = s.key;
+            return true;
+          } catch {
+            return false;
+          }
+        }
+      }
+    };
+  }
+
   const id = value => (typeof value === "string" || typeof value === "number" && Number.isSafeInteger(value)) && /^[1-9]\d{0,15}$/u.test(String(value)) ? String(value) : "";
 
   function isUmuCourseStudyUrl(location2) {
@@ -8252,7 +8803,7 @@
       if (state.initialDone || (receipt == null ? void 0 : receipt.courseId) === state.courseId && receipt.sessionId === state.sessionId && receipt.complete === true) completed.add(state.key);
       return completed.has(state.key);
     };
-    const modal = doc => [ ...doc.querySelectorAll('[role="dialog"],.dialog,.ant-modal-wrap') ].some(e => {
+    const modal2 = doc => [ ...doc.querySelectorAll('[role="dialog"],.dialog,.ant-modal-wrap') ].some(e => {
       var _a, _b;
       return !e.hidden && e.getAttribute("aria-hidden") !== "true" && ((_a = doc.defaultView) == null ? void 0 : _a.getComputedStyle(e).display) !== "none" && ((_b = doc.defaultView) == null ? void 0 : _b.getComputedStyle(e).visibility) !== "hidden";
     });
@@ -8269,7 +8820,7 @@
           kind: "blocked",
           reason: "locked"
         };
-        if (modal(state.doc)) return {
+        if (modal2(state.doc)) return {
           kind: "blocked",
           reason: "face-recognition"
         };
@@ -8392,18 +8943,18 @@
         advanceSection(documents) {
           var _a, _b;
           const s = read(documents);
-          if (!s || modal(s.doc) || !done(s) && ((_a = options.isKindEnabled) == null ? void 0 : _a.call(options, "media")) !== false) return false;
-          const targets = [ ...s.doc.querySelectorAll(".siblings-nav-item.nav-next.active") ].filter(e => {
+          if (!s || modal2(s.doc) || !done(s) && ((_a = options.isKindEnabled) == null ? void 0 : _a.call(options, "media")) !== false) return false;
+          const targets2 = [ ...s.doc.querySelectorAll(".siblings-nav-item.nav-next.active") ].filter(e => {
             var _a2;
             return ((_a2 = e.textContent) == null ? void 0 : _a2.trim()) === "\u4e0b\u4e00\u8282";
           });
           const location2 = (_b = s.doc.defaultView) == null ? void 0 : _b.location;
-          if (targets.length !== 1 || !location2) return false;
+          if (targets2.length !== 1 || !location2) return false;
           const bindings = new core.RuleBindingRegistry({
             maxBindings: 1
           });
           try {
-            core.assertNavClickTarget(targets[0], location2, {
+            core.assertNavClickTarget(targets2[0], location2, {
               bindings: bindings,
               commitEntryText: () => null
             }).click();
@@ -8422,6 +8973,7 @@
     if (platform === "chaoxing") return createChaoxingCourseAdapter();
     if (platform === "anhui") return createAnhuiCourseAdapter();
     if (platform === "umu") return createUmuCourseAdapter();
+    if (platform === "qingshu") return createQingshuCourseAdapter();
     return null;
   }
 
@@ -8429,6 +8981,7 @@
     if (platform === "chaoxing") return isNewCourseStudyUrl(location2);
     if (platform === "anhui") return isAnhuiCourseStudyUrl(location2);
     if (platform === "umu") return isUmuCourseStudyUrl(location2);
+    if (platform === "qingshu") return isQingshuCourseStudyUrl(location2);
     return false;
   }
 
@@ -8628,10 +9181,10 @@
       const doc = view2.document;
       const form = (_a = doc == null ? void 0 : doc.forms) == null ? void 0 : _a.namedItem("form1");
       if (!form) return "form=\u8bfb\u4e0d\u5230";
-      const answers = [ ...form.querySelectorAll('input[name^="answer"]') ];
-      const filled = answers.filter(el => (el.value ?? "").trim() !== "").length;
+      const answers2 = [ ...form.querySelectorAll('input[name^="answer"]') ];
+      const filled = answers2.filter(el => (el.value ?? "").trim() !== "").length;
       const empty = [ ...form.elements ].map(el => el).filter(el => el.name && !String(el.value ?? "").trim()).map(el => el.name).slice(0, 8);
-      return `ans=${filled}/${answers.length} \xb7 \u7a7a[${empty.join(",") || "\u65e0"}]`;
+      return `ans=${filled}/${answers2.length} \xb7 \u7a7a[${empty.join(",") || "\u65e0"}]`;
     } catch {
       return "form=\u8bfb\u4e0d\u5230";
     }
@@ -8742,7 +9295,7 @@
       (_g = state.onConfirmProbe) == null ? void 0 : _g.call(state, `\u786e\u8ba4\u6846\u5df2\u51fa\u73b0 \xb7 ${answeredFieldSummary(frame.win)} \xb7 lock=${readScalar(frame.win, "submitLock")}`);
       await sleep(CONFIRM_SETTLE_MS);
       let clicked = false;
-      for (let attempt2 = 0; attempt2 < CONFIRM_CLICK_ATTEMPTS; attempt2 += 1) {
+      for (let attempt = 0; attempt < CONFIRM_CLICK_ATTEMPTS; attempt += 1) {
         if ((_h = state.isCanceled) == null ? void 0 : _h.call(state)) return "confirm-unverified";
         const button = findConfirmButton(getDocuments());
         if (!button) break;
@@ -9342,16 +9895,16 @@
     if (!state.enabled || ((_a = state.isCanceled) == null ? void 0 : _a.call(state))) return "off";
     if (state.items.length === 0) return "no-items";
     const documents = getDocuments();
-    const paper = documents.find(doc => isHubuExamPaper(doc));
-    if (!paper) return "no-entry";
+    const paper2 = documents.find(doc => isHubuExamPaper(doc));
+    if (!paper2) return "no-entry";
     const paperRound = trust == null ? void 0 : trust.capture(documents);
     const recorded = trust == null ? void 0 : trust.snapshot(documents);
     if (!paperRound || !recorded || !shouldAutoSubmit({
       ...state,
       ...recorded
     })) return "below-threshold";
-    if (!hubuPaperComplete(paper)) return "below-threshold";
-    const entry = hubuSubmitEntry(paper);
+    if (!hubuPaperComplete(paper2)) return "below-threshold";
+    const entry = hubuSubmitEntry(paper2);
     if (!entry) return "no-entry";
     if ((_b = state.isCanceled) == null ? void 0 : _b.call(state)) return "off";
     (_c = state.onEntry) == null ? void 0 : _c.call(state, "click", "");
@@ -9363,7 +9916,7 @@
     }
     const confirm = await pollFor(() => {
       var _a2;
-      return ((_a2 = state.isCanceled) == null ? void 0 : _a2.call(state)) ? "canceled" : hubuSubmitConfirm(paper);
+      return ((_a2 = state.isCanceled) == null ? void 0 : _a2.call(state)) ? "canceled" : hubuSubmitConfirm(paper2);
     }, 8e3);
     if (confirm === "canceled" || ((_e = state.isCanceled) == null ? void 0 : _e.call(state))) return "confirm-unverified";
     if (!confirm) {
@@ -9377,7 +9930,7 @@
     if (!(trust == null ? void 0 : trust.isCurrent(paperRound, currentDocuments)) || !current || !shouldAutoSubmit({
       ...state,
       ...current
-    }) || !hubuPaperComplete(paper)) {
+    }) || !hubuPaperComplete(paper2)) {
       (_i = state.onConfirmProbe) == null ? void 0 : _i.call(state, "\u5377\u9762\u6216\u53ef\u4fe1\u6765\u6e90\u5df2\u53d8\u5316\uff0c\u62d2\u7edd\u786e\u8ba4\u63d0\u4ea4");
       return "below-threshold";
     }
@@ -9497,7 +10050,7 @@
       const context = this.sync(documents);
       if (!context) return null;
       return {
-        items: [ ...this.records.values() ].map(record => record.item),
+        items: [ ...this.records.values() ].map(record2 => record2.item),
         answerableCount: context.total
       };
     }
@@ -9511,9 +10064,9 @@
   function createLogBuffer(max = 200) {
     const entries = [];
     return {
-      add(content, type = "info") {
+      add(content2, type = "info") {
         const last = entries.at(-1);
-        if (last && last.content === content && last.type === type) {
+        if (last && last.content === content2 && last.type === type) {
           last.repeat += 1;
           last.time = formatTime();
           return last;
@@ -9521,7 +10074,7 @@
         const entry = {
           time: formatTime(),
           type: type,
-          content: content,
+          content: content2,
           repeat: 1
         };
         entries.push(entry);
@@ -9869,6 +10422,7 @@
   }
 
   const PLATFORM_LABEL = Object.freeze({
+    qingshu: "\u9752\u4e66\u5b66\u5802",
     umu: "UMU \u4e92\u52a8\u5e73\u53f0",
     anhui: "\u5b89\u5fbd\u7ee7\u7eed\u6559\u80b2\u5728\u7ebf\u65b0\u7248",
     wencai: "\u67e0\u6aac\u6587\u91c7",
@@ -9884,6 +10438,7 @@
   const platformLabelFor = platform => PLATFORM_LABEL[platform] ?? platform;
 
   const PLATFORM_CEILING = Object.freeze({
+    qingshu: Object.freeze([ "answer", "harvest", "course-automation" ]),
     umu: Object.freeze([ "answer", "harvest", "course-automation" ]),
     wencai: Object.freeze([ "answer", "harvest" ]),
     anhui: Object.freeze([ "answer", "harvest", "course-automation" ]),
@@ -11151,14 +11706,14 @@
 
   const esc = value => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-  const contentHtml = content => protocol.parseQuestionContent(content).map(part => part.type === "image" ? `<img src="${esc(part.value)}" alt="\u9898\u76ee\u56fe\u7247" referrerpolicy="no-referrer">` : esc(part.value)).join("");
+  const contentHtml = content2 => protocol.parseQuestionContent(content2).map(part => part.type === "image" ? `<img src="${esc(part.value)}" alt="\u9898\u76ee\u56fe\u7247" referrerpolicy="no-referrer">` : esc(part.value)).join("");
 
   const letter = index => String.fromCharCode(65 + index);
 
   const typeLabel = it => it.unit && core.isTextAnswerType(it.unit.queryType) ? harvestTypeLabel(it.unit.queryType) : TYPE_LABELS[it.q.type];
 
   function buildPageExportHtml(items, meta) {
-    const sections = items.map((it, inx) => {
+    const sections2 = items.map((it, inx) => {
       if (it.status === "decodeFail" || it.status === "unsupported") {
         const reason = it.status === "decodeFail" ? "\u9898\u9762\u89e3\u6790\u5931\u8d25\uff0c\u5df2\u8df3\u8fc7" : "\u9898\u76ee\u65e0\u5408\u6cd5\u6587\u5b57\u6216\u56fe\u7247\uff0c\u5df2\u8df3\u8fc7";
         return `<section class="q"><h3>\u7b2c ${inx + 1} \u9898</h3><p class="mute">\uff08${reason}\uff09</p></section>`;
@@ -11168,7 +11723,7 @@
       const answer = it.answer.length ? `${it.answer.map(contentHtml).join("\uff1b")}${it.aiGenerated ? ' <span class="mute">\uff08AI \u751f\u6210 \xb7 \u5f85\u6838\u5bf9\uff09</span>' : ""}` : '<span class="mute">\u672a\u547d\u4e2d</span>';
       return `<section class="q">\n<h3>\u7b2c ${inx + 1} \u9898 <small>[${typeLabel(it)}]</small></h3>\n<p class="stem">${contentHtml(it.q.stem)}</p>\n${opts ? `<ol class="opts">${opts}</ol>` : ""}\n<p class="ans">\u53c2\u8003\u7b54\u6848\uff1a${answer}</p>\n</section>`;
     }).join("\n");
-    return pageShell("\u672c\u9875\u9898\u76ee\u4e0e\u53c2\u8003\u7b54\u6848", meta, sections);
+    return pageShell("\u672c\u9875\u9898\u76ee\u4e0e\u53c2\u8003\u7b54\u6848", meta, sections2);
   }
 
   const harvestHitIndexes = it => {
@@ -11181,15 +11736,15 @@
   };
 
   function buildHarvestExportHtml(items, meta) {
-    const sections = items.map((it, inx) => {
+    const sections2 = items.map((it, inx) => {
       const matched = harvestHitIndexes(it);
       const opts = (it.options ?? []).map((option, i) => `<li${matched.has(i) ? ' class="hit"' : ""}>${letter(i)}. ${contentHtml(option)}</li>`).join("");
       return `<section class="q">\n<h3>\u7b2c ${inx + 1} \u9898 <small>[${esc(harvestTypeLabel(it.itemType))}]</small></h3>\n<p class="stem">${it.stem ? contentHtml(it.stem) : '<span class="mute">\uff08\u8fd9\u6761\u6ca1\u6709\u9898\u9762\uff09</span>'}</p>\n${opts ? `<ol class="opts">${opts}</ol>` : ""}\n<p class="ans">\u7b54\u6848\uff1a${it.values.map(contentHtml).join("\uff1b")}</p>\n</section>`;
     }).join("\n");
-    return pageShell("\u672c\u9875\u6536\u5f55\u7684\u9898\u76ee\u4e0e\u7b54\u6848", meta, sections);
+    return pageShell("\u672c\u9875\u6536\u5f55\u7684\u9898\u76ee\u4e0e\u7b54\u6848", meta, sections2);
   }
 
-  const pageShell = (heading, meta, sections) => `<!doctype html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<title>\u7231\u95ee\u7b54 \xb7 ${esc(heading)}</title>\n<style>\nbody { max-width: 760px; margin: 24px auto; padding: 0 16px; font: 15px/1.7 system-ui, sans-serif; color: #222; }\n.meta, .mute { color: #888; font-size: 13px; }\n.q { border-bottom: 1px solid #eee; padding: 12px 0; }\n.q h3 { margin: 0 0 6px; font-size: 15px; }\n.opts { list-style: none; padding-left: 8px; margin: 6px 0; }\n.opts .hit { font-weight: 600; }\n.opts .hit::after { content: " \u2713"; }\n.ans { margin: 6px 0 0; }\nimg { max-height: 180px; vertical-align: middle; }\n</style>\n</head>\n<body>\n<h1>${esc(heading)}</h1>\n<p class="meta">${esc(meta.platformLabel)} \xb7 ${esc(meta.exportedAt)}</p>\n${sections}\n<p class="meta">\u7231\u95ee\u7b54 \xb7 \u7b54\u6848\u4ec5\u4f9b\u53c2\u8003\uff0c\u81ea\u884c\u6838\u5bf9\u3002</p>\n</body>\n</html>`;
+  const pageShell = (heading, meta, sections2) => `<!doctype html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n<title>\u7231\u95ee\u7b54 \xb7 ${esc(heading)}</title>\n<style>\nbody { max-width: 760px; margin: 24px auto; padding: 0 16px; font: 15px/1.7 system-ui, sans-serif; color: #222; }\n.meta, .mute { color: #888; font-size: 13px; }\n.q { border-bottom: 1px solid #eee; padding: 12px 0; }\n.q h3 { margin: 0 0 6px; font-size: 15px; }\n.opts { list-style: none; padding-left: 8px; margin: 6px 0; }\n.opts .hit { font-weight: 600; }\n.opts .hit::after { content: " \u2713"; }\n.ans { margin: 6px 0 0; }\nimg { max-height: 180px; vertical-align: middle; }\n</style>\n</head>\n<body>\n<h1>${esc(heading)}</h1>\n<p class="meta">${esc(meta.platformLabel)} \xb7 ${esc(meta.exportedAt)}</p>\n${sections2}\n<p class="meta">\u7231\u95ee\u7b54 \xb7 \u7b54\u6848\u4ec5\u4f9b\u53c2\u8003\uff0c\u81ea\u884c\u6838\u5bf9\u3002</p>\n</body>\n</html>`;
 
   const NONE = {
     kind: "none",
@@ -13472,8 +14027,8 @@
         l: "\u9519\u8bef"
       } ];
       const filteredLogs = vue.computed(() => filterLogs(logs.value, logFilter.value));
-      function pushLog(content, type = "info") {
-        logBuf.add(content, type);
+      function pushLog(content2, type = "info") {
+        logBuf.add(content2, type);
         logs.value = logBuf.list().map(entry => ({
           ...entry
         }));
