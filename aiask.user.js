@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.5.9
+// @version      3.5.10
 // @author       爱问答
 // @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学、广东开放大学、安徽继续教育在线新版、柠檬文采、UMU 互动平台、青书学堂】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
 // @homepage     https://www.aiask.site/
 // @supportURL   https://www.aiask.site/contact.html
+// @match        https://degree.qingshuxuetang.com/*
+// @match        https://m.umu.cn/*
+// @match        *://learning.wencaischool.net/*
+// @match        *://jxjynew.ahjxjy.cn/*
 // @match        *://*.chaoxing.com/*
 // @match        *://mooc1.ceduacad.ahut.edu.cn/*
 // @match        *://xatu.168wangxiao.com/*
@@ -14,20 +18,12 @@
 // @match        *://xuexi.jsou.cn/*
 // @match        *://lms.ouchn.cn/*
 // @match        *://course.ougd.cn/*
-// @match        *://jxjynew.ahjxjy.cn/*
-// @match        *://learning.wencaischool.net/openlearning/exam/portal/*
-// @match        *://learning.wencaischool.net/openlearning/console/*
-// @match        https://m.umu.cn/session/quiz/*
-// @match        https://m.umu.cn/session/video/*
-// @match        https://degree.qingshuxuetang.com/nnsf/Student/ExercisePaper*
-// @match        https://degree.qingshuxuetang.com/nnsf/Student/ViewQuiz*
-// @match        https://degree.qingshuxuetang.com/nnsf/Student/Course/CourseShow*
 // @match        https://www.aiask.site/import.html
 // @match        https://www.aiask.site/import
 // @match        https://www.aiask.site/feedback.html
 // @match        https://www.aiask.site/feedback
 // @require      https://registry.npmmirror.com/vue/3.5.39/files/dist/vue.global.prod.js
-// @require      https://www.aiask.site/engine/aiask-engine-1255dc3dd0510681.js#sha256=1255dc3dd0510681e4a1eab59338ff16b0bba71c8d6af757be8a725ec1b5879b
+// @require      https://www.aiask.site/engine/aiask-engine-61673dab49c5dab0.js#sha256=61673dab49c5dab01a54e3e5c30ce2c5c3339cc4ca99c9a8468c258aa9d866ef
 // @resource     chaoxingFontTable  https://www.aiask.site/assets/chaoxing-font-table.json
 // @connect      www.aiask.site
 // @connect      cx.icodef.com
@@ -38,6 +34,7 @@
 // @grant        GM_deleteValue
 // @grant        GM_getResourceText
 // @grant        GM_getValue
+// @grant        GM_info
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
@@ -151,9 +148,9 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.5.9";
+  const SCRIPT_VERSION = "3.5.10";
 
-  const ENGINE_ID = "1255dc3dd0510681";
+  const ENGINE_ID = "61673dab49c5dab0";
 
   const DEFAULT_ROOT_PUBLIC_JWK = protocol.PRODUCTION_ROOT_PUBLIC_JWK;
 
@@ -5812,6 +5809,72 @@
     [CHA0XING_PACKAGE_IDS.newChapter]: Object.freeze([ "noSubmit" ])
   });
 
+  const MOSOTEACH_HOOK_IDS = Object.freeze([ "mosoteach.applyPlan" ]);
+
+  function registerMosoteachHooks(registry, environment) {
+    core.registerLocalHook(registry, {
+      id: "mosoteach.applyPlan",
+      phases: [ "fill" ],
+      capability: "answer-write",
+      requiresSafetyCapability: true,
+      parseArgs: args => args.safety,
+      validateResult: value => typeof value === "boolean",
+      execute: async (safety, {signal: signal}) => {
+        var _a;
+        if (!environment || signal.aborted) return false;
+        const {document: doc, location: location2} = environment.ctx;
+        if (location2.protocol !== "https:" || location2.hostname !== "www.mosoteach.cn") return false;
+        const plan = core.safetyPlanForCapability(safety);
+        const registry2 = environment.capture.bindings;
+        const wanted = new Set(plan.operations.flatMap(op => op.kind === "choose" ? [ op.optionId ] : []));
+        const binding = registry2.get(plan.path);
+        const view2 = doc.defaultView;
+        if (!binding || !view2 || wanted.size === 0 || wanted.size !== plan.operations.length || ![ ...wanted ].every(id2 => binding.optionIds.includes(id2))) return false;
+        const choices2 = binding.optionIds.map(id2 => {
+          var _a2, _b;
+          return {
+            id: id2,
+            input: (_b = (_a2 = registry2.targetForOperation(plan.path, {
+              kind: "choose",
+              optionId: id2
+            })) == null ? void 0 : _a2.anchor) == null ? void 0 : _b.call(_a2)
+          };
+        });
+        if (!choices2.every(c => c.input instanceof view2.HTMLInputElement && [ "radio", "checkbox" ].includes(c.input.type))) return false;
+        const root = (_a = choices2[0]) == null ? void 0 : _a.input.closest(".pt-10.d-flex.list-item");
+        if (!root) return false;
+        const multiple = choices2.every(c => c.input.type === "checkbox");
+        if (!multiple && (!choices2.every(c => c.input.type === "radio") || wanted.size !== 1)) return false;
+        const current = () => {
+          const next = registry2.get(plan.path);
+          const inputs = [ ...root.querySelectorAll('input[type="radio"],input[type="checkbox"]') ];
+          return !signal.aborted && (next == null ? void 0 : next.connected) && next.currentFingerprint === plan.fingerprint && next.capturedFingerprint === plan.fingerprint && inputs.length === choices2.length && choices2.every((c, i) => c.input === inputs[i] && c.input.isConnected && !c.input.disabled);
+        };
+        if (!current()) return false;
+        const before = choices2.map(c => c.input.checked);
+        let success = false;
+        try {
+          if (multiple) for (const choice of choices2) {
+            if (!current()) return false;
+            if (choice.input.checked && !wanted.has(choice.id)) choice.input.click();
+          }
+          if (!current() || !(await environment.writer.applyPlan(plan, signal)) || !(await core.waitUntil(() => !current() || choices2.every(c => c.input.checked === wanted.has(c.id)), {
+            timeout: 400,
+            interval: 20,
+            signal: signal
+          })) || !current() || !(await environment.writer.verifyPlan(plan, signal))) return false;
+          success = !!current() && choices2.every(c => c.input.checked === wanted.has(c.id));
+          return success;
+        } finally {
+          if (!success && current()) for (const [i, choice] of choices2.entries()) {
+            if (!current()) break;
+            if (choice.input.checked !== before[i] && (multiple || before[i])) choice.input.click();
+          }
+        }
+      }
+    });
+  }
+
   const QINGSHU_HOOK_IDS = [ "qingshu.ready", "qingshu.capture", "qingshu.harvest", "qingshu.applyPlan" ];
 
   const id$2 = v => typeof v === "string" && /^[a-f0-9]{24}$/u.test(v);
@@ -6097,10 +6160,14 @@
     });
   }
 
+  function isUmuQuizUrl(location2, review2) {
+    return location2.protocol === "https:" && location2.hostname === "m.umu.cn" && (review2 ? location2.pathname === "/session/quiz/result" : /^\/session\/quiz\/(?!result\/?$)[\w-]+\/?$/u.test(location2.pathname));
+  }
+
   function attemptRoot(document2) {
     var _a;
     const location2 = (_a = document2.defaultView) == null ? void 0 : _a.location;
-    if ((location2 == null ? void 0 : location2.protocol) !== "https:" || location2.hostname !== "m.umu.cn" || !/^\/session\/quiz\/(?!result\/?$)[\w-]+\/?$/u.test(location2.pathname)) return null;
+    if (!location2 || !isUmuQuizUrl(location2, false)) return null;
     const roots2 = document2.querySelectorAll(".card-quiz, .single-quiz");
     if (roots2.length !== 1) return null;
     const root = roots2[0];
@@ -6109,8 +6176,7 @@
   }
 
   function review(document2) {
-    var _a;
-    return ((_a = document2.defaultView) == null ? void 0 : _a.location.hostname) === "m.umu.cn" && document2.defaultView.location.pathname === "/session/quiz/result" && document2.querySelectorAll(".section-item.show-result").length > 0;
+    return !!document2.defaultView && isUmuQuizUrl(document2.defaultView.location, true) && document2.querySelectorAll(".section-item.show-result").length > 0;
   }
 
   function choices(document2, node) {
@@ -6352,7 +6418,7 @@
 
   const JUDGE_FALSE = /^(?:\u9519|\u9519\u8bef|\u5426|\xd7|false|F)$/iu;
 
-  function workLocation(location2, review2) {
+  function isWencaiHomeworkUrl(location2, review2) {
     const url = new URL(location2.href);
     return url.origin === "https://learning.wencaischool.net" && url.pathname === `/openlearning/exam/portal/${review2 ? "view_answer" : "exam"}.jsp` && url.searchParams.getAll("type").length >= 1 && url.searchParams.getAll("type").length <= 2 && url.searchParams.getAll("type").every(value => value === "work");
   }
@@ -6379,7 +6445,7 @@
       try {
         const location2 = (_a = current.document.defaultView) == null ? void 0 : _a.location;
         if (!location2 || location2.hostname !== "learning.wencaischool.net") continue;
-        if (workLocation(location2, review2) && roots(current.document, review2).length) {
+        if (isWencaiHomeworkUrl(location2, review2) && roots(current.document, review2).length) {
           if (found) return null;
           found = current.document;
         }
@@ -6551,7 +6617,7 @@
               const identities = controls.map(i => [ i.id, i.name, i.type, i.getAttribute("value") ]);
               const live = () => {
                 try {
-                  if (signal.aborted || paperDocument(environment.ctx.document, false, signal) !== document2 || !workLocation(location2, false)) return false;
+                  if (signal.aborted || paperDocument(environment.ctx.document, false, signal) !== document2 || !isWencaiHomeworkUrl(location2, false)) return false;
                   const currentRoots = roots(document2, false);
                   if (currentRoots.length !== original.length || currentRoots.some((e, i) => e !== original[i])) return false;
                   const current = parse(root, index, false, signal);
@@ -6611,6 +6677,11 @@
   }
 
   const PLATFORM_PRIVATE_HOOKS = Object.freeze({
+    mosoteach: Object.freeze({
+      primitiveIds: MOSOTEACH_HOOK_IDS,
+      registerForVerification: registry => registerMosoteachHooks(registry),
+      registerForRuntime: registerMosoteachHooks
+    }),
     qingshu: Object.freeze({
       primitiveIds: QINGSHU_HOOK_IDS,
       registerForVerification: registry => registerQingshuHooks(registry),
@@ -6683,7 +6754,7 @@
 
   const RULE_EXPRESSION_SERVICES = createRuleExpressionServices();
 
-  const RULE_ENGINE_VERSION = "1.16.0";
+  const RULE_ENGINE_VERSION = "1.17.0";
 
   const RULE_LIMITS = Object.freeze({
     maxSteps: 5e4,
@@ -6721,6 +6792,11 @@
   const CHA0XING_RULE_POLICY = platformRulePolicy("chaoxing");
 
   const TRUSTED_REMOTE_RULE_PLATFORMS = Object.freeze([ Object.freeze({
+    platform: "mosoteach",
+    packageId: "mosoteach-quiz",
+    hosts: Object.freeze([ "www.mosoteach.cn" ]),
+    policy: platformRulePolicy("mosoteach")
+  }), Object.freeze({
     platform: "qingshu",
     packageId: "qingshu-degree-homework",
     hosts: Object.freeze([ "degree.qingshuxuetang.com" ]),
@@ -6772,7 +6848,7 @@
     policy: GENERIC_DOM_RULE_POLICY
   }) ]);
 
-  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|mooc1\.ceduacad\.ahut\.edu\.cn|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn|learning\.wencaischool\.net|m\.umu\.cn|degree\.qingshuxuetang\.com)$/u;
+  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|mooc1\.ceduacad\.ahut\.edu\.cn|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn|learning\.wencaischool\.net|m\.umu\.cn|degree\.qingshuxuetang\.com|www\.mosoteach\.cn)$/u;
 
   function trustedRemoteRulePlatformFor(hostname) {
     const host = normalizedHost(hostname);
@@ -7364,7 +7440,6 @@
     playerError: ".vjs-modal-dialog-content",
     playerErrorTexts: Object.freeze([ "\u89c6\u9891\u6587\u4ef6\u635f\u574f", "\u7f51\u7edc\u9519\u8bef\u5bfc\u81f4\u89c6\u9891\u4e0b\u8f7d\u4e2d\u9014\u5931\u8d25", "\u89c6\u9891\u56e0\u683c\u5f0f\u4e0d\u652f\u6301", "\u7f51\u7edc\u7684\u95ee\u9898\u65e0\u6cd5\u52a0\u8f7d" ]),
     taskDoneText: "\u4efb\u52a1\u70b9\u5df2\u5b8c\u6210",
-    chapterTestAnswerable: '.TiMu input[name^="answertype"]',
     chapterTestStatus: ".testTit_status",
     chapterTestDoneClass: "testTit_status_complete",
     chapterTestDoneText: "\u5df2\u5b8c\u6210",
@@ -7393,7 +7468,6 @@
     "course.gate.videoQuiz": "videoQuiz",
     "course.gate.playerError": "playerError",
     "course.marker.taskDone": "taskDoneText",
-    "course.probe.chapterTestAnswerable": "chapterTestAnswerable",
     "course.marker.chapterTestStatus": "chapterTestStatus",
     "course.marker.chapterTestDoneClass": "chapterTestDoneClass",
     "course.marker.chapterTestDoneText": "chapterTestDoneText",
@@ -7482,6 +7556,46 @@
   function applyCourseConfig(remote, probe2) {
     active = resolveCourseConfig(remote, probe2);
     return active;
+  }
+
+  const DEFAULT_SELECTOR = '.TiMu input[name^="answertype"]';
+
+  const SELECTOR_KEY = "course.probe.chapterTestAnswerable";
+
+  function createPaperAnswerability(readRule, probe2 = globalThis.document) {
+    let active2 = DEFAULT_SELECTOR;
+    let source = null;
+    const selector = () => {
+      const {platform: platform, selectors: selectors, version: version} = readRule();
+      if (platform !== "chaoxing" && !selectors) return active2;
+      const nextSource = selectors ? version ?? "remote" : "built-in";
+      if (source === nextSource) return active2;
+      source = nextSource;
+      active2 = DEFAULT_SELECTOR;
+      if (!selectors || typeof selectors !== "object" || !probe2) return active2;
+      const value = selectors[SELECTOR_KEY];
+      if (typeof value !== "string" || !value.trim()) return active2;
+      try {
+        probe2.createDocumentFragment().querySelector(value);
+        active2 = value;
+      } catch {}
+      return active2;
+    };
+    return {
+      count(documents) {
+        const current = selector();
+        let total = 0;
+        for (const document2 of documents) {
+          try {
+            total += document2.querySelectorAll(current).length;
+          } catch {}
+        }
+        return total > 0 ? total : void 0;
+      },
+      has(document2) {
+        return document2.querySelector(selector()) !== null;
+      }
+    };
   }
 
   function activeMedia(documents) {
@@ -8244,6 +8358,10 @@
     }
   }
 
+  const DEFAULT_PAPER = createPaperAnswerability(() => ({
+    platform: "chaoxing"
+  }));
+
   const MAX_PLAYBACK_RATE = 2;
 
   const hasFaceRecognition = doc => {
@@ -8297,7 +8415,7 @@
     };
   }
 
-  function stepSurveyedTask(survey, documents, options) {
+  function stepSurveyedTask(survey, documents, options, paper2) {
     const handled = options.isHandled ?? (() => false);
     const kindEnabled = options.isKindEnabled ?? (() => true);
     const unfinished = survey.tasks.filter(task2 => isPendingTask(task2) && kindEnabled(task2.kind));
@@ -8336,7 +8454,7 @@
         kind: "answering",
         name: task.name,
         taskKey: task.key,
-        frameLoaded: !!task.document.querySelector(courseConfig().chapterTestAnswerable)
+        frameLoaded: paper2.has(task.document)
       };
 
      case "hyperlink":
@@ -8376,7 +8494,7 @@
     }
   }
 
-  function stepMediaTask(documents, options) {
+  function stepMediaTask(documents, options, paper2 = DEFAULT_PAPER) {
     for (const doc of documents) {
       if (hasFaceRecognition(doc)) return {
         kind: "blocked",
@@ -8392,7 +8510,7 @@
       };
     }
     const survey = surveyTasks(documents);
-    if (survey.authoritative) return stepSurveyedTask(survey, documents, options);
+    if (survey.authoritative) return stepSurveyedTask(survey, documents, options, paper2);
     const media = playableMediaList(documents);
     const markerDone = documents.slice(1).some(taskAlreadyDone);
     if (markerDone && media.length <= 1) return {
@@ -8522,9 +8640,9 @@
     };
   }
 
-  function createChaoxingCourseAdapter() {
+  function createChaoxingCourseAdapter(paper2) {
     return {
-      step: stepMediaTask,
+      step: (documents, options) => stepMediaTask(documents, options, paper2),
       survey: surveyTasks,
       courseCounter: courseCounter,
       simulateReading: simulateReading,
@@ -8969,8 +9087,8 @@
     };
   }
 
-  function courseAdapterFor(platform) {
-    if (platform === "chaoxing") return createChaoxingCourseAdapter();
+  function courseAdapterFor(platform, paper2) {
+    if (platform === "chaoxing") return createChaoxingCourseAdapter(paper2);
     if (platform === "anhui") return createAnhuiCourseAdapter();
     if (platform === "umu") return createUmuCourseAdapter();
     if (platform === "qingshu") return createQingshuCourseAdapter();
@@ -10422,10 +10540,11 @@
   }
 
   const PLATFORM_LABEL = Object.freeze({
+    mosoteach: "\u4e91\u73ed\u8bfe",
     qingshu: "\u9752\u4e66\u5b66\u5802",
     umu: "UMU \u4e92\u52a8\u5e73\u53f0",
-    anhui: "\u5b89\u5fbd\u7ee7\u7eed\u6559\u80b2\u5728\u7ebf\u65b0\u7248",
     wencai: "\u67e0\u6aac\u6587\u91c7",
+    anhui: "\u5b89\u5fbd\u7ee7\u7eed\u6559\u80b2\u5728\u7ebf\u65b0\u7248",
     chaoxing: "\u8d85\u661f",
     wangxiao: "168 \u7f51\u6821",
     aopeng: "\u5965\u9e4f\u6559\u80b2",
@@ -10435,9 +10554,8 @@
     ougd: "\u5e7f\u4e1c\u5f00\u653e\u5927\u5b66"
   });
 
-  const platformLabelFor = platform => PLATFORM_LABEL[platform] ?? platform;
-
   const PLATFORM_CEILING = Object.freeze({
+    mosoteach: Object.freeze([ "answer" ]),
     qingshu: Object.freeze([ "answer", "harvest", "course-automation" ]),
     umu: Object.freeze([ "answer", "harvest", "course-automation" ]),
     wencai: Object.freeze([ "answer", "harvest" ]),
@@ -10450,6 +10568,8 @@
     guokai: Object.freeze([ "answer", "harvest" ]),
     ougd: Object.freeze([ "answer", "harvest" ])
   });
+
+  const platformLabelFor = platform => PLATFORM_LABEL[platform] ?? platform;
 
   const FALLBACK_FEATURES = Object.freeze([ "answer", "harvest" ]);
 
@@ -11431,6 +11551,43 @@
       reachable: reached.length
     };
   }
+
+  function channelOf(value) {
+    var _a;
+    if (value.length > 2048) return "unknown";
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:" || url.username || url.password || url.port) return "unknown";
+      if (url.hostname === "scriptcat.org") return "scriptcat";
+      if ([ "greasyfork.org", "update.greasyfork.org" ].includes(url.hostname)) return "greasyfork";
+      const distRepo = (_a = FALLBACK_SOURCES.find(source => source.channel === "dist")) == null ? void 0 : _a.id;
+      if (distRepo && [ "github.com", "raw.githubusercontent.com" ].includes(url.hostname) && url.pathname.toLowerCase().startsWith(`/${distRepo.toLowerCase()}/`)) return "dist";
+    } catch {}
+    return "unknown";
+  }
+
+  function agree(urls) {
+    const channels = urls.map(channelOf);
+    return channels.every(channel => channel === channels[0]) ? channels[0] ?? "unknown" : "unknown";
+  }
+
+  function detectCurrentUpdateChannel(info) {
+    var _a, _b, _c;
+    if (!info) return "unknown";
+    const updates = [ info.scriptUpdateURL, (_a = info.script) == null ? void 0 : _a.updateURL ].filter(url => typeof url === "string" && url.trim() !== "");
+    if (updates.length) return agree(updates);
+    const meta = info.scriptMetaStr ?? "";
+    if (meta.length > 32768) return "unknown";
+    const block = ((_b = /\/\/\s*==UserScript==([\s\S]*?)\/\/\s*==\/UserScript==/u.exec(meta)) == null ? void 0 : _b[1]) ?? "";
+    for (const key of [ "updateURL", "downloadURL" ]) {
+      const urls = [ ...block.matchAll(new RegExp(`^[^\\S\\n]*//[^\\S\\n]*@${key}[^\\S\\n]+(\\S+)[^\\S\\n]*$`, "gmu")) ].map(match => match[1]);
+      if (key === "downloadURL" && ((_c = info.script) == null ? void 0 : _c.downloadURL)) urls.push(info.script.downloadURL);
+      if (urls.length) return agree(urls);
+    }
+    return "unknown";
+  }
+
+  const getCurrentUpdateChannel = () => detectCurrentUpdateChannel(typeof GM_info === "undefined" ? void 0 : GM_info);
 
   const _hoisted_1$1 = {
     class: "question-content"
@@ -13189,7 +13346,8 @@
           clientId: getClientId(),
           platform: platform.value,
           scriptVersion: SCRIPT_VERSION,
-          engineVersion: RULE_ENGINE_VERSION
+          engineVersion: RULE_ENGINE_VERSION,
+          updateChannel: getCurrentUpdateChannel()
         })
       });
       function trackUsage(event) {
@@ -13217,16 +13375,6 @@
         "site-locked": "\u7ad9\u70b9\u8fd9\u4efd\u5377\u5b50\u5df2\u5728\u63d0\u4ea4\u4e2d\u6216\u5df2\u4ea4\u8fc7 \xb7 \u5237\u65b0\u9875\u9762\u540e\u53ef\u518d\u4ea4",
         "no-page-window": "\u8fd9\u4e00\u523b\u8bfb\u4e0d\u5230\u7b54\u9898\u5e27\uff08\u591a\u534a\u6b63\u5728\u91cd\u8f7d\uff09\xb7 \u4e0b\u4e00\u8f6e\u518d\u8bd5"
       };
-      function countAnswerable() {
-        const selector = courseConfig().chapterTestAnswerable;
-        let total = 0;
-        for (const doc of readableDocuments(document)) {
-          try {
-            total += doc.querySelectorAll(selector).length;
-          } catch {}
-        }
-        return total > 0 ? total : void 0;
-      }
       const submitOutcome = vue.ref(null);
       const submitNote = vue.computed(() => {
         const outcome = submitOutcome.value;
@@ -14110,7 +14258,15 @@
       let adapter = null;
       let createAdapter = null;
       const platform = vue.ref(((_a = trustedRemoteRulePlatformFor(location.hostname)) == null ? void 0 : _a.platform) ?? "chaoxing");
-      const courseAdapter = courseAdapterFor(platform.value);
+      const paperAnswerability = createPaperAnswerability(() => {
+        var _a2, _b, _c;
+        return {
+          platform: platform.value,
+          selectors: (_b = (_a2 = resolvedRulePackage(adapter)) == null ? void 0 : _a2.shellConfig) == null ? void 0 : _b.selectors,
+          version: (_c = ruleDiag.value) == null ? void 0 : _c.version
+        };
+      }, document);
+      const courseAdapter = courseAdapterFor(platform.value, paperAnswerability);
       let loaded = false;
       let harvestSettledAt = 0;
       let harvestSignature = "";
@@ -14558,7 +14714,7 @@
         if ((hubuRound == null ? void 0 : hubuRound.session) === active2) hubuTrust.record(hubuRound.round, submitDocs(), active2.list);
         const wholePaper = onHubuPaper ? hubuTrust.snapshot(submitDocs()) : null;
         const submitItems = onHubuPaper ? (wholePaper == null ? void 0 : wholePaper.items) ?? [] : active2.list;
-        const answerableCount = onHubuPaper ? wholePaper == null ? void 0 : wholePaper.answerableCount : countAnswerable();
+        const answerableCount = onHubuPaper ? wholePaper == null ? void 0 : wholePaper.answerableCount : paperAnswerability.count(readableDocuments(document));
         const ratio = Math.round(trustedRatio(submitItems, answerableCount, settings.ai.countTowardSubmit) * 100);
         let outcome;
         const submitRound = onHubuPaper ? (docs, state) => hubuAutoSubmitRound(docs, state, hubuTrust) : autoSubmitRound;
@@ -16106,7 +16262,7 @@
   const PANEL_STYLE = `\n:host, .aiask-root {\n  --acc: #1e478f;\n  --acc-tint: color-mix(in srgb, var(--acc) 9%, #fff);\n  --ink: #171a21; --body: #4b5059; --mute: #8b909b;\n  --line: #e6e8ec; --line-strong: #aab0ba;\n  --canvas: #fff; --soft: #f6f7f9;\n  --err: #c8322f;\n  --mono: "JetBrains Mono","IBM Plex Mono","Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;\n  --sans: "Inter","Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;\n  --zhu: #c7391b;\n  --serif: "Songti SC","Noto Serif SC","SimSun",serif;\n  font-family: var(--sans);\n  font-feature-settings: "ss01","ss02","cv01","tnum";\n  font-variant-numeric: tabular-nums;\n  color: var(--ink); -webkit-font-smoothing: antialiased;\n  \n  overflow-wrap: anywhere;\n}\n.aiask-root * { box-sizing: border-box; }\n\n\n.bubble { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; display: flex; align-items: center; gap: 8px; cursor: move; user-select: none; touch-action: none; }\n.tip { background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; color: var(--body); font: 12px/1.3 var(--mono); box-shadow: 0 1px 2px rgba(23,26,33,.05); }\n.launcher { appearance: none; position: relative; width: 44px; height: 44px; border: 0; background: transparent; cursor: move; padding: 0; display: flex; align-items: center; justify-content: center; box-shadow: none; }\n.badge { position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--acc); color: #fff; font: 11px/18px var(--mono); text-align: center; border: 2px solid var(--canvas); box-sizing: border-box; }\n\n\n.seal { background: var(--zhu); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; flex: 0 0 auto; box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); }\n.seal.s44 { width: 44px; height: 44px; border-radius: 8px; font-size: 26px; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.55), 0 2px 6px rgba(23,26,33,.18); }\n.seal.s28 { width: 28px; height: 28px; border-radius: 5px; font-size: 17px; }\n.seal.s22 { width: 22px; height: 22px; border-radius: 4px; font-size: 14px; }\n\n\n.luokuan { font-family: var(--serif); color: var(--zhu); font-size: 11px; letter-spacing: 1px; }\n\n\n.standby-title { font-family: var(--serif); font-size: 17px; letter-spacing: 6px; color: var(--ink); }\n.standby { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 0 10px; text-align: center; }\n\n\n.done-seal { position: absolute; right: 10px; top: 9px; width: 48px; height: 48px; border-radius: 9px; background: var(--zhu); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--serif); font-weight: 700; font-size: 28px; opacity: .92; box-shadow: inset 0 0 0 2px rgba(255,255,255,.5), 0 1px 3px rgba(199,57,27,.3); animation: seal-drop .18s cubic-bezier(.22,1,.36,1) both; }\n@keyframes seal-drop {\n  from { transform: scale(1.15) rotate(0deg); opacity: 0; }\n  to { transform: scale(1) rotate(-4deg); opacity: .92; }\n}\n@media (prefers-reduced-motion: reduce) {\n  .done-seal { animation: none; transform: rotate(-4deg); }\n}\n\n\n.panel { position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; width: min(340px, calc(100vw - 32px)); background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 1px rgba(23,26,33,.03), 0 6px 14px -4px rgba(23,26,33,.05), 0 20px 30px -12px rgba(23,26,33,.10); }\n\n\n.head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); cursor: move; user-select: none; touch-action: none; }\n.name { font-size: 13.5px; font-weight: 600; letter-spacing: -0.3px; white-space: nowrap; }\n.spacer { flex: 1; }\n.chip { font: 12px/1.3 var(--sans); color: var(--body); background: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }\n.chip.mono { font-family: var(--mono); }\n.x { border: 1px solid transparent; background: none; cursor: pointer; color: var(--mute); width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 0; }\n.x:hover { background: var(--soft); color: var(--ink); }\n\n\n.ava { width: 24px; height: 24px; border-radius: 5px; background: var(--ink); color: #fff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; border: none; padding: 0; cursor: pointer; flex: 0 0 auto; font-family: var(--sans); }\n.ava.out { background: var(--canvas); color: var(--mute); border: 1px dashed var(--line-strong); font-weight: 400; }\n.ava.lg { width: 32px; height: 32px; border-radius: 6px; font-size: 15px; }\n\n\n.scrim { position: absolute; inset: 0; z-index: 8; background: rgba(23,26,33,.10); }\n.pop { position: absolute; top: 40px; right: 10px; width: 262px; z-index: 9; background: var(--canvas); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 1px 2px rgba(23,26,33,.04), 0 10px 20px -6px rgba(23,26,33,.14); }\n.sep-top { border-top: 1px solid var(--line); padding-top: 9px; }\n\n\n.tabbar { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }\n.tab { appearance: none; border: none; background: none; cursor: pointer; padding: 8px 10px; font-size: 13px; letter-spacing: -0.2px; color: var(--body); border-bottom: 2px solid transparent; margin-bottom: -1px; }\n.tab.active { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }\n\n\n.subbar { display: flex; gap: 4px; padding: 8px 12px 0; flex: 0 0 auto; }\n.seg { appearance: none; border: 1px solid var(--line); background: var(--canvas); color: var(--body); cursor: pointer; padding: 4px 10px; font-size: 12px; border-radius: 6px; font-family: var(--sans); line-height: 1.3; }\n.seg.active { background: var(--ink); color: #fff; border-color: var(--ink); }\n.seg:hover:not(.active) { background: var(--soft); }\n\n\n.home-user { display: flex; align-items: center; gap: 8px; }\n.home-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }\n\n\n.log-filter { display: flex; flex-wrap: wrap; gap: 4px; }\n.log-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }\n.log-row { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; line-height: 1.4; padding: 4px 0; border-bottom: 1px solid var(--line); }\n.log-row:last-child { border-bottom: none; }\n.log-time { color: var(--mute); flex: 0 0 auto; }\n.log-repeat { color: var(--muted); }\n.log-msg { color: var(--body); flex: 1; min-width: 0; word-break: break-word; }\n.log-row.log-warning .log-msg { color: var(--body); }\n.log-row.log-error .log-msg { color: var(--err); }\n\n\n.rule-meta { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }\n.rule-row { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); font: 11.5px/1.45 var(--mono); }\n.rule-row:last-child { border-bottom: none; }\n.rule-key { color: var(--mute); }\n.rule-value { color: var(--body); overflow-wrap: anywhere; }\n\n\n.body { padding: 12px; display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; max-height: min(520px, calc(100vh - 200px)); overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }\n.body::-webkit-scrollbar { width: 6px; }\n.body::-webkit-scrollbar-track { background: transparent; }\n.body::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; }\n.grp { display: flex; flex-direction: column; gap: 8px; }\n.sep { border-top: 1px solid var(--line); }\n\n.gh2 { font: 11px/1.4 var(--mono); color: var(--mute); letter-spacing: .3px; }\n\n.statcard { border: 1px solid var(--line); border-radius: 6px; padding: 11px; display: flex; flex-direction: column; gap: 8px; }\n.statgrid { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; font-size: 12px; align-items: baseline; margin: 0; }\n.statgrid dt { color: var(--mute); }\n.statgrid dd { margin: 0; font-family: var(--mono); }\n\n\n.actbar { flex: 0 0 auto; border-top: 1px solid var(--line); background: var(--canvas); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }\n\n.actbar-foot { display: flex; align-items: center; justify-content: space-between; padding-right: 14px; }\n\n\n.grip { position: absolute; right: 2px; bottom: 2px; width: 16px; height: 16px; padding: 0; border: none; background: none; color: var(--line-strong); cursor: nwse-resize; touch-action: none; display: flex; align-items: center; justify-content: center; }\n.grip:hover { color: var(--mute); }\n.grip svg { width: 12px; height: 12px; display: block; }\n\n\n.fold { display: flex; align-items: center; gap: 6px; cursor: pointer; font: 12px/1.4 var(--mono); color: var(--mute); padding: 4px 6px; margin: 0 -6px; border-radius: 6px; background: none; border: none; text-align: left; width: calc(100% + 12px); }\n.fold:hover { background: var(--soft); }\n.fold .chev { margin-left: auto; color: var(--mute); transition: transform .15s ease; }\n.fold .chev.right { transform: rotate(-90deg); }\n\n\n.card { min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--canvas); }\n\n\n.gate-h { font-size: 16px; font-weight: 600; letter-spacing: -0.4px; color: var(--ink); }\n.ctitle { font-size: 13.5px; font-weight: 600; letter-spacing: -0.2px; color: var(--ink); }\n.stem { min-width: 0; font-size: 15px; font-weight: 500; letter-spacing: -0.25px; line-height: 1.45; color: var(--ink); word-break: auto-phrase; text-wrap: pretty; }\n.question-content { max-width: 100%; white-space: pre-wrap; overflow-wrap: anywhere; }\n.question-content img { display: inline-block; max-width: 100%; height: auto; object-fit: contain; vertical-align: middle; }\n.image-failed { color: var(--err); font-size: 12px; }\n.lbl { font-size: 13.5px; font-weight: 500; letter-spacing: -0.2px; }\n.locator { font-size: 12px; color: var(--body); letter-spacing: -0.1px; }\n.cap-mute { font-size: 12px; color: var(--mute); line-height: 1.45; }\n.mono { font-family: var(--mono); }\n\n\n.skip summary { cursor: pointer; list-style: none; }\n.skip summary::-webkit-details-marker { display: none; }\n.skip summary::before { content: '\u25b8 '; }\n.skip[open] summary::before { content: '\u25be '; }\n.skip div { padding-left: 12px; }\n\n\n.ic { width: 14px; height: 14px; display: block; color: currentColor; flex: 0 0 auto; }\n.ic.sm { width: 12px; height: 12px; }\n\n\n.btn { appearance: none; border: 1px solid var(--ink); background: var(--ink); color: #fff; border-radius: 6px; height: 32px; padding: 0 12px; font-size: 13.5px; font-weight: 500; letter-spacing: -0.2px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1; font-family: var(--sans); flex-shrink: 0; text-decoration: none; }\n.btn:hover { background: #0f1218; border-color: #0f1218; }\n.btn:disabled { opacity: .5; cursor: not-allowed; }\n.btn.ghost { background: var(--canvas); color: var(--ink); border-color: var(--line); }\n.btn.ghost:hover:not(:disabled) { background: var(--soft); border-color: var(--line-strong); }\n.btn.ghost.sub { color: var(--body); }\n.btn.danger { background: var(--canvas); color: var(--err); border-color: color-mix(in srgb, var(--err) 28%, #fff); }\n.btn.danger:hover { background: color-mix(in srgb, var(--err) 6%, #fff); }\n.btn.sm { height: 28px; padding: 0 8px; font-size: 12px; }\n.btn.block { width: 100%; }\n\n\n.in { width: 100%; height: 36px; padding: 0 12px; font-family: var(--sans); border: 1px solid var(--line); border-radius: 6px; font-size: 13.5px; letter-spacing: -0.2px; color: var(--ink); background: var(--canvas); }\n.in::placeholder { color: var(--mute); }\n.in:focus { outline: 2px solid var(--acc); outline-offset: 0; border-color: var(--acc); }\n\n\n.sel { flex: 1; height: 36px; padding: 0 8px; font-family: var(--sans); border: 1px solid var(--line); border-radius: 6px; font-size: 13.5px; color: var(--ink); background: var(--canvas); }\n.sel:focus { outline: 2px solid var(--acc); outline-offset: 0; border-color: var(--acc); }\n\n\n.captcha-cover { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 12px; background: color-mix(in srgb, var(--canvas) 94%, transparent); }\n.captcha-card { width: 100%; padding: 12px; display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); box-shadow: 0 1px 1px rgba(23,26,33,.03), 0 8px 16px -4px rgba(23,26,33,.08); }\n.captcha-frame { display: block; width: 100%; height: 150px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); }\n\n\n.prev { border: 1px solid var(--line-strong); border-radius: 6px; background: var(--soft); padding: 9px 10px; display: flex; flex-direction: column; gap: 5px; }\n.prow { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }\n.prow .k { color: var(--mute); min-width: 56px; flex: 0 0 auto; }\n.prow b { font-family: var(--mono); font-weight: 600; }\n.done { position: relative; display: flex; flex-direction: column; gap: 8px; }\n\n\n.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }\n\n\n.prog { display: flex; align-items: center; gap: 8px; }\n.prog .stat { font-size: 12px; color: var(--body); white-space: nowrap; }\n.prog .stat b { font-family: var(--mono); font-weight: 400; color: var(--ink); }\n.ticks { flex: 1; display: flex; gap: 2px; height: 6px; }\n.ticks i { flex: 1; border-radius: 1px; background: var(--line); }\n.ticks i.on { background: var(--ink); }\n\n\n.switch-row { display: flex; align-items: center; gap: 8px; }\n.switch { width: 32px; height: 20px; border-radius: 999px; background: var(--ink); position: relative; flex: 0 0 auto; border: none; cursor: pointer; padding: 0; }\n.switch.off { background: var(--line-strong); }\n.switch > i { position: absolute; top: 2px; left: 14px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 1px rgba(23,26,33,.2); transition: left .15s ease; }\n.switch.off > i { left: 2px; }\n\n\n.tag { display: inline-flex; align-items: center; font-size: 12px; padding: 2px 8px; border-radius: 6px; line-height: 1.4; white-space: nowrap; }\n.tag.acc { background: var(--acc-tint); color: var(--acc); border: 1px solid color-mix(in srgb, var(--acc) 22%, #fff); font-family: var(--mono); }\n.tag.neutral { background: var(--soft); color: var(--body); border: 1px solid var(--line); }\n\n\n.banner { display: flex; align-items: center; gap: 8px; border-radius: 6px; padding: 8px 12px; font-size: 13px; background: var(--soft); border: 1px solid var(--line); color: var(--body); }\n\n\n.anb { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 13px; background: var(--soft); border-bottom: 1px solid var(--line); color: var(--body); flex: 0 0 auto; }\n.anb .dot { width: 6px; height: 6px; border-radius: 999px; background: var(--mute); flex: 0 0 auto; }\n.anb .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }\n\n.anb.warning { border-bottom-color: var(--line-strong); }\n.anb.warning .dot { background: var(--ink); }\n.anb.warning .t { font-weight: 600; }\n.anb.critical { background: color-mix(in srgb, var(--err) 8%, #fff); border-bottom-color: color-mix(in srgb, var(--err) 26%, #fff); }\n.anb.critical .dot { background: var(--err); }\n\n.an-body { font-size: 13.5px; line-height: 1.55; color: var(--body); }\n.an-body p { margin: 6px 0; }\n.an-body a { color: var(--acc); }\n.an-body img { max-width: 100%; }\n.an-body :is(h1, h2, h3) { font-size: 14px; margin: 8px 0 4px; color: var(--ink); }\n\n\n.legend { display: flex; gap: 8px 12px; flex-wrap: wrap; }\n.legend span { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--mute); white-space: nowrap; }\n.sw { width: 10px; height: 10px; border-radius: 2px; background: var(--canvas); border: 1px solid var(--line); flex: 0 0 auto; }\n.sw.cur { box-shadow: inset 0 0 0 2px var(--acc); border-color: transparent; }\n.sw.hit { background: var(--acc-tint); border-color: var(--acc); }\n.sw.miss { background: color-mix(in srgb, var(--err) 10%, #fff); border-color: var(--err); }\n.grid { display: flex; flex-wrap: wrap; gap: 4px; }\n.cell { width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 6px; background: var(--canvas); cursor: pointer; font: 12px/1 var(--mono); color: var(--body); padding: 0; display: flex; align-items: center; justify-content: center; }\n.cell.cur { box-shadow: inset 0 0 0 2px var(--acc); border-color: transparent; color: var(--ink); }\n.cell.hit { background: var(--acc-tint); border-color: var(--acc); color: var(--acc); }\n.cell.miss { color: var(--err); border-color: color-mix(in srgb, var(--err) 35%, #fff); background: color-mix(in srgb, var(--err) 6%, #fff); }\n\n\n.opts { min-width: 0; display: flex; flex-direction: column; gap: 2px; }\n.optrow { min-width: 0; display: flex; align-items: center; gap: 8px; }\n.opt { min-width: 0; flex: 1; font-size: 13.5px; color: var(--body); line-height: 1.45; letter-spacing: -0.2px; }\n.opt.hit { color: var(--acc); font-weight: 500; }\n.expand { display: inline-flex; align-items: center; gap: 4px; font: 12px/1 var(--mono); color: var(--mute); cursor: pointer; white-space: nowrap; background: none; border: none; padding: 0; }\n.question-head { min-height: 28px; }\n.stem-type { margin-right: 4px; color: var(--mute); font-weight: 400; }\n.answer-block { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }\n.answer-label { font-size: 12px; color: var(--mute); }\n.answer-value { color: var(--acc); font: 500 13px/1.5 var(--mono); word-break: break-word; }\n.answer-list { display: flex; flex-direction: column; gap: 6px; }\n.answer-item { display: flex; align-items: flex-start; gap: 8px; }\n.answer-key { flex: 0 0 auto; min-width: 36px; color: var(--muted); font: 12px/1.5 var(--mono); }\n\n\n.ent { border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; display: flex; flex-direction: column; gap: 5px; }\n.ent-top { display: flex; align-items: center; gap: 6px; }\n.ent-ty { font: 10.5px/1.4 var(--mono); color: var(--body); border: 1px solid var(--line); border-radius: 3px; padding: 1px 5px; flex: 0 0 auto; }\n.ent-tm { font: 10.5px/1.4 var(--mono); color: var(--mute); margin-left: auto; }\n.ent-q { font-size: 13px; line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }\n.ent-a { font: 12.5px/1.5 var(--mono); color: var(--acc); word-break: break-word; }\n.ent-ops summary { cursor: pointer; list-style: none; }\n.ent-ops summary::-webkit-details-marker { display: none; }\n.ent-ops summary::before { content: '\u25b8 '; }\n.ent-ops[open] summary::before { content: '\u25be '; }\n.ent-ops div { padding-left: 12px; }\n.ent-del { width: 20px; height: 20px; border: none; background: none; color: var(--line-strong); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 4px; flex: 0 0 auto; }\n.ent-del:hover { background: color-mix(in srgb, var(--err) 6%, #fff); color: var(--err); }\n\n.meter { flex: 1; height: 5px; background: var(--soft); border-radius: 3px; overflow: hidden; }\n.meter i { display: block; height: 100%; background: var(--ink); }\n.meter i.over { background: var(--err); }\n\n.alert { border: 1px solid color-mix(in srgb, var(--err) 35%, #fff); background: color-mix(in srgb, var(--err) 6%, #fff); color: var(--err); border-radius: 6px; padding: 8px 10px; font-size: 12px; line-height: 1.55; }\n\n\n.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }\n.balance { font-size: 20px; font-weight: 600; letter-spacing: -0.6px; font-family: var(--mono); color: var(--ink); }\n.range { width: 100%; accent-color: var(--ink); }\n`;
 
   function mountPanel() {
-    if (document.getElementById("aiask-host")) return;
+    if (document.getElementById("aiask-host")) return () => {};
     const host = document.createElement("div");
     host.id = "aiask-host";
     document.body.appendChild(host);
@@ -16119,7 +16275,85 @@
     const root = document.createElement("div");
     root.className = "aiask-root";
     shadow.appendChild(root);
-    vue.createApp(_sfc_main).mount(root);
+    const app = vue.createApp(_sfc_main);
+    app.mount(root);
+    return () => {
+      app.unmount();
+      host.remove();
+    };
+  }
+
+  function isScopedLineHost(hostname) {
+    return [ "degree.qingshuxuetang.com", "m.umu.cn", "learning.wencaischool.net" ].includes(hostname);
+  }
+
+  function canClaimScopedPage(document2) {
+    var _a;
+    const host = (_a = document2.defaultView) == null ? void 0 : _a.location.hostname;
+    return readableDocuments(document2).some(doc => {
+      var _a2;
+      try {
+        const location2 = (_a2 = doc.defaultView) == null ? void 0 : _a2.location;
+        if (!location2 || location2.hostname !== host) return false;
+        if (host === "degree.qingshuxuetang.com") return isQingshuHomework(location2, false) || isQingshuHomework(location2, true) || isCourseStudyUrl("qingshu", location2);
+        if (host === "m.umu.cn") return isUmuQuizUrl(location2, false) || isUmuQuizUrl(location2, true) || isCourseStudyUrl("umu", location2);
+        return host === "learning.wencaischool.net" && (isWencaiHomeworkUrl(location2, false) || isWencaiHomeworkUrl(location2, true));
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  function startScopedLineClaim(view2, mount) {
+    const doc = view2.document;
+    const docView = doc.defaultView;
+    if (!docView) throw new Error("line claim requires a live document");
+    let unmount;
+    const release = () => {
+      if (!unmount) return;
+      unmount();
+      unmount = void 0;
+      if (doc.documentElement.getAttribute(LINE_ATTR) === LINE_NEW) doc.documentElement.removeAttribute(LINE_ATTR);
+    };
+    const sync = () => {
+      if (canClaimScopedPage(doc)) {
+        if (!unmount) {
+          claimPageForNewLine(doc);
+          unmount = mount();
+        }
+      } else release();
+      const highest = findHighestSameOriginWindow(view2);
+      if (highest !== view2) notifyFrameReady(highest);
+    };
+    const stopUrl = subscribeUrlChanges(view2, sync);
+    const scheduler = createPageChangeScheduler(view2, sync);
+    const observer = new docView.MutationObserver(() => scheduler.notify());
+    observer.observe(doc.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: [ "src" ]
+    });
+    const stopFrame = subscribeFrameReady(doc, sync);
+    const onLoad = event => {
+      if (event.target instanceof docView.HTMLIFrameElement || event.target instanceof docView.HTMLFrameElement) scheduler.notify();
+    };
+    doc.addEventListener("load", onLoad, true);
+    const stop = () => {
+      release();
+      stopUrl();
+      observer.disconnect();
+      scheduler.dispose();
+      stopFrame();
+      doc.removeEventListener("load", onLoad, true);
+      view2.removeEventListener("pagehide", onPageHide);
+    };
+    const onPageHide = event => {
+      if (!event.persisted) stop();
+    };
+    view2.addEventListener("pagehide", onPageHide);
+    sync();
+    return stop;
   }
 
   installResponseListener(location.hostname);
@@ -16129,7 +16363,8 @@
   if (bridgeMode) installImportBridge(bridgeMode === "full" ? localAnswerCache : null);
 
   if (SUPPORTED_HOST_PATTERN.test(location.hostname) && (location.hostname !== "mooc1.ceduacad.ahut.edu.cn" || validatedRulePackageIdFor(location) !== null)) {
-    claimPageForNewLine();
+    const scopedClaim = isScopedLineHost(location.hostname);
+    if (!scopedClaim) claimPageForNewLine();
     const highest = findHighestSameOriginWindow(window);
     const isTop = window === window.top;
     const isHighestSameOrigin = highest === window;
@@ -16146,13 +16381,23 @@
       supportedHostPattern: SUPPORTED_HOST_PATTERN
     });
     if (role === "mount") {
-      const run = () => {
+      const mount = () => {
         const restored = initializeRuleStoreRuntime();
-        mountPanel();
+        const unmount = mountPanel();
         void restored.then(() => void checkRuleUpdates()).catch(() => {});
+        return unmount;
+      };
+      const run = () => {
+        if (scopedClaim) startScopedLineClaim(window, mount); else mount();
       };
       if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", run); else run();
-    } else if (role === "relay-f9") {
+    } else if (scopedClaim) {
+      const run = () => startScopedLineClaim(window, () => () => {});
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", run, {
+        once: true
+      }); else run();
+    }
+    if (role === "relay-f9") {
       if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => notifyFrameReady(highest)); else notifyFrameReady(highest);
       addEventListener("keydown", e => {
         if (e.key === "F9") {
