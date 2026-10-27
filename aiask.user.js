@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.5.10
+// @version      3.5.11
 // @author       爱问答
-// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学、广东开放大学、安徽继续教育在线新版、柠檬文采、UMU 互动平台、青书学堂】，更多平台持续适配中...
+// @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学、广东开放大学、安徽继续教育在线新版、柠檬文采、UMU 互动平台、青书学堂、云班课】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
 // @homepage     https://www.aiask.site/
 // @supportURL   https://www.aiask.site/contact.html
+// @match        https://www.mosoteach.cn/*
 // @match        https://degree.qingshuxuetang.com/*
 // @match        https://m.umu.cn/*
 // @match        *://learning.wencaischool.net/*
@@ -23,7 +24,7 @@
 // @match        https://www.aiask.site/feedback.html
 // @match        https://www.aiask.site/feedback
 // @require      https://registry.npmmirror.com/vue/3.5.39/files/dist/vue.global.prod.js
-// @require      https://www.aiask.site/engine/aiask-engine-61673dab49c5dab0.js#sha256=61673dab49c5dab01a54e3e5c30ce2c5c3339cc4ca99c9a8468c258aa9d866ef
+// @require      https://www.aiask.site/engine/aiask-engine-262af99a0b5efd53.js#sha256=262af99a0b5efd534053929e0911cd943351990d73e9448686538fc15c983b97
 // @resource     chaoxingFontTable  https://www.aiask.site/assets/chaoxing-font-table.json
 // @connect      www.aiask.site
 // @connect      cx.icodef.com
@@ -148,9 +149,9 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.5.10";
+  const SCRIPT_VERSION = "3.5.11";
 
-  const ENGINE_ID = "61673dab49c5dab0";
+  const ENGINE_ID = "262af99a0b5efd53";
 
   const DEFAULT_ROOT_PUBLIC_JWK = protocol.PRODUCTION_ROOT_PUBLIC_JWK;
 
@@ -5377,10 +5378,10 @@
     applicable = true;
     expected = rules.map(rule => rule.slot);
     let target;
-    let page;
+    let page2;
     try {
       if (typeof unsafeWindow !== "undefined") {
-        page = unsafeWindow;
+        page2 = unsafeWindow;
         target = unsafeWindow == null ? void 0 : unsafeWindow.XMLHttpRequest;
       }
     } catch {
@@ -5390,7 +5391,7 @@
       target = XMLHttpRequest;
       installTarget = "sandbox";
     }
-    const fetchTarget = page ?? (typeof window !== "undefined" ? window : null);
+    const fetchTarget = page2 ?? (typeof window !== "undefined" ? window : null);
     const xhrInstalled = target ? responseListener.install(target) : false;
     const fetchInstalled = fetchTarget ? responseListener.installFetch(fetchTarget) : false;
     installed = xhrInstalled || fetchInstalled;
@@ -5450,13 +5451,13 @@
 
   function view(document2) {
     var _a, _b;
-    let page = pageDocuments.get(document2);
-    if (!page) {
-      page = (_a = pageWindowForDocument(document2)) == null ? void 0 : _a.document;
-      if (!page) return void 0;
-      pageDocuments.set(document2, page);
+    let page2 = pageDocuments.get(document2);
+    if (!page2) {
+      page2 = (_a = pageWindowForDocument(document2)) == null ? void 0 : _a.document;
+      if (!page2) return void 0;
+      pageDocuments.set(document2, page2);
     }
-    return (_b = page.querySelector("micro-app-body>#app>div")) == null ? void 0 : _b.__vue__;
+    return (_b = page2.querySelector("micro-app-body>#app>div")) == null ? void 0 : _b.__vue__;
   }
 
   function ready(document2) {
@@ -5809,9 +5810,351 @@
     [CHA0XING_PACKAGE_IDS.newChapter]: Object.freeze([ "noSubmit" ])
   });
 
-  const MOSOTEACH_HOOK_IDS = Object.freeze([ "mosoteach.applyPlan" ]);
+  const LEARNIN_HOOK_IDS = [ "learnin.paperReady", "learnin.capturePaper", "learnin.harvestPaper", "learnin.applyPlan" ];
+
+  const TYPES$2 = [ "single", "multiple", "judge" ];
+
+  const ROOT$1 = ".store-question-item-container";
+
+  function isLearninHomeworkUrl(location2) {
+    return location2.origin === "https://www.learnin.com.cn" && location2.pathname === "/user/" && /^#\/user\/student\/course\/[a-f0-9]{32}\/topic\/[a-f0-9]{32}\/do$/u.test(location2.hash);
+  }
+
+  function roots$3(doc, review2) {
+    if (!doc.defaultView || !isLearninHomeworkUrl(doc.defaultView.location)) return [];
+    const buttons = [ ...doc.querySelectorAll("button") ];
+    const submit = buttons.filter(e => {
+      var _a;
+      return ((_a = e.textContent) == null ? void 0 : _a.trim()) === "\u63d0\u4ea4\u4f5c\u4e1a";
+    });
+    const save = buttons.filter(e => {
+      var _a;
+      return ((_a = e.textContent) == null ? void 0 : _a.trim()) === "\u4fdd\u5b58\u5e76\u79bb\u5f00";
+    });
+    const close = buttons.filter(e => {
+      var _a;
+      return ((_a = e.textContent) == null ? void 0 : _a.trim()) === "\u5173\u95ed";
+    });
+    const reviewed = !!doc.querySelector(".question-answer-exhibition");
+    if (review2 ? submit.length !== 0 || save.length !== 0 || close.length !== 1 || !reviewed : submit.length !== 1 || save.length !== 1 || reviewed) return [];
+    const list = [ ...doc.querySelectorAll(ROOT$1) ];
+    return list.length <= 256 ? list : [];
+  }
+
+  function parse$3(root, index, review2, signal) {
+    var _a, _b, _c;
+    if (signal.aborted || !root.isConnected || root.querySelectorAll("*").length > 5e3) throw new Error("inactive or oversized question");
+    const headers = root.querySelectorAll(":scope > .item-question-header > .header-left");
+    const name = (_c = (_b = (_a = headers[0]) == null ? void 0 : _a.textContent) == null ? void 0 : _b.match(/\u3010(.+)\u3011/u)) == null ? void 0 : _c[1];
+    const type = name === "\u5355\u9009\u9898" ? "single" : name === "\u591a\u9009\u9898" ? "multiple" : name === "\u5224\u65ad\u9898" ? "judge" : null;
+    const titles = root.querySelectorAll(".item-question-body > .question-title > div:first-child");
+    const rows = [ ...root.querySelectorAll(".question-info > .question-option-list > .option-item") ];
+    if (headers.length !== 1 || !type || titles.length !== 1 || rows.length < 2 || rows.length > 26 || type === "judge" && rows.length !== 2) throw new Error("unsupported question");
+    const content2 = e => core.serializeDomQuestionContent(e, {
+      signal: signal,
+      maxNodes: 2e3
+    });
+    const labels = rows.map(row => {
+      const list = row.querySelectorAll(":scope > .option-index");
+      if (list.length !== 1 || !review2 && !list[0].classList.contains("can-do")) throw new Error("unbound option");
+      return list[0];
+    });
+    const options = rows.map((row, i) => {
+      var _a2;
+      const texts = row.querySelectorAll(":scope > .option-content > div:first-child");
+      const code = ((_a2 = labels[i].textContent) == null ? void 0 : _a2.trim()) ?? "";
+      if (texts.length !== 1 || !(type === "judge" ? /^[TF]$/u : /^[A-Z]$/u).test(code)) throw new Error("invalid option");
+      return {
+        id: `option-${code}`,
+        content: content2(texts[0])
+      };
+    });
+    if (new Set(options.map(o => o.id)).size !== options.length || options.some(o => !o.content.trim()) || new Set(options.map(o => o.content)).size !== options.length) throw new Error("ambiguous option");
+    const node = protocol.LeafQuestionNodeSchema.parse({
+      kind: "leaf",
+      id: `question-${index}`,
+      path: `/question-${index}`,
+      type: type,
+      stem: content2(titles[0]),
+      options: options,
+      slots: [],
+      fillPolicy: "atomic",
+      metadata: {
+        platform: "learnin",
+        variant: `learnin-homework-${review2 ? "review" : "attempt"}`,
+        ruleVersion: "1.0.0"
+      }
+    });
+    if (!node.stem.trim()) throw new Error("empty stem");
+    return {
+      node: node,
+      labels: labels
+    };
+  }
+
+  function published$2(root, parsed) {
+    var _a;
+    if (parsed.node.type === "judge") return null;
+    const blocks = root.querySelectorAll(".question-answer-exhibition > .topic-teacher-check-content");
+    const refs = [ ...blocks ].filter(e => {
+      var _a2, _b;
+      return ((_b = (_a2 = e.querySelector(".content-title > span")) == null ? void 0 : _a2.textContent) == null ? void 0 : _b.trim()) === "\u53c2\u8003\u7b54\u6848";
+    });
+    if (refs.length !== 1) return null;
+    const answers2 = refs[0].querySelectorAll(".check-content > .answer-content");
+    if (answers2.length !== 1) return null;
+    const text2 = ((_a = answers2[0].textContent) == null ? void 0 : _a.trim()) ?? "";
+    if (!/^[A-Z](?:\u3001[A-Z])*$/u.test(text2)) return null;
+    const codes = text2.split("\u3001");
+    if (new Set(codes).size !== codes.length || parsed.node.type !== "multiple" && codes.length !== 1) return null;
+    const values = codes.map(code => {
+      var _a2;
+      return (_a2 = parsed.node.options.find(o => o.id === `option-${code}`)) == null ? void 0 : _a2.content;
+    });
+    return values.every(v => v !== void 0) ? values : null;
+  }
+
+  function isLearninTextHomework(doc) {
+    for (const review2 of [ false, true ]) if (roots$3(doc, review2).some((root, i) => {
+      try {
+        parse$3(root, i, review2, (new AbortController).signal);
+        return true;
+      } catch {
+        return false;
+      }
+    })) return true;
+    return false;
+  }
+
+  function registerLearninHooks(registry, environment) {
+    const records = new Map;
+    core.registerLocalHook(registry, {
+      id: "learnin.applyPlan",
+      phases: [ "fill" ],
+      capability: "answer-write",
+      requiresSafetyCapability: true,
+      parseArgs: args => args.safety,
+      validateResult: v => typeof v === "boolean",
+      execute: async (safety, {signal: signal}) => {
+        if (!environment || signal.aborted) return false;
+        const plan = core.safetyPlanForCapability(safety);
+        const record2 = records.get(plan.path);
+        const binding = environment.capture.bindings.get(plan.path);
+        if (!record2 || !(binding == null ? void 0 : binding.connected) || binding.currentFingerprint !== plan.fingerprint || !record2.live()) return false;
+        const {parsed: parsed, live: live} = record2;
+        const wanted = new Set(plan.operations.flatMap(op => op.kind === "choose" ? [ op.optionId ] : []));
+        if (wanted.size !== plan.operations.length || !wanted.size || parsed.node.type !== "multiple" && wanted.size !== 1 || ![ ...wanted ].every(id2 => parsed.node.options.some(o => o.id === id2))) return false;
+        const selected2 = i => parsed.labels[i].classList.contains("active");
+        const current = () => !signal.aborted && live();
+        const before = parsed.labels.map((_, i) => selected2(i));
+        let success = false;
+        try {
+          if (parsed.node.type === "multiple") for (const [i, label] of parsed.labels.entries()) {
+            if (!current()) return false;
+            if (selected2(i) && !wanted.has(parsed.node.options[i].id)) label.click();
+          }
+          if (!(await environment.writer.applyPlan(plan, signal)) || !(await environment.writer.verifyPlan(plan, signal))) return false;
+          success = current() && parsed.labels.every((_, i) => selected2(i) === wanted.has(parsed.node.options[i].id));
+          return success;
+        } finally {
+          if (!success && current()) for (const [i, label] of parsed.labels.entries()) {
+            if (!current()) break;
+            if (selected2(i) !== before[i] && (parsed.node.type === "multiple" || before[i])) label.click();
+          }
+        }
+      }
+    });
+    core.registerLocalHook(registry, {
+      id: "learnin.paperReady",
+      phases: [ "match" ],
+      capability: "runtime-read",
+      parseArgs: args => {
+        if (Object.keys(args).length !== 1 || typeof args.review !== "boolean") throw new Error("expected review flag");
+        return args.review;
+      },
+      validateResult: v => typeof v === "boolean",
+      execute: review2 => !!environment && !environment.ctx.signal.aborted && roots$3(environment.ctx.document, review2).length > 0
+    });
+    for (const id2 of [ "learnin.capturePaper", "learnin.harvestPaper" ]) {
+      const review2 = id2 === "learnin.harvestPaper";
+      core.registerLocalHook(registry, {
+        id: id2,
+        phases: [ "capture" ],
+        capability: "runtime-read",
+        parseArgs: args => {
+          if (Object.keys(args).length !== 1 || !Array.isArray(args.leaves) || args.leaves.length !== (review2 ? 2 : TYPES$2.length) || args.leaves.some((leaf, i) => !leaf || leaf.kind !== "leaf" || leaf.type !== TYPES$2[i])) throw new Error("expected three leaf descriptors");
+        },
+        validateResult: v => Number.isInteger(v) && Number(v) >= 0 && Number(v) <= 256,
+        execute: () => {
+          var _a;
+          if (!environment) return 0;
+          records.clear();
+          const {document: document2, signal: signal} = environment.ctx;
+          const location2 = (_a = document2.defaultView) == null ? void 0 : _a.location;
+          if (!location2) return 0;
+          const original = roots$3(document2, review2);
+          const deadline = Date.now() + 4e3;
+          let registered = 0;
+          for (const [index, root] of original.entries()) {
+            if (signal.aborted || Date.now() >= deadline) break;
+            try {
+              const parsed = parse$3(root, index, review2, signal);
+              if (review2) {
+                const values = published$2(root, parsed);
+                if (values) {
+                  environment.capture.registerHarvestLeaf(parsed.node, values);
+                  registered++;
+                }
+                continue;
+              }
+              const fingerprint = protocol.questionNodeHash(parsed.node);
+              const live = () => {
+                try {
+                  if (signal.aborted || !isLearninHomeworkUrl(location2)) return false;
+                  const currentRoots = roots$3(document2, false);
+                  if (currentRoots.length !== original.length || currentRoots.some((e, i) => e !== original[i])) return false;
+                  const current = parse$3(root, index, false, signal);
+                  return protocol.questionNodeHash(current.node) === fingerprint && current.labels.every((e, i) => e === parsed.labels[i]);
+                } catch {
+                  return false;
+                }
+              };
+              const targets2 = parsed.labels.map((label, i) => core.createDomChoiceBindingTarget({
+                optionId: parsed.node.options[i].id,
+                clickTarget: label,
+                readTarget: label,
+                selected: {
+                  kind: "class",
+                  name: "active"
+                },
+                location: location2
+              }));
+              environment.capture.registerLeaf(parsed.node, {
+                readCurrentFingerprint: () => live() ? fingerprint : "learnin-page-changed",
+                targets: targets2.map(target => ({
+                  ...target,
+                  isConnected: () => live() && target.isConnected(),
+                  apply: (op, abort) => live() ? target.apply(op, abort) : Promise.resolve(false),
+                  verify: (op, abort) => live() ? target.verify(op, abort) : Promise.resolve(false)
+                }))
+              });
+              records.set(parsed.node.path, {
+                parsed: parsed,
+                live: live
+              });
+              registered++;
+            } catch {}
+          }
+          return registered;
+        }
+      });
+    }
+  }
+
+  function mosoteachReviewLayout(location2) {
+    if (location2.origin !== "https://www.mosoteach.cn") return null;
+    if (/^\/web\/cc-detail\/[^/]+\/act\/quiz-single-result\/[^/]+\/?$/u.test(location2.pathname)) return "modern";
+    const url = new URL(location2.href);
+    return /^\/web(?:-old)?\/index\.php$/u.test(url.pathname) && url.searchParams.get("c") === "interaction_quiz" && url.searchParams.get("m") === "person_quiz_result" ? "legacy" : null;
+  }
+
+  function readMosoteachReview(root, index, legacy, signal) {
+    var _a, _b, _c, _d, _e;
+    if (signal.aborted || !root.isConnected || root.querySelectorAll("*").length > 5e3) return null;
+    const content2 = e => core.serializeDomQuestionContent(e, {
+      signal: signal,
+      maxNodes: 2e3
+    });
+    const stems = root.querySelectorAll(legacy ? ".t-subject" : ".topic-subject");
+    const types = root.querySelectorAll(legacy ? ".t-type" : ".v-chip__content");
+    const type = ((_b = (_a = types[0]) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim()) === "\u5355\u9009\u9898" ? "single" : ((_d = (_c = types[0]) == null ? void 0 : _c.textContent) == null ? void 0 : _d.trim()) === "\u591a\u9009\u9898" ? "multiple" : null;
+    const labels = [ ...root.querySelectorAll(legacy ? ".answer-l" : ".label") ].filter(e => {
+      var _a2;
+      return /^\u6b63\u786e\u7b54\u6848[\uff1a:]/u.test(((_a2 = e.textContent) == null ? void 0 : _a2.replace(/\s/gu, "")) ?? "");
+    });
+    if (stems.length !== 1 || types.length !== 1 || !type || labels.length !== 1) return null;
+    const answer = legacy ? labels[0] : labels[0].nextElementSibling;
+    if (!answer || !legacy && !answer.classList.contains("flex-grow-1")) return null;
+    let ancestor = answer;
+    for (let depth = 0; ancestor && depth < 64; depth++, ancestor = ancestor.parentElement) {
+      const style = (_e = ancestor.ownerDocument.defaultView) == null ? void 0 : _e.getComputedStyle(ancestor);
+      if (ancestor.hasAttribute("hidden") || ancestor.getAttribute("aria-hidden") === "true" || (style == null ? void 0 : style.display) === "none" || (style == null ? void 0 : style.visibility) === "hidden") return null;
+    }
+    if (ancestor) return null;
+    const text2 = (answer.textContent ?? "").replace(/^\s*\u6b63\u786e\u7b54\u6848\s*[\uff1a:]/u, "").trim();
+    if (!/^[A-Z]+(?:[\s,\uff0c\u3001]+[A-Z]+)*$/u.test(text2)) return null;
+    const codes = text2.replace(/[\s,\uff0c\u3001]/gu, "").split("");
+    if (new Set(codes).size !== codes.length || type === "single" && codes.length !== 1) return null;
+    const targets2 = [ ...root.querySelectorAll(legacy ? ".opt-content" : ".topic-answer") ];
+    if (targets2.length < 2 || targets2.length > 26) return null;
+    const letters = targets2.map(e => {
+      var _a2, _b2;
+      const label = e.previousElementSibling;
+      return (label == null ? void 0 : label.matches(legacy ? ".opt-index" : ".vote-option-index")) ? (_b2 = (_a2 = label.textContent) == null ? void 0 : _a2.trim().match(/^([A-Z])[.\u3001\uff0e]$/u)) == null ? void 0 : _b2[1] : void 0;
+    });
+    const options = targets2.map((e, i) => ({
+      id: `option-${i}`,
+      content: content2(e)
+    }));
+    if (letters.some(l => !l) || new Set(letters).size !== targets2.length || options.some(o => !o.content.trim()) || new Set(options.map(o => o.content)).size !== options.length) return null;
+    const values = codes.map(c => {
+      var _a2;
+      return (_a2 = options[letters.indexOf(c)]) == null ? void 0 : _a2.content;
+    });
+    if (!values.every(v => !!v)) return null;
+    const stem = content2(stems[0]);
+    if (!stem.trim()) return null;
+    const node = protocol.LeafQuestionNodeSchema.parse({
+      kind: "leaf",
+      id: `question-${index}`,
+      path: `/question-${index}`,
+      type: type,
+      stem: stem,
+      options: options,
+      slots: [],
+      fillPolicy: "atomic"
+    });
+    return {
+      node: node,
+      values: values
+    };
+  }
+
+  const MOSOTEACH_HOOK_IDS = Object.freeze([ "mosoteach.applyPlan", "mosoteach.harvestReview" ]);
 
   function registerMosoteachHooks(registry, environment) {
+    core.registerLocalHook(registry, {
+      id: "mosoteach.harvestReview",
+      phases: [ "capture" ],
+      capability: "dom-read",
+      parseArgs: args => {
+        if (Object.keys(args).length !== 1 || !Array.isArray(args.leaves) || args.leaves.length !== 2 || args.leaves.some((leaf, i) => !leaf || leaf.kind !== "leaf" || leaf.type !== [ "single", "multiple" ][i])) throw new Error("expected choice leaf descriptors");
+      },
+      validateResult: v => Number.isInteger(v) && Number(v) >= 0 && Number(v) <= 200,
+      execute: () => {
+        if (!environment) return 0;
+        const {document: document2, location: location2, signal: signal} = environment.ctx;
+        const layout = mosoteachReviewLayout(location2);
+        if (!layout || signal.aborted) return 0;
+        const roots2 = document2.querySelectorAll(layout === "legacy" ? ".topic-item" : ".quiz-topic-content");
+        if (roots2.length > 200) return 0;
+        const deadline = Date.now() + 4e3;
+        let count = 0;
+        for (const [index, root] of [ ...roots2 ].entries()) {
+          if (signal.aborted || Date.now() >= deadline) break;
+          try {
+            const parsed = readMosoteachReview(root, index, layout === "legacy", signal);
+            if (parsed) {
+              environment.capture.registerHarvestLeaf(parsed.node, parsed.values);
+              count++;
+            }
+          } catch {
+            if (signal.aborted) break;
+          }
+        }
+        return count;
+      }
+    });
     core.registerLocalHook(registry, {
       id: "mosoteach.applyPlan",
       phases: [ "fill" ],
@@ -5873,6 +6216,234 @@
         }
       }
     });
+  }
+
+  const OLEARN_HOOK_IDS = [ "olearn.paperReady", "olearn.capturePaper", "olearn.harvestPaper", "olearn.applyPlan" ];
+
+  const TYPES$1 = [ "single", "multiple", "judge" ];
+
+  const ROOT = ".topic-group > .topic-container";
+
+  function isOlearnHomeworkUrl(location2, review2) {
+    return location2.origin === "https://cjzzxylearning.o-learn.cn" && location2.pathname === "/student/" && new RegExp(`^#/course/[a-f0-9]{32}/learn/(?:outline/)?homework/${review2 ? "show" : "do"}/[a-f0-9]{32}$`, "u").test(location2.hash);
+  }
+
+  function roots$2(doc, review2) {
+    if (!doc.defaultView || !isOlearnHomeworkUrl(doc.defaultView.location, review2)) return [];
+    const list = [ ...doc.querySelectorAll(ROOT) ];
+    return list.length <= 256 ? list : [];
+  }
+
+  function parse$2(root, index, review2, signal) {
+    var _a, _b, _c;
+    if (signal.aborted || !root.isConnected || root.querySelectorAll("*").length > 5e3) throw new Error("inactive or oversized question");
+    const typeName = (_c = (_b = (_a = root.parentElement) == null ? void 0 : _a.querySelector(":scope > .topic-title .title-bold")) == null ? void 0 : _b.textContent) == null ? void 0 : _c.trim();
+    const type = typeName === "\u5355\u9009\u9898" ? "single" : typeName === "\u591a\u9009\u9898" ? "multiple" : typeName === "\u5224\u65ad\u9898" ? "judge" : null;
+    const titles = root.querySelectorAll(".topic-type > .topic-title");
+    const rows = [ ...root.querySelectorAll(".topic-answer .radio-wrap") ];
+    if (!type || titles.length !== 1 || rows.length < 2 || rows.length > 26 || type === "judge" && rows.length !== 2) throw new Error("unsupported question");
+    const content2 = e => core.serializeDomQuestionContent(e, {
+      signal: signal,
+      maxNodes: 2e3
+    });
+    const labels = rows.map(row => {
+      const labels2 = row.querySelectorAll(":scope > label");
+      if (labels2.length !== 1) throw new Error("ambiguous label");
+      return labels2[0];
+    });
+    const inputs = labels.map(label => {
+      const inputs2 = label.querySelectorAll("input");
+      if (inputs2.length !== 1 || label.control !== inputs2[0] || inputs2[0].type !== (type === "multiple" ? "checkbox" : "radio") || !review2 && inputs2[0].disabled) throw new Error("unbound option");
+      return inputs2[0];
+    });
+    const options = rows.map((row, i) => {
+      const text2 = row.querySelectorAll(":scope > .radio-text");
+      const code = inputs[i].value;
+      if (text2.length !== 1 || !(type === "judge" ? /^[TF]$/u : /^[A-Z]$/u).test(code)) throw new Error("invalid option");
+      return {
+        id: `option-${code}`,
+        content: content2(text2[0])
+      };
+    });
+    if (new Set(options.map(o => o.id)).size !== options.length || options.some(o => !o.content.trim()) || new Set(options.map(o => o.content)).size !== options.length || !review2 && root.querySelector(".standard-answer")) throw new Error("ambiguous or reviewed options");
+    const node = protocol.LeafQuestionNodeSchema.parse({
+      kind: "leaf",
+      id: `question-${index}`,
+      path: `/question-${index}`,
+      type: type,
+      stem: content2(titles[0]),
+      options: options,
+      slots: [],
+      fillPolicy: "atomic",
+      metadata: {
+        platform: "olearn",
+        variant: `olearn-homework-${review2 ? "review" : "attempt"}`,
+        ruleVersion: "1.0.0"
+      }
+    });
+    if (!node.stem.trim()) throw new Error("empty stem");
+    return {
+      node: node,
+      labels: labels,
+      inputs: inputs
+    };
+  }
+
+  function published$1(root, parsed) {
+    var _a, _b;
+    const markers = root.querySelectorAll(".standard-answer > .analysis-text");
+    if (markers.length !== 1) return null;
+    let e = markers[0];
+    for (let depth = 0; e && depth < 32; depth++, e = e.parentElement) {
+      const style = (_a = e.ownerDocument.defaultView) == null ? void 0 : _a.getComputedStyle(e);
+      if (e.hasAttribute("hidden") || e.getAttribute("aria-hidden") === "true" || (style == null ? void 0 : style.display) === "none" || (style == null ? void 0 : style.visibility) === "hidden") return null;
+    }
+    if (e) return null;
+    const answer = ((_b = markers[0].textContent) == null ? void 0 : _b.trim()) ?? "";
+    if (!/^[A-Z]+$/u.test(answer) || new Set(answer).size !== answer.length || parsed.node.type !== "multiple" && answer.length !== 1) return null;
+    const values = [ ...answer ].map(code => {
+      var _a2;
+      return (_a2 = parsed.node.options.find(o => o.id === `option-${code}`)) == null ? void 0 : _a2.content;
+    });
+    return values.every(v => v !== void 0) ? values : null;
+  }
+
+  function isOlearnTextHomework(document2) {
+    const review2 = !!document2.defaultView && isOlearnHomeworkUrl(document2.defaultView.location, true);
+    return roots$2(document2, review2).some((root, i) => {
+      try {
+        parse$2(root, i, review2, (new AbortController).signal);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  function registerOlearnHooks(registry, environment) {
+    const records = new Map;
+    core.registerLocalHook(registry, {
+      id: "olearn.applyPlan",
+      phases: [ "fill" ],
+      capability: "answer-write",
+      requiresSafetyCapability: true,
+      parseArgs: args => args.safety,
+      validateResult: v => typeof v === "boolean",
+      execute: async (safety, {signal: signal}) => {
+        if (!environment || signal.aborted) return false;
+        const plan = core.safetyPlanForCapability(safety);
+        const record2 = records.get(plan.path);
+        const binding = environment.capture.bindings.get(plan.path);
+        if (!record2 || !(binding == null ? void 0 : binding.connected) || binding.currentFingerprint !== plan.fingerprint || !record2.live()) return false;
+        const {parsed: parsed, live: live} = record2;
+        const wanted = new Set(plan.operations.flatMap(op => op.kind === "choose" ? [ op.optionId ] : []));
+        if (wanted.size !== plan.operations.length || !wanted.size || parsed.node.type !== "multiple" && wanted.size !== 1 || ![ ...wanted ].every(id2 => parsed.node.options.some(o => o.id === id2))) return false;
+        const selected2 = i => parsed.labels[i].classList.contains(parsed.node.type === "multiple" ? "is-checked" : "is-active");
+        const current = () => !signal.aborted && live();
+        const before = parsed.labels.map((_, i) => selected2(i));
+        let success = false;
+        try {
+          if (parsed.node.type === "multiple") for (const [i, label] of parsed.labels.entries()) {
+            if (!current()) return false;
+            if (selected2(i) && !wanted.has(parsed.node.options[i].id)) label.click();
+          }
+          if (!(await environment.writer.applyPlan(plan, signal)) || !(await environment.writer.verifyPlan(plan, signal))) return false;
+          success = current() && parsed.labels.every((_, i) => selected2(i) === wanted.has(parsed.node.options[i].id));
+          return success;
+        } finally {
+          if (!success && current()) for (const [i, label] of parsed.labels.entries()) {
+            if (!current()) break;
+            if (selected2(i) !== before[i] && (parsed.node.type === "multiple" || before[i])) label.click();
+          }
+        }
+      }
+    });
+    core.registerLocalHook(registry, {
+      id: "olearn.paperReady",
+      phases: [ "match" ],
+      capability: "runtime-read",
+      parseArgs: args => {
+        if (Object.keys(args).length !== 1 || typeof args.review !== "boolean") throw new Error("expected review flag");
+        return args.review;
+      },
+      validateResult: v => typeof v === "boolean",
+      execute: review2 => !!environment && !environment.ctx.signal.aborted && roots$2(environment.ctx.document, review2).length > 0
+    });
+    for (const id2 of [ "olearn.capturePaper", "olearn.harvestPaper" ]) {
+      const review2 = id2 === "olearn.harvestPaper";
+      core.registerLocalHook(registry, {
+        id: id2,
+        phases: [ "capture" ],
+        capability: "runtime-read",
+        parseArgs: args => {
+          if (Object.keys(args).length !== 1 || !Array.isArray(args.leaves) || args.leaves.length !== TYPES$1.length || args.leaves.some((leaf, i) => !leaf || leaf.kind !== "leaf" || leaf.type !== TYPES$1[i])) throw new Error("expected three leaf descriptors");
+        },
+        validateResult: v => Number.isInteger(v) && Number(v) >= 0 && Number(v) <= 256,
+        execute: () => {
+          var _a;
+          if (!environment) return 0;
+          records.clear();
+          const {document: document2, signal: signal} = environment.ctx;
+          const location2 = (_a = document2.defaultView) == null ? void 0 : _a.location;
+          if (!location2) return 0;
+          const original = roots$2(document2, review2);
+          const deadline = Date.now() + 4e3;
+          let registered = 0;
+          for (const [index, root] of original.entries()) {
+            if (signal.aborted || Date.now() >= deadline) break;
+            try {
+              const parsed = parse$2(root, index, review2, signal);
+              if (review2) {
+                const values = published$1(root, parsed);
+                if (values) {
+                  environment.capture.registerHarvestLeaf(parsed.node, values);
+                  registered++;
+                }
+                continue;
+              }
+              const fingerprint = protocol.questionNodeHash(parsed.node);
+              const identities = parsed.inputs.map(input => [ input.id, input.name ]);
+              const live = () => {
+                try {
+                  if (signal.aborted || !isOlearnHomeworkUrl(location2, false)) return false;
+                  const currentRoots = roots$2(document2, false);
+                  if (currentRoots.length !== original.length || currentRoots.some((e, i) => e !== original[i])) return false;
+                  const current = parse$2(root, index, false, signal);
+                  return protocol.questionNodeHash(current.node) === fingerprint && current.labels.every((e, i) => e === parsed.labels[i]) && current.inputs.every((e, i) => e === parsed.inputs[i]) && current.inputs.every((e, i) => e.id === identities[i][0] && e.name === identities[i][1]);
+                } catch {
+                  return false;
+                }
+              };
+              const targets2 = parsed.labels.map((label, i) => core.createDomChoiceBindingTarget({
+                optionId: parsed.node.options[i].id,
+                clickTarget: label,
+                readTarget: label,
+                selected: {
+                  kind: "class",
+                  name: parsed.node.type === "multiple" ? "is-checked" : "is-active"
+                },
+                location: location2
+              }));
+              environment.capture.registerLeaf(parsed.node, {
+                readCurrentFingerprint: () => live() ? fingerprint : "olearn-page-changed",
+                targets: targets2.map(target => ({
+                  ...target,
+                  isConnected: () => live() && target.isConnected(),
+                  apply: (op, abort) => live() ? target.apply(op, abort) : Promise.resolve(false),
+                  verify: (op, abort) => live() ? target.verify(op, abort) : Promise.resolve(false)
+                }))
+              });
+              records.set(parsed.node.path, {
+                parsed: parsed,
+                live: live
+              });
+              registered++;
+            } catch {}
+          }
+          return registered;
+        }
+      });
+    }
   }
 
   const QINGSHU_HOOK_IDS = [ "qingshu.ready", "qingshu.capture", "qingshu.harvest", "qingshu.applyPlan" ];
@@ -6100,8 +6671,8 @@
 
   function umuNative(document2) {
     var _a, _b, _c, _d;
-    const page = (_a = pageWindowForDocument(document2)) == null ? void 0 : _a.document;
-    const layout = page && attemptRoot(page);
+    const page2 = (_a = pageWindowForDocument(document2)) == null ? void 0 : _a.document;
+    const layout = page2 && attemptRoot(page2);
     const root = (layout == null ? void 0 : layout.classList.contains("single-quiz")) ? layout : layout == null ? void 0 : layout.querySelector(".controller-panel");
     if (!root) return null;
     let f = root[Object.keys(root).find(k => k.startsWith("__reactFiber$")) ?? ""];
@@ -6677,6 +7248,16 @@
   }
 
   const PLATFORM_PRIVATE_HOOKS = Object.freeze({
+    learnin: Object.freeze({
+      primitiveIds: LEARNIN_HOOK_IDS,
+      registerForVerification: registry => registerLearninHooks(registry),
+      registerForRuntime: registerLearninHooks
+    }),
+    olearn: Object.freeze({
+      primitiveIds: OLEARN_HOOK_IDS,
+      registerForVerification: registry => registerOlearnHooks(registry),
+      registerForRuntime: registerOlearnHooks
+    }),
     mosoteach: Object.freeze({
       primitiveIds: MOSOTEACH_HOOK_IDS,
       registerForVerification: registry => registerMosoteachHooks(registry),
@@ -6754,7 +7335,7 @@
 
   const RULE_EXPRESSION_SERVICES = createRuleExpressionServices();
 
-  const RULE_ENGINE_VERSION = "1.17.0";
+  const RULE_ENGINE_VERSION = "1.20.0";
 
   const RULE_LIMITS = Object.freeze({
     maxSteps: 5e4,
@@ -6792,6 +7373,16 @@
   const CHA0XING_RULE_POLICY = platformRulePolicy("chaoxing");
 
   const TRUSTED_REMOTE_RULE_PLATFORMS = Object.freeze([ Object.freeze({
+    platform: "learnin",
+    packageId: "learnin-homework",
+    hosts: Object.freeze([ "www.learnin.com.cn" ]),
+    policy: platformRulePolicy("learnin")
+  }), Object.freeze({
+    platform: "olearn",
+    packageId: "olearn-homework",
+    hosts: Object.freeze([ "cjzzxylearning.o-learn.cn" ]),
+    policy: platformRulePolicy("olearn")
+  }), Object.freeze({
     platform: "mosoteach",
     packageId: "mosoteach-quiz",
     hosts: Object.freeze([ "www.mosoteach.cn" ]),
@@ -6848,7 +7439,7 @@
     policy: GENERIC_DOM_RULE_POLICY
   }) ]);
 
-  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|mooc1\.ceduacad\.ahut\.edu\.cn|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn|learning\.wencaischool\.net|m\.umu\.cn|degree\.qingshuxuetang\.com|www\.mosoteach\.cn)$/u;
+  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|mooc1\.ceduacad\.ahut\.edu\.cn|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn|learning\.wencaischool\.net|m\.umu\.cn|degree\.qingshuxuetang\.com|www\.mosoteach\.cn|cjzzxylearning\.o-learn\.cn|www\.learnin\.com\.cn)$/u;
 
   function trustedRemoteRulePlatformFor(hostname) {
     const host = normalizedHost(hostname);
@@ -6860,34 +7451,34 @@
   }
 
   function validatedRulePackageIdFor(location2) {
-    const page = new URL(location2.href);
-    if (!isChaoxingRuleHost(page.hostname)) return null;
-    if (page.hostname === "mooc1.ceduacad.ahut.edu.cn" && ![ "/mooc-ans/work/selectWorkQuestionYiPiYue", "/work/selectWorkQuestionYiPiYue", "/mooc-ans/work/doHomeWorkNew", "/mooc-ans/mooc2/work/dowork", "/mooc-ans/mooc2/work/view" ].includes(page.pathname)) return null;
-    if (CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page.pathname) && page.searchParams.get("mooc2") === "1") return CHA0XING_PACKAGE_IDS.studentstudy;
-    if (page.pathname === "/mooc-ans/work/selectWorkQuestionYiPiYue" || page.pathname === "/work/selectWorkQuestionYiPiYue") return CHA0XING_PACKAGE_IDS.studentstudy;
-    if (page.pathname === "/exam-ans/exam/test/reVersionTestStartNew" || page.pathname === CHA0XING_EXAM_PREVIEW_PATH) return CHA0XING_PACKAGE_IDS.examStudent;
-    if (page.pathname === "/mooc-ans/work/doHomeWorkNew" && page.searchParams.get("mooc2") === "1") return CHA0XING_PACKAGE_IDS.newChapter;
-    if (page.pathname === "/mooc-ans/work/doHomeWorkNew" && page.searchParams.get("mooc2") === "0") return CHA0XING_PACKAGE_IDS.oldChapter;
-    if (page.pathname === "/mooc-ans/work/doHomeWorkNew" && page.searchParams.get("mooc") === "1") return CHA0XING_PACKAGE_IDS.oldHomework;
-    if (page.pathname === "/mooc-ans/mooc2/work/dowork") return CHA0XING_PACKAGE_IDS.dowork;
-    if (page.pathname === "/mooc-ans/mooc2/work/view") return CHA0XING_PACKAGE_IDS.dowork;
+    const page2 = new URL(location2.href);
+    if (!isChaoxingRuleHost(page2.hostname)) return null;
+    if (page2.hostname === "mooc1.ceduacad.ahut.edu.cn" && ![ "/mooc-ans/work/selectWorkQuestionYiPiYue", "/work/selectWorkQuestionYiPiYue", "/mooc-ans/work/doHomeWorkNew", "/mooc-ans/mooc2/work/dowork", "/mooc-ans/mooc2/work/view" ].includes(page2.pathname)) return null;
+    if (CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page2.pathname) && page2.searchParams.get("mooc2") === "1") return CHA0XING_PACKAGE_IDS.studentstudy;
+    if (page2.pathname === "/mooc-ans/work/selectWorkQuestionYiPiYue" || page2.pathname === "/work/selectWorkQuestionYiPiYue") return CHA0XING_PACKAGE_IDS.studentstudy;
+    if (page2.pathname === "/exam-ans/exam/test/reVersionTestStartNew" || page2.pathname === CHA0XING_EXAM_PREVIEW_PATH) return CHA0XING_PACKAGE_IDS.examStudent;
+    if (page2.pathname === "/mooc-ans/work/doHomeWorkNew" && page2.searchParams.get("mooc2") === "1") return CHA0XING_PACKAGE_IDS.newChapter;
+    if (page2.pathname === "/mooc-ans/work/doHomeWorkNew" && page2.searchParams.get("mooc2") === "0") return CHA0XING_PACKAGE_IDS.oldChapter;
+    if (page2.pathname === "/mooc-ans/work/doHomeWorkNew" && page2.searchParams.get("mooc") === "1") return CHA0XING_PACKAGE_IDS.oldHomework;
+    if (page2.pathname === "/mooc-ans/mooc2/work/dowork") return CHA0XING_PACKAGE_IDS.dowork;
+    if (page2.pathname === "/mooc-ans/mooc2/work/view") return CHA0XING_PACKAGE_IDS.dowork;
     return null;
   }
 
   function isNewCourseStudyUrl(location2) {
-    const page = new URL(location2.href);
-    if (page.hostname !== "chaoxing.com" && !page.hostname.endsWith(".chaoxing.com")) return false;
-    return CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page.pathname) && page.searchParams.get("mooc2") === "1";
+    const page2 = new URL(location2.href);
+    if (page2.hostname !== "chaoxing.com" && !page2.hostname.endsWith(".chaoxing.com")) return false;
+    return CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page2.pathname) && page2.searchParams.get("mooc2") === "1";
   }
 
   function legacyStudentstudyUpgradeUrl(location2) {
-    const page = new URL(location2.href);
-    if (page.hostname !== "chaoxing.com" && !page.hostname.endsWith(".chaoxing.com")) return null;
-    if (!CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page.pathname)) return null;
-    if (page.searchParams.get("mooc2") === "1") return null;
-    page.pathname = "/mycourse/studentstudy";
-    page.searchParams.set("mooc2", "1");
-    return page.toString();
+    const page2 = new URL(location2.href);
+    if (page2.hostname !== "chaoxing.com" && !page2.hostname.endsWith(".chaoxing.com")) return null;
+    if (!CHA0XING_STUDENTSTUDY_PATHS.some(pathname => pathname === page2.pathname)) return null;
+    if (page2.searchParams.get("mooc2") === "1") return null;
+    page2.pathname = "/mycourse/studentstudy";
+    page2.searchParams.set("mooc2", "1");
+    return page2.toString();
   }
 
   const ENGINE_RECHECK_BUDGET = new core.EngineRecheckBudget;
@@ -7018,12 +7609,12 @@
     return location2.protocol === "https:" && location2.hostname === "jxjynew.ahjxjy.cn" && location2.pathname === "/app/jxjy-student-space-web" && /^#\/myCourse\/courseStudy(?:\?|$)/u.test(location2.hash);
   }
 
-  function read$2(documents) {
+  function read$3(documents) {
     var _a, _b;
     for (const doc of documents) {
       if (!doc.defaultView || !isAnhuiCourseStudyUrl(doc.defaultView.location)) continue;
-      const page = (_a = pageWindowForDocument(doc)) == null ? void 0 : _a.document;
-      const native = (_b = page == null ? void 0 : page.querySelector("micro-app-body>#app>div")) == null ? void 0 : _b.__vue__;
+      const page2 = (_a = pageWindowForDocument(doc)) == null ? void 0 : _a.document;
+      const native = (_b = page2 == null ? void 0 : page2.querySelector("micro-app-body>#app>div")) == null ? void 0 : _b.__vue__;
       if (!native || !identity(native.courseId) || !identity(native.cellId) || !Array.isArray(native.designList) || !native.designList.length || native.designList.length > 64) continue;
       const params = new URLSearchParams(doc.defaultView.location.hash.split("?")[1]);
       if (params.get("courseId") !== native.courseId || params.get("cellId") !== native.cellId) continue;
@@ -7063,7 +7654,7 @@
     return null;
   }
 
-  function kind(cell) {
+  function kind$1(cell) {
     if (cell.resType === 1 && [ "mp4", "zipx" ].includes(cell.extension.toLowerCase())) return "media";
     if (cell.resType === 2 && [ "ppt", "pdf", "doc" ].includes(cell.extension.toLowerCase())) return "document";
     return "unknown";
@@ -7106,7 +7697,7 @@
     const done = (state, cell) => cell.studyCount === 100 || completed.has(key(state.native.courseId, cell.id));
     const next = state => state.resources.find(r => {
       var _a;
-      return !done(state, r.cell) && ((_a = options.isKindEnabled) == null ? void 0 : _a.call(options, kind(r.cell))) !== false;
+      return !done(state, r.cell) && ((_a = options.isKindEnabled) == null ? void 0 : _a.call(options, kind$1(r.cell))) !== false;
     });
     const navigatePending = state => {
       var _a, _b;
@@ -7154,7 +7745,7 @@
       step(documents, given) {
         var _a, _b, _c;
         options = given;
-        const state = read$2(documents);
+        const state = read$3(documents);
         if (!state) return {
           kind: "blocked",
           reason: "locked"
@@ -7179,7 +7770,7 @@
           }
           pending = null;
         }
-        if (kind(current.cell) === "unknown" || native.resType !== current.cell.resType) return {
+        if (kind$1(current.cell) === "unknown" || native.resType !== current.cell.resType) return {
           kind: "blocked",
           reason: "locked"
         };
@@ -7202,7 +7793,7 @@
         if (native.isStudy === 1) completed.add(taskKey);
         if (done(state, current.cell)) {
           const upcoming = next(state);
-          if (upcoming && kind(upcoming.cell) === "unknown") return {
+          if (upcoming && kind$1(upcoming.cell) === "unknown") return {
             kind: "blocked",
             reason: "locked"
           };
@@ -7210,11 +7801,11 @@
             kind: "finished"
           };
         }
-        if (((_a = given.isKindEnabled) == null ? void 0 : _a.call(given, kind(current.cell))) === false) return {
+        if (((_a = given.isKindEnabled) == null ? void 0 : _a.call(given, kind$1(current.cell))) === false) return {
           kind: "all-done",
           declared: 1
         };
-        if (kind(current.cell) === "document") {
+        if (kind$1(current.cell) === "document") {
           if (native.previewType !== (current.cell.extension.toLowerCase() === "pdf" ? 4 : 1)) return {
             kind: "blocked",
             reason: "locked"
@@ -7289,13 +7880,13 @@
         };
       },
       survey(documents) {
-        const state = read$2(documents);
+        const state = read$3(documents);
         return state ? {
           authoritative: true,
           declared: 1,
           tasks: [ {
             document: state.doc,
-            kind: kind(state.current.cell),
+            kind: kind$1(state.current.cell),
             jobId: state.native.cellId,
             name: state.current.cell.title,
             skip: done(state, state.current.cell) ? "passed" : null,
@@ -7309,7 +7900,7 @@
         };
       },
       courseCounter(documents) {
-        const state = read$2(documents);
+        const state = read$3(documents);
         return state ? {
           unfinished: state.resources.filter(r => !done(state, r.cell)).length
         } : null;
@@ -7323,11 +7914,11 @@
         tabs: () => null,
         advanceTab: () => false,
         sectionSignature: documents => {
-          const s = read$2(documents);
+          const s = read$3(documents);
           return s ? key(s.native.courseId, s.native.cellId) : "";
         },
         sectionCursor: documents => {
-          const s = read$2(documents);
+          const s = read$3(documents);
           return s ? {
             courseId: s.native.courseId,
             chapterId: s.native.cellId,
@@ -7337,7 +7928,7 @@
           } : null;
         },
         chapters: documents => {
-          const s = read$2(documents);
+          const s = read$3(documents);
           if (!s) return [];
           const chapters = s.native.designList.map(module => {
             const element = unique(s.doc, ".course-directory .module-name", module.title);
@@ -7356,10 +7947,10 @@
         chapterLabel: c => c.chapterId ?? "",
         advanceSection(documents) {
           var _a;
-          const state = read$2(documents);
-          if (!state || pending || blocked(state.native) || state.native.loading || !done(state, state.current.cell) && ((_a = options.isKindEnabled) == null ? void 0 : _a.call(options, kind(state.current.cell))) !== false) return false;
+          const state = read$3(documents);
+          if (!state || pending || blocked(state.native) || state.native.loading || !done(state, state.current.cell) && ((_a = options.isKindEnabled) == null ? void 0 : _a.call(options, kind$1(state.current.cell))) !== false) return false;
           const resource = next(state);
-          if (!resource || resource.cell.id === state.native.cellId || kind(resource.cell) === "unknown") return false;
+          if (!resource || resource.cell.id === state.native.cellId || kind$1(resource.cell) === "unknown") return false;
           pending = {
             courseId: state.native.courseId,
             resource: resource,
@@ -7600,17 +8191,17 @@
 
   function activeMedia(documents) {
     for (const doc of documents) for (const candidate of doc.querySelectorAll("video, audio")) {
-      const media = candidate;
-      if (!media.paused && media.readyState > 0) return media;
+      const media2 = candidate;
+      if (!media2.paused && media2.readyState > 0) return media2;
     }
     return null;
   }
 
-  function mediaPosition(media) {
+  function mediaPosition(media2) {
     return {
-      currentSeconds: media.currentTime,
-      totalSeconds: Number.isFinite(media.duration) ? media.duration : null,
-      rate: media.playbackRate
+      currentSeconds: media2.currentTime,
+      totalSeconds: Number.isFinite(media2.duration) ? media2.duration : null,
+      rate: media2.playbackRate
     };
   }
 
@@ -7633,12 +8224,12 @@
   }
 
   function courseProgress(documents, survey, skipped, activeTask, course) {
-    const media = activeMedia(documents);
+    const media2 = activeMedia(documents);
     return {
       task: activeTask ? {
         name: activeTask.name,
         kind: activeTask.kind,
-        position: media ? mediaPosition(media) : null
+        position: media2 ? mediaPosition(media2) : null
       } : null,
       section: sectionLayer(survey, skipped),
       course: course
@@ -7686,20 +8277,20 @@
     return out;
   }
 
-  const playableSource = media => !!(media.currentSrc || media.getAttribute("src") || media.querySelector("source[src]") || media.readyState >= 1);
+  const playableSource = media2 => !!(media2.currentSrc || media2.getAttribute("src") || media2.querySelector("source[src]") || media2.readyState >= 1);
 
   const playableMediaList = documents => {
     const found = [];
     for (const doc of documents) for (const candidate of doc.querySelectorAll("video, audio")) {
-      const media = candidate;
-      if (playableSource(media)) found.push(media);
+      const media2 = candidate;
+      if (playableSource(media2)) found.push(media2);
     }
     return found;
   };
 
   const allMediaEnded = document2 => {
-    const media = playableMediaList([ document2 ]);
-    return media.length > 0 && media.every(item => item.ended);
+    const media2 = playableMediaList([ document2 ]);
+    return media2.length > 0 && media2.every(item => item.ended);
   };
 
   function skippedTasks(survey, options) {
@@ -7721,10 +8312,10 @@
   function pauseAllMedia(documents) {
     let paused = false;
     for (const doc of documents) for (const el of doc.querySelectorAll("video, audio")) {
-      const media = el;
-      if (media.paused) continue;
+      const media2 = el;
+      if (media2.paused) continue;
       try {
-        media.pause();
+        media2.pause();
         paused = true;
       } catch {}
     }
@@ -8135,8 +8726,8 @@
     const src = (frame == null ? void 0 : frame.getAttribute("src")) ?? "";
     const raw = (_a = /[?&]timing=(\d+)/u.exec(src)) == null ? void 0 : _a[1];
     const timing = raw ? Number.parseInt(raw, 10) : TIMED_READ_FALLBACK_SECONDS;
-    const seconds = Number.isFinite(timing) ? timing : TIMED_READ_FALLBACK_SECONDS;
-    return (seconds + TIMED_READ_SLACK_SECONDS) * TIMED_READ_ROUNDS;
+    const seconds2 = Number.isFinite(timing) ? timing : TIMED_READ_FALLBACK_SECONDS;
+    return (seconds2 + TIMED_READ_SLACK_SECONDS) * TIMED_READ_ROUNDS;
   };
 
   const moduleOf = attachment => {
@@ -8395,7 +8986,7 @@
 
   const NETWORK_LOADING = 2;
 
-  const isLoadingMedia = media => media.networkState === NETWORK_LOADING;
+  const isLoadingMedia = media2 => media2.networkState === NETWORK_LOADING;
 
   const hasLoadingMedia = documents => documents.some(doc => [ ...doc.querySelectorAll("video, audio") ].some(el => isLoadingMedia(el)));
 
@@ -8432,8 +9023,8 @@
     switch (task.kind) {
      case "media":
       {
-        const media = playableMediaList([ task.document ]);
-        const pending = media.find(item => !item.ended) ?? playableMediaList(documents).find(item => !item.ended);
+        const media2 = playableMediaList([ task.document ]);
+        const pending = media2.find(item => !item.ended) ?? playableMediaList(documents).find(item => !item.ended);
         if (!pending) {
           const live = documents.some(doc => [ ...doc.querySelectorAll("video, audio") ].some(item => !item.paused));
           if (!live && documents.some(doc => startPlayer(doc))) return {
@@ -8511,14 +9102,14 @@
     }
     const survey = surveyTasks(documents);
     if (survey.authoritative) return stepSurveyedTask(survey, documents, options, paper2);
-    const media = playableMediaList(documents);
+    const media2 = playableMediaList(documents);
     const markerDone = documents.slice(1).some(taskAlreadyDone);
-    if (markerDone && media.length <= 1) return {
+    if (markerDone && media2.length <= 1) return {
       kind: "finished"
     };
-    const pending = media.find(item => !item.ended);
+    const pending = media2.find(item => !item.ended);
     if (!pending) {
-      if (media.length > 0) return {
+      if (media2.length > 0) return {
         kind: "finished"
       };
       return {
@@ -8661,6 +9252,849 @@
     };
   }
 
+  const ROUTE$2 = /^#\/user\/student\/course\/([a-f0-9]{32})\/learn\/([a-f0-9]{32})(\?hideChapter=true)?$/u;
+
+  function isLearninCourseStudyUrl(location2) {
+    return location2.origin === "https://www.learnin.com.cn" && location2.pathname === "/user/" && ROUTE$2.test(location2.hash);
+  }
+
+  function page$1(documents) {
+    var _a, _b;
+    for (const doc of documents) {
+      const location2 = (_a = doc.defaultView) == null ? void 0 : _a.location;
+      const match = location2 && isLearninCourseStudyUrl(location2) ? ROUTE$2.exec(location2.hash) : null;
+      const roots2 = doc.querySelectorAll(".page-student-course-outline-learn");
+      const players = (_b = roots2[0]) == null ? void 0 : _b.querySelectorAll(".media-player-container[vid]");
+      const mediaId = (players == null ? void 0 : players.length) === 1 ? players[0].getAttribute("vid") ?? "" : "";
+      if (location2 && match && roots2.length === 1) return {
+        doc: doc,
+        location: location2,
+        root: roots2[0],
+        courseId: match[1],
+        itemId: match[2],
+        single: !!match[3],
+        key: `${match[1]}/${match[2]}/${mediaId.slice(0, 128)}`
+      };
+    }
+    return null;
+  }
+
+  function gated$2(doc) {
+    return [ ...doc.querySelectorAll('.el-message-box__wrapper,.el-dialog__wrapper,[role="dialog"],.geetest_panel') ].some(e => {
+      var _a;
+      if (e.closest(".video-js")) return false;
+      let ancestor = e;
+      for (let depth = 0; ancestor && depth < 64; depth++) {
+        const style = (_a = doc.defaultView) == null ? void 0 : _a.getComputedStyle(ancestor);
+        if (ancestor.hasAttribute("hidden") || ancestor.getAttribute("aria-hidden") === "true" || (style == null ? void 0 : style.display) === "none" || (style == null ? void 0 : style.visibility) === "hidden") return false;
+        ancestor = ancestor.parentElement;
+      }
+      return true;
+    });
+  }
+
+  function seconds(text2) {
+    if (!/^\d{2}:([0-5]\d):([0-5]\d)$/u.test(text2)) return null;
+    const [h, m, s] = text2.split(":").map(Number);
+    return h * 3600 + m * 60 + s;
+  }
+
+  function media(p) {
+    var _a, _b, _c, _d;
+    const titles = p.root.querySelectorAll(p.single ? ".student-learn-video-slot .playback-header .course-live-title" : ".chapter-section-title > span");
+    const kinds = p.root.querySelectorAll(".section-content-addition-title-content");
+    const videos = p.root.querySelectorAll(".student-learn-video-slot .media-player-container video");
+    const hints = p.root.querySelectorAll(".student-learn-video-slot .video-hint");
+    const name = ((_b = (_a = titles[0]) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim()) ?? "";
+    if (titles.length !== 1 || !name || name.length > 1e3 || kinds.length !== 1 || !/^\u5fc5\u5b66\s*\|\s*\u5f55\u64ad\u2014/u.test(((_c = kinds[0].textContent) == null ? void 0 : _c.trim()) ?? "") || videos.length !== 1 || p.doc.querySelectorAll("video").length !== 1 || hints.length !== 1) return null;
+    const times = (_d = hints[0].textContent) == null ? void 0 : _d.match(/\u89c2\u770b\u65f6\u957f\u5e94\u8fbe\u5230\s*(\d{2}:\d{2}:\d{2})\s*\uff0c\u5f53\u524d\u5df2\u89c2\u770b\s*(\d{2}:\d{2}:\d{2})?\s*\u3002/u);
+    const required = times ? seconds(times[1]) : null;
+    const watched = (times == null ? void 0 : times[2]) ? seconds(times[2]) : 0;
+    if (required === null || required <= 0 || watched === null) return null;
+    return {
+      name: name,
+      video: videos[0],
+      finished: watched >= required
+    };
+  }
+
+  function createLearninCourseAdapter() {
+    let observed = "";
+    let observedAt = 0;
+    let playAt = 0;
+    let endedAt = 0;
+    let options = {};
+    let pending = null;
+    return {
+      resetRun() {
+        observed = "";
+        playAt = 0;
+        endedAt = 0;
+        pending = null;
+      },
+      step(documents, given) {
+        var _a;
+        options = given;
+        const p = page$1(documents);
+        const now = Date.now();
+        if (!p) return {
+          kind: "blocked",
+          reason: "locked"
+        };
+        if (observed !== p.key) {
+          observed = p.key;
+          observedAt = now;
+          playAt = 0;
+          endedAt = 0;
+        }
+        if (gated$2(p.doc)) return {
+          kind: "blocked",
+          reason: "face-recognition"
+        };
+        const m = media(p);
+        if (pending) {
+          if (p.key !== pending.from && m && m.name !== pending.name) pending = null; else return now - pending.at < 15e3 ? {
+            kind: "starting",
+            name: pending.name,
+            taskKey: p.key
+          } : {
+            kind: "blocked",
+            reason: "advance-failed"
+          };
+        }
+        if (!m) return now - observedAt < 2e4 ? {
+          kind: "starting",
+          name: "",
+          taskKey: p.key
+        } : {
+          kind: "blocked",
+          reason: "locked"
+        };
+        if (m.finished) return {
+          kind: "finished"
+        };
+        if (((_a = given.isKindEnabled) == null ? void 0 : _a.call(given, "media")) === false) return {
+          kind: "all-done",
+          declared: 1
+        };
+        const v = m.video;
+        const starting = {
+          kind: "starting",
+          name: m.name,
+          taskKey: p.key
+        };
+        if (v.error) return {
+          kind: "blocked",
+          reason: "media-error"
+        };
+        if (!Number.isFinite(v.duration) || v.duration <= 0 || v.readyState === 0) return now - observedAt < 2e4 ? starting : {
+          kind: "blocked",
+          reason: "media-error"
+        };
+        if (v.ended) {
+          endedAt || (endedAt = now);
+          return now - endedAt < 6e4 ? starting : {
+            kind: "blocked",
+            reason: "advance-failed"
+          };
+        }
+        if (!v.paused) return {
+          kind: "playing",
+          rate: v.playbackRate
+        };
+        if (playAt) return now - playAt < 5e3 ? starting : {
+          kind: "blocked",
+          reason: "not-playing"
+        };
+        v.playbackRate = 1;
+        v.volume = Math.max(0, Math.min(1, given.volume ?? 0));
+        v.muted = v.volume === 0;
+        try {
+          Promise.resolve(v.play()).catch(() => void 0);
+          playAt = now;
+        } catch {
+          return {
+            kind: "blocked",
+            reason: "media-error"
+          };
+        }
+        return starting;
+      },
+      survey(documents) {
+        const p = page$1(documents);
+        const m = p && media(p);
+        return p && m ? {
+          authoritative: true,
+          declared: 1,
+          tasks: [ {
+            document: p.doc,
+            kind: "media",
+            jobId: p.itemId,
+            name: m.name,
+            skip: m.finished ? "passed" : null,
+            dwellSeconds: 0,
+            key: p.key
+          } ]
+        } : {
+          authoritative: false,
+          declared: 0,
+          tasks: []
+        };
+      },
+      courseCounter: () => null,
+      simulateReading: () => ({
+        frames: 0,
+        scrolled: 0,
+        pagers: 0
+      }),
+      navigate: {
+        tabs: () => null,
+        advanceTab: () => false,
+        sectionSignature: documents => {
+          var _a;
+          return ((_a = page$1(documents)) == null ? void 0 : _a.key) ?? "";
+        },
+        sectionCursor: documents => {
+          const p = page$1(documents);
+          return p && !p.single ? {
+            courseId: p.courseId,
+            chapterId: p.itemId,
+            clazzId: "",
+            tabCount: 1,
+            document: p.doc
+          } : null;
+        },
+        chapters: () => [],
+        nextUnfinishedChapter: () => null,
+        jumpToChapter: () => false,
+        isSpecialMode: () => false,
+        chapterLabel: () => "",
+        advanceSection(documents) {
+          var _a, _b;
+          const p = page$1(documents);
+          const m = p && media(p);
+          if (!p || p.single || !m || pending || gated$2(p.doc) || !m.finished && ((_a = options.isKindEnabled) == null ? void 0 : _a.call(options, "media")) !== false) return false;
+          const targets2 = p.root.querySelectorAll(".learn-header .next-chapter > button");
+          if (targets2.length !== 1 || targets2[0].disabled || ((_b = targets2[0].textContent) == null ? void 0 : _b.trim()) !== "\u4e0b\u4e00\u8282") return false;
+          const bindings = new core.RuleBindingRegistry({
+            maxBindings: 1
+          });
+          try {
+            core.assertNavClickTarget(targets2[0], p.location, {
+              bindings: bindings,
+              commitEntryText: () => null
+            }).click();
+          } catch {
+            return false;
+          } finally {
+            bindings.dispose();
+          }
+          pending = {
+            from: p.key,
+            name: m.name,
+            at: Date.now()
+          };
+          return true;
+        }
+      }
+    };
+  }
+
+  const UUID = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/iu;
+
+  const ROUTE$1 = /^\/web\/cc-detail\/([a-f\d-]{36})\/res\/?$/iu;
+
+  function isMosoteachCourseStudyUrl(location2) {
+    const match = ROUTE$1.exec(location2.pathname);
+    return location2.origin === "https://www.mosoteach.cn" && !!match && UUID.test(match[1]);
+  }
+
+  const kind = r => r.mimeType === "video/mp4" ? "media" : r.mimeType === "mosoink/url" ? "hyperlink" : r.mimeType.startsWith("image/") || [ "application/pdf", "application/msword", "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml" ].includes(r.mimeType) ? "document" : "unknown";
+
+  const credited = r => r.score > 0 && r.obtainScore >= r.score;
+
+  function read$2(documents) {
+    var _a, _b, _c, _d, _e;
+    for (const doc of documents) {
+      const location2 = (_a = doc.defaultView) == null ? void 0 : _a.location;
+      if (!location2 || !isMosoteachCourseStudyUrl(location2)) continue;
+      const main = (_b = pageWindowForDocument(doc)) == null ? void 0 : _b.document.querySelector("main");
+      const elements = main == null ? void 0 : main.querySelectorAll("div");
+      if (!elements || elements.length > 2e4) continue;
+      const lists = new Set;
+      for (const element of elements) {
+        const vm = element.__vue__;
+        if (((_c = vm == null ? void 0 : vm.$options) == null ? void 0 : _c.name) === "MResourceList" && vm.$el === element) lists.add(vm);
+      }
+      if (lists.size !== 1) continue;
+      const list = [ ...lists ][0];
+      const courseId = (_d = ROUTE$1.exec(location2.pathname)) == null ? void 0 : _d[1];
+      if (list.ccId !== courseId || list.roleId !== 2 || typeof list.onResourceItemClick !== "function" || !Array.isArray(list.resources) || !list.resources.length || list.resources.length > 1e3 || !Array.isArray(list.resourceByGroups) || list.resourceByGroups.length > 128) continue;
+      const resources = list.resources;
+      if (resources.some(r => !r || !UUID.test(r.id) || r.clazzCourseId !== courseId || typeof r.name !== "string" || !r.name.trim() || r.name.length > 1e3 || typeof r.mimeType !== "string" || !Number.isFinite(r.score) || r.score < 0 || !Number.isFinite(r.obtainScore) || r.obtainScore < 0 && r.obtainScore !== -1) || new Set(resources.map(r => r.id)).size !== resources.length) continue;
+      if (list.resourceByGroups.some(g => !Array.isArray(g == null ? void 0 : g.resources) || g.resources.length > 1e3)) continue;
+      const grouped = list.resourceByGroups.flatMap(g => g.resources);
+      const resourceIds = new Set(resources.map(r => r.id));
+      if (grouped.length !== resources.length || new Set(grouped.map(r => r == null ? void 0 : r.id)).size !== resources.length || grouped.some(r => !resourceIds.has(r.id) || r.clazzCourseId !== courseId)) continue;
+      const player2 = (_e = list.$refs) == null ? void 0 : _e.playerDialog;
+      return {
+        doc: doc,
+        list: list,
+        resources: resources,
+        courseId: courseId,
+        player: (player2 == null ? void 0 : player2.$parent) === list ? player2 : void 0
+      };
+    }
+    return null;
+  }
+
+  function visible$2(element) {
+    var _a;
+    let e = element;
+    for (let i = 0; e && i < 64; i++, e = e.parentElement) {
+      const s = (_a = e.ownerDocument.defaultView) == null ? void 0 : _a.getComputedStyle(e);
+      if (e.hasAttribute("hidden") || e.getAttribute("aria-hidden") === "true" || (s == null ? void 0 : s.display) === "none" || (s == null ? void 0 : s.visibility) === "hidden") return false;
+    }
+    return e === null;
+  }
+
+  function gated$1(p) {
+    return [ ...p.doc.querySelectorAll('.v-dialog--active,[role="dialog"]:not(.v-dialog__content),.geetest_panel') ].some(e => visible$2(e) && !e.querySelector("#videoPlayer"));
+  }
+
+  function createMosoteachCourseAdapter() {
+    let options = {};
+    let opened = "";
+    let openedAt = 0;
+    let playAt = 0;
+    let confirming = null;
+    const completed = new Set;
+    const key = (p, r) => `${p.courseId}/${r.id}`;
+    const done = (p, r) => credited(r) || completed.has(key(p, r));
+    const nextPending = p => p.resources.find(r => {
+      var _a;
+      return r.score > 0 && !done(p, r) && (kind(r) === "unknown" || ((_a = options.isKindEnabled) == null ? void 0 : _a.call(options, kind(r))) !== false);
+    });
+    const open = (p, r) => {
+      if (r.mimeType !== "video/mp4" || r.releaseStatus !== "Y" || r.viewerSupported !== "Y") return false;
+      try {
+        p.list.onResourceItemClick(r);
+      } catch {
+        return false;
+      }
+      opened = key(p, r);
+      openedAt = Date.now();
+      playAt = 0;
+      return true;
+    };
+    return {
+      resetRun() {
+        opened = "";
+        playAt = 0;
+        confirming = null;
+      },
+      step(documents, given) {
+        var _a, _b, _c, _d, _e;
+        options = given;
+        const p = read$2(documents);
+        if (!p) return {
+          kind: "blocked",
+          reason: "locked"
+        };
+        if (gated$1(p)) return {
+          kind: "blocked",
+          reason: "face-recognition"
+        };
+        const player2 = p.player;
+        const active2 = (player2 == null ? void 0 : player2.shown) ? p.resources.find(r => {
+          var _a2;
+          return r.id === ((_a2 = player2.resItem) == null ? void 0 : _a2.id) && r.clazzCourseId === player2.resItem.clazzCourseId;
+        }) : void 0;
+        if ((player2 == null ? void 0 : player2.shown) && !active2) return {
+          kind: "blocked",
+          reason: "locked"
+        };
+        if (active2 && opened !== key(p, active2)) {
+          opened = key(p, active2);
+          openedAt = Date.now();
+          playAt = 0;
+        }
+        const next = nextPending(p);
+        const starting = {
+          kind: "starting",
+          name: (active2 == null ? void 0 : active2.name) ?? (next == null ? void 0 : next.name) ?? "",
+          taskKey: active2 ? key(p, active2) : opened
+        };
+        if (confirming) {
+          if (Date.now() - confirming.at > 2e4) return {
+            kind: "blocked",
+            reason: "advance-failed"
+          };
+          const resource = p.resources.find(r => r.id === (confirming == null ? void 0 : confirming.id));
+          if (!resource) return {
+            kind: "blocked",
+            reason: "locked"
+          };
+          if (!confirming.reopened) {
+            if (Date.now() - confirming.at < 1e3) return starting;
+            if (!open(p, resource)) return {
+              kind: "blocked",
+              reason: "advance-failed"
+            };
+            confirming.reopened = true;
+            return starting;
+          }
+        }
+        if (!active2) {
+          if (!next) return {
+            kind: "all-done",
+            declared: p.resources.length
+          };
+          if (kind(next) !== "media") return {
+            kind: "blocked",
+            reason: "locked"
+          };
+          if (((_a = given.isKindEnabled) == null ? void 0 : _a.call(given, "media")) === false) return {
+            kind: "all-done",
+            declared: p.resources.length
+          };
+          if (opened === key(p, next)) return Date.now() - openedAt < 2e4 ? starting : {
+            kind: "blocked",
+            reason: "advance-failed"
+          };
+          return open(p, next) ? starting : {
+            kind: "blocked",
+            reason: "advance-failed"
+          };
+        }
+        if (done(p, active2)) return {
+          kind: "finished"
+        };
+        if (((_b = given.isKindEnabled) == null ? void 0 : _b.call(given, "media")) === false) return {
+          kind: "all-done",
+          declared: 1
+        };
+        const videos = p.doc.querySelectorAll("#videoPlayer video");
+        if (videos.length !== 1 || ((_d = (_c = player2 == null ? void 0 : player2.player) == null ? void 0 : _c.el()) == null ? void 0 : _d.querySelector("video")) !== videos[0]) return {
+          kind: "blocked",
+          reason: "media-error"
+        };
+        const video = videos[0];
+        if (!Number.isFinite(video.duration) || video.duration <= 0 || video.readyState === 0) return Date.now() - openedAt < 2e4 ? starting : {
+          kind: "blocked",
+          reason: "media-error"
+        };
+        if (typeof ((_e = player2.resItem) == null ? void 0 : _e.lastWatchTo) === "number" && typeof player2.resItem.watchTo === "number" && player2.resItem.lastWatchTo >= ((confirming == null ? void 0 : confirming.endPosition) ?? Math.floor(video.duration)) && player2.resItem.watchTo >= ((confirming == null ? void 0 : confirming.endPosition) ?? Math.floor(video.duration))) {
+          completed.add(key(p, active2));
+          confirming = null;
+          return {
+            kind: "finished"
+          };
+        }
+        if (confirming) return starting;
+        if (video.error) return {
+          kind: "blocked",
+          reason: "media-error"
+        };
+        if (video.ended) {
+          try {
+            player2.cancel();
+          } catch {
+            return {
+              kind: "blocked",
+              reason: "advance-failed"
+            };
+          }
+          confirming = {
+            id: active2.id,
+            at: Date.now(),
+            reopened: false,
+            endPosition: Math.floor(video.duration)
+          };
+          return starting;
+        }
+        if (!video.paused) return {
+          kind: "playing",
+          rate: video.playbackRate
+        };
+        if (playAt) return Date.now() - playAt < 5e3 ? starting : {
+          kind: "blocked",
+          reason: "not-playing"
+        };
+        video.playbackRate = 1;
+        video.volume = Math.max(0, Math.min(1, given.volume ?? 0));
+        video.muted = video.volume === 0;
+        try {
+          Promise.resolve(player2.player.play()).catch(() => void 0);
+          playAt = Date.now();
+        } catch {
+          return {
+            kind: "blocked",
+            reason: "media-error"
+          };
+        }
+        return starting;
+      },
+      survey(documents) {
+        var _a, _b;
+        const p = read$2(documents);
+        const activeId = ((_a = p == null ? void 0 : p.player) == null ? void 0 : _a.shown) ? (_b = p.player.resItem) == null ? void 0 : _b.id : null;
+        return p ? {
+          authoritative: true,
+          declared: p.resources.length,
+          tasks: p.resources.map(r => ({
+            document: p.doc,
+            kind: kind(r),
+            jobId: r.id,
+            name: r.name,
+            skip: r.score === 0 ? "not-a-job" : done(p, r) ? "passed" : null,
+            dwellSeconds: 0,
+            key: key(p, r)
+          })).sort((a, b) => Number(b.jobId === activeId) - Number(a.jobId === activeId))
+        } : {
+          authoritative: false,
+          declared: 0,
+          tasks: []
+        };
+      },
+      courseCounter(documents) {
+        const p = read$2(documents);
+        return p ? {
+          unfinished: p.resources.filter(r => r.score > 0 && !done(p, r)).length
+        } : null;
+      },
+      simulateReading: () => ({
+        frames: 0,
+        scrolled: 0,
+        pagers: 0
+      }),
+      navigate: {
+        tabs: () => null,
+        advanceTab: () => false,
+        sectionSignature(documents) {
+          var _a, _b;
+          const p = read$2(documents);
+          return p ? `${p.courseId}/${((_a = p.player) == null ? void 0 : _a.shown) ? (_b = p.player.resItem) == null ? void 0 : _b.id : "list"}` : "";
+        },
+        sectionCursor(documents) {
+          var _a, _b;
+          const p = read$2(documents);
+          return p ? {
+            courseId: p.courseId,
+            chapterId: ((_b = (_a = p.player) == null ? void 0 : _a.resItem) == null ? void 0 : _b.id) ?? "list",
+            clazzId: "",
+            tabCount: 1,
+            document: p.doc
+          } : null;
+        },
+        chapters: () => [],
+        nextUnfinishedChapter: () => null,
+        jumpToChapter: () => false,
+        isSpecialMode: () => false,
+        chapterLabel: () => "",
+        advanceSection(documents) {
+          var _a, _b;
+          const p = read$2(documents);
+          if (!p || gated$1(p) || confirming || !((_a = p.player) == null ? void 0 : _a.shown) || !p.player.resItem || !done(p, p.player.resItem)) return false;
+          const next = nextPending(p);
+          if (!next || kind(next) !== "media" || ((_b = options.isKindEnabled) == null ? void 0 : _b.call(options, "media")) === false) return false;
+          try {
+            p.player.cancel();
+          } catch {
+            return false;
+          }
+          opened = "";
+          playAt = 0;
+          return true;
+        }
+      }
+    };
+  }
+
+  const ROUTE = /^#\/course\/([a-f0-9]{32})\/learn\/outline\/courseware\/item\/([a-f0-9]{32})$/u;
+
+  const ICON_KIND = new Map([ [ "#icon-video_backup_lock", "media" ], [ "#icon-work_lock", "chapter-test" ] ]);
+
+  function isOlearnCourseStudyUrl(location2) {
+    return location2.protocol === "https:" && location2.hostname === "cjzzxylearning.o-learn.cn" && location2.pathname === "/student/" && ROUTE.test(location2.hash);
+  }
+
+  function page(documents) {
+    var _a;
+    for (const doc of documents) {
+      const location2 = (_a = doc.defaultView) == null ? void 0 : _a.location;
+      const match = location2 && isOlearnCourseStudyUrl(location2) ? ROUTE.exec(location2.hash) : null;
+      if (match) return {
+        doc: doc,
+        courseId: match[1],
+        itemId: match[2],
+        key: `${match[1]}/${match[2]}`
+      };
+    }
+    return null;
+  }
+
+  function outline(doc) {
+    var _a, _b, _c;
+    const roots2 = [ ...doc.querySelectorAll(".el-collapse:not(.sec-wrap)") ].filter(e => e.querySelector("li.three-content"));
+    if (roots2.length !== 1) return null;
+    const chapters = [ ...roots2[0].querySelectorAll(":scope > .el-collapse-item") ];
+    const total = roots2[0].querySelectorAll("li.three-content").length;
+    if (!chapters.length || chapters.length > 128 || total > 2048) return null;
+    const items = [];
+    for (const [chapter, element] of chapters.entries()) {
+      for (const li of element.querySelectorAll("li.three-content")) {
+        const names = li.querySelectorAll(".inner-three-name");
+        const bars = li.querySelectorAll('[role="progressbar"]');
+        const icons = li.querySelectorAll(".icon-wrap use");
+        const name = ((_b = (_a = names[0]) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim()) ?? "";
+        const value = ((_c = bars[0]) == null ? void 0 : _c.getAttribute("aria-valuenow")) ?? "";
+        if (names.length !== 1 || bars.length !== 1 || icons.length !== 1 || !name || name.length > 1e3 || !/^(?:100|[1-9]?\d)$/u.test(value)) return null;
+        const icon = icons[0].getAttribute("xlink:href") ?? icons[0].getAttribute("href");
+        items.push({
+          element: li,
+          name: name,
+          kind: ICON_KIND.get(icon ?? "") ?? "unknown",
+          percent: Number(value),
+          chapter: chapter
+        });
+      }
+    }
+    const active2 = items.filter(i => i.element.classList.contains("active"));
+    if (items.length !== total || active2.length !== 1) return null;
+    return {
+      chapters: chapters,
+      items: items,
+      current: active2[0],
+      complete: chapters.every(chapter => {
+        const sections2 = chapter.querySelectorAll(".sec-content");
+        return sections2.length > 0 && [ ...sections2 ].every(s => s.querySelector("li.three-content"));
+      })
+    };
+  }
+
+  function player(doc) {
+    const videos = doc.querySelectorAll(".media-video-wrapper .video-js > video");
+    return videos.length === 1 && doc.querySelectorAll("video").length === 1 ? videos[0] : null;
+  }
+
+  function gated(doc) {
+    const view2 = doc.defaultView;
+    return [ ...doc.querySelectorAll('.video-show-behavior-verification-layer > *,.el-overlay,.el-message-box,[role="dialog"]') ].some(e => !e.closest(".video-js") && !e.hidden && e.getAttribute("aria-hidden") !== "true" && (view2 == null ? void 0 : view2.getComputedStyle(e).display) !== "none" && (view2 == null ? void 0 : view2.getComputedStyle(e).visibility) !== "hidden");
+  }
+
+  function createOlearnCourseAdapter() {
+    let options = {};
+    let observed = "";
+    let observedAt = 0;
+    let playAt = 0;
+    let endedAt = 0;
+    let pending = null;
+    const enabled = kind2 => {
+      var _a;
+      return ((_a = options.isKindEnabled) == null ? void 0 : _a.call(options, kind2)) !== false;
+    };
+    return {
+      resetRun() {
+        observed = "";
+        playAt = 0;
+        endedAt = 0;
+        pending = null;
+      },
+      step(documents, given) {
+        options = given;
+        const p = page(documents);
+        if (!p) return {
+          kind: "blocked",
+          reason: "locked"
+        };
+        const now = Date.now();
+        if (observed !== p.key) {
+          observed = p.key;
+          observedAt = now;
+          playAt = 0;
+          endedAt = 0;
+        }
+        if (gated(p.doc)) return {
+          kind: "blocked",
+          reason: "face-recognition"
+        };
+        const tree = outline(p.doc);
+        if (pending) {
+          if (p.key !== pending.from && tree && tree.items.indexOf(tree.current) === pending.index && tree.current.name === pending.name) pending = null; else return now - pending.at < 15e3 ? {
+            kind: "starting",
+            name: pending.name,
+            taskKey: p.key
+          } : {
+            kind: "blocked",
+            reason: "advance-failed"
+          };
+        }
+        if (!tree) return now - observedAt < 2e4 ? {
+          kind: "starting",
+          name: "",
+          taskKey: p.key
+        } : {
+          kind: "blocked",
+          reason: "locked"
+        };
+        const {current: current} = tree;
+        const starting = {
+          kind: "starting",
+          name: current.name,
+          taskKey: p.key
+        };
+        if (current.percent === 100) return {
+          kind: "finished"
+        };
+        if (!enabled(current.kind)) return {
+          kind: "all-done",
+          declared: 1
+        };
+        if (current.kind !== "media") return {
+          kind: "blocked",
+          reason: "locked"
+        };
+        const video = player(p.doc);
+        if (video == null ? void 0 : video.error) return {
+          kind: "blocked",
+          reason: "media-error"
+        };
+        if (!video || !Number.isFinite(video.duration) || video.duration <= 0 || video.readyState === 0) return now - observedAt < 2e4 ? starting : {
+          kind: "blocked",
+          reason: "media-error"
+        };
+        if (video.ended) {
+          endedAt || (endedAt = now);
+          return now - endedAt < 6e4 ? starting : {
+            kind: "blocked",
+            reason: "advance-failed"
+          };
+        }
+        if (!video.paused) return {
+          kind: "playing",
+          rate: video.playbackRate
+        };
+        if (playAt) return now - playAt < 5e3 ? starting : {
+          kind: "blocked",
+          reason: "not-playing"
+        };
+        video.playbackRate = 1;
+        video.volume = Math.max(0, Math.min(1, given.volume ?? 0));
+        video.muted = video.volume === 0;
+        try {
+          Promise.resolve(video.play()).catch(() => void 0);
+          playAt = now;
+        } catch {
+          return {
+            kind: "blocked",
+            reason: "media-error"
+          };
+        }
+        return starting;
+      },
+      survey(documents) {
+        const p = page(documents);
+        const tree = p && outline(p.doc);
+        return p && tree ? {
+          authoritative: true,
+          declared: 1,
+          tasks: [ {
+            document: p.doc,
+            kind: tree.current.kind,
+            jobId: p.itemId,
+            name: tree.current.name,
+            skip: tree.current.percent === 100 ? "passed" : null,
+            dwellSeconds: 0,
+            key: p.key
+          } ]
+        } : {
+          authoritative: false,
+          declared: 0,
+          tasks: []
+        };
+      },
+      courseCounter(documents) {
+        const p = page(documents);
+        const tree = p && outline(p.doc);
+        return (tree == null ? void 0 : tree.complete) ? {
+          unfinished: tree.items.filter(i => i.percent < 100).length
+        } : null;
+      },
+      simulateReading: () => ({
+        frames: 0,
+        scrolled: 0,
+        pagers: 0
+      }),
+      navigate: {
+        tabs: () => null,
+        advanceTab: () => false,
+        sectionSignature: documents => {
+          var _a;
+          return ((_a = page(documents)) == null ? void 0 : _a.key) ?? "";
+        },
+        sectionCursor: documents => {
+          const p = page(documents);
+          return p ? {
+            courseId: p.courseId,
+            chapterId: p.itemId,
+            clazzId: "",
+            tabCount: 1,
+            document: p.doc
+          } : null;
+        },
+        chapters(documents) {
+          const p = page(documents);
+          const tree = p && outline(p.doc);
+          if (!(tree == null ? void 0 : tree.complete)) return [];
+          return tree.chapters.map((element, i) => ({
+            element: element,
+            chapterId: null,
+            active: tree.current.chapter === i,
+            unfinishedCount: tree.items.filter(x => x.chapter === i && x.percent < 100).length
+          }));
+        },
+        nextUnfinishedChapter: () => null,
+        jumpToChapter: () => false,
+        isSpecialMode: () => false,
+        chapterLabel: c => {
+          var _a, _b;
+          return ((_b = (_a = c.element.querySelector(".inner-first-name")) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim()) ?? "";
+        },
+        advanceSection(documents) {
+          var _a;
+          const p = page(documents);
+          const tree = p && outline(p.doc);
+          const location2 = (_a = p == null ? void 0 : p.doc.defaultView) == null ? void 0 : _a.location;
+          if (!p || !(tree == null ? void 0 : tree.complete) || !location2 || pending || gated(p.doc) || tree.current.percent < 100 && enabled(tree.current.kind)) return false;
+          const target = tree.items.find(i => i !== tree.current && i.percent < 100 && enabled(i.kind));
+          const name = target == null ? void 0 : target.element.querySelector(".inner-three-name");
+          if (!target || target.kind !== "media" || !name) return false;
+          const bindings = new core.RuleBindingRegistry({
+            maxBindings: 1
+          });
+          try {
+            core.assertNavClickTarget(name, location2, {
+              bindings: bindings,
+              commitEntryText: () => null
+            }).click();
+          } catch {
+            return false;
+          } finally {
+            bindings.dispose();
+          }
+          pending = {
+            from: p.key,
+            index: tree.items.indexOf(target),
+            name: target.name,
+            at: Date.now()
+          };
+          return true;
+        }
+      }
+    };
+  }
+
   function isQingshuCourseStudyUrl(location2) {
     const url = new URL(location2.href);
     return url.origin === "https://degree.qingshuxuetang.com" && url.pathname === "/nnsf/Student/Course/CourseShow" && [ "courseId", "teachPlanId", "periodId" ].every(k => url.searchParams.getAll(k).length === 1 && /^[1-9]\d{0,15}$/u.test(url.searchParams.get(k) ?? "")) && url.searchParams.getAll("nodeId").length === 1 && qingshuNodeId(url.searchParams.get("nodeId"));
@@ -8675,8 +10109,8 @@
       const video = doc.querySelectorAll("#playerContainer video");
       const menu = [ ...doc.querySelectorAll('#lessonMenu a[id^="courseware-"]') ];
       if (video.length !== 1 || menu.length > 500 || menu.filter(x => x.id === `courseware-${nodeId}`).length !== 1 || new Set(menu.map(x => x.id)).size !== menu.length) continue;
-      const page = pageWindowForDocument(doc);
-      if (((_e = (_d = (_c = (_b = (_a = page == null ? void 0 : page.CoursewarePlayer) == null ? void 0 : _a.videoPlayer) == null ? void 0 : _b.player) == null ? void 0 : _c.el) == null ? void 0 : _d.call(_c)) == null ? void 0 : _e.querySelector("video")) !== video[0]) continue;
+      const page2 = pageWindowForDocument(doc);
+      if (((_e = (_d = (_c = (_b = (_a = page2 == null ? void 0 : page2.CoursewarePlayer) == null ? void 0 : _a.videoPlayer) == null ? void 0 : _b.player) == null ? void 0 : _c.el) == null ? void 0 : _d.call(_c)) == null ? void 0 : _e.querySelector("video")) !== video[0]) continue;
       return {
         doc: doc,
         nodeId: nodeId,
@@ -8684,7 +10118,7 @@
         periodId: params.get("periodId"),
         video: video[0],
         menu: menu,
-        page: page,
+        page: page2,
         name: ((_g = (_f = doc.querySelector(".learn-title")) == null ? void 0 : _f.textContent) == null ? void 0 : _g.trim()) || nodeId,
         key: `${params.get("courseId")}/${params.get("periodId")}/${nodeId}`
       };
@@ -8874,8 +10308,8 @@
     var _a, _b, _c;
     for (const doc of documents) {
       if (!doc.defaultView || !isUmuCourseStudyUrl(doc.defaultView.location)) continue;
-      const page = pageWindowForDocument(doc);
-      const data = (_a = page == null ? void 0 : page.pageData) == null ? void 0 : _a.data;
+      const page2 = pageWindowForDocument(doc);
+      const data = (_a = page2 == null ? void 0 : page2.pageData) == null ? void 0 : _a.data;
       const element = data == null ? void 0 : data.element_info;
       const courseId = id((_b = data == null ? void 0 : data.course_info) == null ? void 0 : _b.id);
       const sessionId = id(element == null ? void 0 : element.element_id);
@@ -8904,8 +10338,8 @@
     let fiber = root[Object.keys(root).find(k => k.startsWith("__reactFiber$")) ?? ""];
     for (let depth = 0; fiber && depth < 100; depth++, fiber = fiber.return) {
       const node = fiber.stateNode;
-      const player = node == null ? void 0 : node.videoPlayer;
-      if (id((_b = node == null ? void 0 : node.props) == null ? void 0 : _b.elementId) === state.sessionId && (player == null ? void 0 : player.videoPlayer) === state.video && typeof player.play === "function") return player;
+      const player2 = node == null ? void 0 : node.videoPlayer;
+      if (id((_b = node == null ? void 0 : node.props) == null ? void 0 : _b.elementId) === state.sessionId && (player2 == null ? void 0 : player2.videoPlayer) === state.video && typeof player2.play === "function") return player2;
     }
     return null;
   }
@@ -8987,8 +10421,8 @@
           kind: "blocked",
           reason: "not-playing"
         };
-        const player = nativePlayer(state);
-        if (!player) return {
+        const player2 = nativePlayer(state);
+        if (!player2) return {
           kind: "blocked",
           reason: "media-error"
         };
@@ -8996,7 +10430,7 @@
         video.volume = Math.max(0, Math.min(1, given.volume ?? 0));
         video.muted = video.volume === 0;
         try {
-          (_b = player.play) == null ? void 0 : _b.call(player);
+          (_b = player2.play) == null ? void 0 : _b.call(player2);
           clickedAt = Date.now();
         } catch {
           return {
@@ -9089,6 +10523,9 @@
 
   function courseAdapterFor(platform, paper2) {
     if (platform === "chaoxing") return createChaoxingCourseAdapter(paper2);
+    if (platform === "mosoteach") return createMosoteachCourseAdapter();
+    if (platform === "learnin") return createLearninCourseAdapter();
+    if (platform === "olearn") return createOlearnCourseAdapter();
     if (platform === "anhui") return createAnhuiCourseAdapter();
     if (platform === "umu") return createUmuCourseAdapter();
     if (platform === "qingshu") return createQingshuCourseAdapter();
@@ -9097,6 +10534,9 @@
 
   function isCourseStudyUrl(platform, location2) {
     if (platform === "chaoxing") return isNewCourseStudyUrl(location2);
+    if (platform === "mosoteach") return isMosoteachCourseStudyUrl(location2);
+    if (platform === "learnin") return isLearninCourseStudyUrl(location2);
+    if (platform === "olearn") return isOlearnCourseStudyUrl(location2);
     if (platform === "anhui") return isAnhuiCourseStudyUrl(location2);
     if (platform === "umu") return isUmuCourseStudyUrl(location2);
     if (platform === "qingshu") return isQingshuCourseStudyUrl(location2);
@@ -10540,6 +11980,8 @@
   }
 
   const PLATFORM_LABEL = Object.freeze({
+    learnin: "Learnin \u6b63\u5728\u5b66",
+    olearn: "O-Learn\uff08\u4e0a\u6d77\u57ce\u5efa\u804c\u9662\uff09",
     mosoteach: "\u4e91\u73ed\u8bfe",
     qingshu: "\u9752\u4e66\u5b66\u5802",
     umu: "UMU \u4e92\u52a8\u5e73\u53f0",
@@ -10555,7 +11997,9 @@
   });
 
   const PLATFORM_CEILING = Object.freeze({
-    mosoteach: Object.freeze([ "answer" ]),
+    learnin: Object.freeze([ "answer", "harvest", "course-automation" ]),
+    olearn: Object.freeze([ "answer", "harvest", "course-automation" ]),
+    mosoteach: Object.freeze([ "answer", "harvest", "course-automation" ]),
     qingshu: Object.freeze([ "answer", "harvest", "course-automation" ]),
     umu: Object.freeze([ "answer", "harvest", "course-automation" ]),
     wencai: Object.freeze([ "answer", "harvest" ]),
@@ -11376,10 +12820,10 @@
         const raw = (_b = (_a = root == null ? void 0 : root.data) == null ? void 0 : _a.script) == null ? void 0 : _b.version;
         const version = typeof raw === "string" ? protocol.parseVersionString(raw) : null;
         if (!version) return null;
-        const seconds = (_c = root == null ? void 0 : root.data) == null ? void 0 : _c.updatetime;
+        const seconds2 = (_c = root == null ? void 0 : root.data) == null ? void 0 : _c.updatetime;
         return {
           version: version,
-          updatedAt: typeof seconds === "number" && Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1e3).toISOString() : null
+          updatedAt: typeof seconds2 === "number" && Number.isFinite(seconds2) && seconds2 > 0 ? new Date(seconds2 * 1e3).toISOString() : null
         };
       }
     },
@@ -11651,8 +13095,8 @@
     }
   });
 
-  function formatClock(seconds) {
-    const total = Math.max(0, Math.floor(seconds));
+  function formatClock(seconds2) {
+    const total = Math.max(0, Math.floor(seconds2));
     const secs = String(total % 60).padStart(2, "0");
     const mins = Math.floor(total / 60) % 60;
     const hours = Math.floor(total / 3600);
@@ -16284,7 +17728,7 @@
   }
 
   function isScopedLineHost(hostname) {
-    return [ "degree.qingshuxuetang.com", "m.umu.cn", "learning.wencaischool.net" ].includes(hostname);
+    return [ "www.learnin.com.cn", "cjzzxylearning.o-learn.cn", "degree.qingshuxuetang.com", "m.umu.cn", "learning.wencaischool.net", "www.mosoteach.cn" ].includes(hostname);
   }
 
   function canClaimScopedPage(document2) {
@@ -16295,6 +17739,9 @@
       try {
         const location2 = (_a2 = doc.defaultView) == null ? void 0 : _a2.location;
         if (!location2 || location2.hostname !== host) return false;
+        if (host === "www.mosoteach.cn") return mosoteachReviewLayout(location2) !== null || isCourseStudyUrl("mosoteach", location2) || /^\/web\/cc-detail\/[^/]+\/act\/quiz-answer\/[^/]+\/?$/u.test(location2.pathname);
+        if (host === "www.learnin.com.cn") return isLearninTextHomework(doc) || isCourseStudyUrl("learnin", location2);
+        if (host === "cjzzxylearning.o-learn.cn") return isOlearnTextHomework(doc) || isCourseStudyUrl("olearn", location2);
         if (host === "degree.qingshuxuetang.com") return isQingshuHomework(location2, false) || isQingshuHomework(location2, true) || isCourseStudyUrl("qingshu", location2);
         if (host === "m.umu.cn") return isUmuQuizUrl(location2, false) || isUmuQuizUrl(location2, true) || isCourseStudyUrl("umu", location2);
         return host === "learning.wencaischool.net" && (isWencaiHomeworkUrl(location2, false) || isWencaiHomeworkUrl(location2, true));
