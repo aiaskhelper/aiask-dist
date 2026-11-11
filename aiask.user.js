@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         爱问答 · 网课学习助手
 // @namespace    aiask
-// @version      3.5.14
+// @version      3.5.15
 // @author       爱问答
 // @description  全平台网课答题助手，一键解析当前页面试题并获取答案，支持作业 / 考试 / 章节测验的自动收录与答题，题库未命中时可用 AI 辅助答题（需自备服务商 Key），视频与文档等课程学习任务自动推进。已适配【超星学习通、168 网校、湖北自考助学平台、江苏开放大学、国家开放大学、广东开放大学、安徽继续教育在线新版、柠檬文采、UMU 互动平台、青书学堂、云班课】，更多平台持续适配中...
 // @icon         data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IueIsemXruetlCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTAiIGZpbGw9IiNDNzM5MUIiLz4KICA8cmVjdCB4PSIzLjUiIHk9IjMuNSIgd2lkdGg9IjU3IiBoZWlnaHQ9IjU3IiByeD0iNy41IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmYiIHN0cm9rZS1vcGFjaXR5PSIwLjU1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iMzMiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJTb25ndGkgU0MsIE5vdG8gU2VyaWYgU0MsIFNpbVN1biwgc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtd2VpZ2h0PSI3MDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJjZW50cmFsIj7pl648L3RleHQ+Cjwvc3ZnPgo=
 // @homepage     https://www.aiask.site/
 // @supportURL   https://www.aiask.site/contact.html
+// @match        https://ybu.edu-gp.com/*
 // @match        https://www.mosoteach.cn/*
 // @match        https://degree.qingshuxuetang.com/*
 // @match        https://m.umu.cn/*
@@ -24,7 +25,7 @@
 // @match        https://www.aiask.site/feedback.html
 // @match        https://www.aiask.site/feedback
 // @require      https://registry.npmmirror.com/vue/3.5.39/files/dist/vue.global.prod.js
-// @require      https://www.aiask.site/engine/aiask-engine-8435a927ff4230c5.js#sha256=8435a927ff4230c5507b5369a676c1b805ca232caefe9d870e2e3e471b2db33d
+// @require      https://www.aiask.site/engine/aiask-engine-960914246a913e8c.js#sha256=960914246a913e8ca6f1157834838716a7e38ea1a356a38e9989b5acd2fcc0ba
 // @resource     chaoxingFontTable  https://www.aiask.site/assets/chaoxing-font-table.json
 // @connect      www.aiask.site
 // @connect      cx.icodef.com
@@ -181,9 +182,9 @@
 
   const IS_DEFAULT_BACKEND = BACKEND_BASE_URL === DEFAULT_BACKEND_BASE_URL;
 
-  const SCRIPT_VERSION = "3.5.14";
+  const SCRIPT_VERSION = "3.5.15";
 
-  const ENGINE_ID = "8435a927ff4230c5";
+  const ENGINE_ID = "960914246a913e8c";
 
   const DEFAULT_ROOT_PUBLIC_JWK = protocol.PRODUCTION_ROOT_PUBLIC_JWK;
 
@@ -5648,6 +5649,8 @@
 
   const SELECTED_SELECTOR = ".check_answer, .check_answer_dx";
 
+  const isReversibleChaoxingChoice = ({clickTarget: clickTarget, readTarget: readTarget, selected: selected2}) => clickTarget === readTarget && selected2.kind === "descendant" && selected2.selector === SELECTED_SELECTOR && (clickTarget.matches(".questionLi .stem_answer .answerBg") || clickTarget.matches('li[class*="before-after"], .Cy_ulTop li, .Zy_ulTop li') && /^(?:\s*return\s+)?\s*addMultipleChoice\s*\(/u.test(clickTarget.getAttribute("onclick") ?? ""));
+
   function isChaoxingHost(hostname) {
     return hostname === "chaoxing.com" || hostname.endsWith(".chaoxing.com");
   }
@@ -5831,11 +5834,7 @@
       const type = questionType(question2.target);
       if (!desired || type !== "0" && type !== "1" && type !== "3") return false;
       if (type === "0" || type === "3") return desired.length === 1;
-      const desiredSet = new Set(desired);
-      for (const [index, target] of targets2.entries()) {
-        if (selected(target) && !desiredSet.has(index) && !clickElement(target)) return false;
-      }
-      return targets2.every((target, index) => !selected(target) || desiredSet.has(index));
+      return plan.multiple === true;
     }
     async commitPlan(plan, signal) {
       if (signal.aborted) return false;
@@ -6849,7 +6848,7 @@
 
   const ANHUI_HOOK_IDS = [ "anhui.ready", "anhui.reviewReady", "anhui.harvestPaper", "anhui.capturePaper", "anhui.applyPlan" ];
 
-  function parseQuestion(input) {
+  function parseQuestion$1(input) {
     const object2 = value => {
       if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid question model");
       return value;
@@ -6883,6 +6882,10 @@
   const WRITE_CLOCK = "aiask:anhui:write-clock";
 
   const pageDocuments = new WeakMap;
+
+  const unconfirmed = new WeakMap;
+
+  const saving = new WeakSet;
 
   function view(document2) {
     var _a, _b;
@@ -6930,7 +6933,7 @@
   }
 
   function questionNode(document2, input, types) {
-    const question2 = parseQuestion(input);
+    const question2 = parseQuestion$1(input);
     const text2 = value => {
       const template = document2.createElement("template");
       template.innerHTML = value;
@@ -6973,23 +6976,30 @@
     return choices2;
   }
 
-  async function applyChoice(environment, node, target, operation, signal) {
-    var _a;
+  async function applyChoice(environment, node, target, operation, signal, selected2 = true) {
+    var _a, _b, _c, _d, _e, _f, _g;
     const doc = environment.ctx.document;
     const identity2 = node.id.slice(1);
-    if (signal.aborted || !currentChoices(doc, node)) return false;
-    if (await target.verify(operation, signal)) return true;
+    const native = view(doc);
+    const anchor = (_a = target.anchor) == null ? void 0 : _a.call(target);
+    const live = () => {
+      const choices2 = currentChoices(doc, node);
+      return !!choices2 && !!anchor && choices2.includes(anchor) && view(doc) === native && !signal.aborted;
+    };
+    if (!native || saving.has(native) || ((_b = unconfirmed.get(native)) == null ? void 0 : _b.has(identity2)) || !live()) return false;
+    const before = (_c = target.readSelected) == null ? void 0 : _c.call(target);
+    if (typeof before !== "boolean") return false;
+    if (before === selected2) return true;
     const deadline = Date.now() + waitBeforeWrite(doc, identity2);
     if (!(await core.waitUntil(() => Date.now() >= deadline, {
       timeout: 3200,
       interval: 50,
       signal: signal
-    })) || signal.aborted || !currentChoices(doc, node)) return false;
-    const native = view(doc);
-    const original = native == null ? void 0 : native.answerQuestion;
-    if (!native || !original) return false;
+    })) || saving.has(native) || ((_d = unconfirmed.get(native)) == null ? void 0 : _d.has(identity2)) || !live() || ((_e = target.readSelected) == null ? void 0 : _e.call(target)) !== before) return false;
+    const original = native.answerQuestion;
+    if (!original) return false;
     try {
-      (_a = doc.defaultView) == null ? void 0 : _a.localStorage.setItem(WRITE_CLOCK, JSON.stringify({
+      (_f = doc.defaultView) == null ? void 0 : _f.localStorage.setItem(WRITE_CLOCK, JSON.stringify({
         at: Date.now(),
         identity: identity2
       }));
@@ -6999,33 +7009,45 @@
     let receipt;
     native.answerQuestion = function(...values) {
       const result = original.apply(this, values);
-      receipt = result.then(() => true, () => false);
+      if (values[1] === identity2) {
+        receipt = result.then(() => true, () => false);
+      }
       return result;
     };
+    saving.add(native);
     try {
-      if (!(await target.apply(operation, signal))) return false;
+      let clicked;
+      try {
+        clicked = selected2 ? target.apply(operation, signal) : (_g = target.setSelected) == null ? void 0 : _g.call(target, false, signal);
+      } finally {
+        native.answerQuestion = original;
+      }
+      if (!(await clicked) && !receipt) return false;
+      let settled = false;
+      let saved = false;
+      receipt == null ? void 0 : receipt.then(value => {
+        settled = true;
+        saved = value;
+      });
+      const confirmed = !!receipt && await core.waitUntil(() => settled, {
+        timeout: 1200,
+        interval: 50
+      }) && saved && await core.waitUntil(() => {
+        var _a2;
+        return !!currentChoices(doc, node) && ((_a2 = target.readSelected) == null ? void 0 : _a2.call(target)) === selected2;
+      }, {
+        timeout: 1200,
+        interval: 50
+      });
+      if (!confirmed) {
+        const questions = unconfirmed.get(native) ?? new Set;
+        questions.add(identity2);
+        unconfirmed.set(native, questions);
+      }
+      return confirmed;
     } finally {
-      native.answerQuestion = original;
+      saving.delete(native);
     }
-    if (!receipt) return false;
-    let settled = false;
-    let saved = false;
-    receipt.then(value => {
-      settled = true;
-      saved = value;
-    });
-    return await core.waitUntil(() => settled, {
-      timeout: 1200,
-      interval: 50,
-      signal: signal
-    }) && saved && await core.waitUntil(() => {
-      var _a2, _b;
-      return !!currentChoices(doc, node) && ((_b = (_a2 = target.anchor) == null ? void 0 : _a2.call(target)) == null ? void 0 : _b.classList.contains("on")) === true;
-    }, {
-      timeout: 1200,
-      interval: 50,
-      signal: signal
-    });
   }
 
   function registerAnhuiHooks(registry, environment) {
@@ -7160,6 +7182,7 @@
                 kind: "class",
                 name: "on"
               },
+              reversibleChoice: node.type === "multiple",
               location: environment.ctx.location
             });
           };
@@ -7174,6 +7197,10 @@
               kind: "choose",
               optionId: option.id,
               isConnected: live,
+              readSelected: () => {
+                var _a, _b, _c;
+                return ((_a = unconfirmed.get(native)) == null ? void 0 : _a.has(node.id.slice(1))) ? null : ((_c = (_b = targetFor(index)) == null ? void 0 : _b.readSelected) == null ? void 0 : _c.call(_b)) ?? null;
+              },
               anchor: () => {
                 var _a, _b;
                 return ((_b = (_a = targetFor(index)) == null ? void 0 : _a.anchor) == null ? void 0 : _b.call(_a)) ?? null;
@@ -7186,9 +7213,18 @@
                 const target = targetFor(index);
                 return !!target && applyChoice(environment, node, target, operation, signal);
               },
+              ...node.type === "multiple" ? {
+                setSelected: (selected2, signal) => {
+                  const target = targetFor(index);
+                  return !!target && applyChoice(environment, node, target, {
+                    kind: "choose",
+                    optionId: option.id
+                  }, signal, selected2);
+                }
+              } : {},
               verify: (operation, signal) => {
-                var _a;
-                return ((_a = targetFor(index)) == null ? void 0 : _a.verify(operation, signal)) ?? false;
+                var _a, _b;
+                return !((_a = unconfirmed.get(native)) == null ? void 0 : _a.has(node.id.slice(1))) && (((_b = targetFor(index)) == null ? void 0 : _b.verify(operation, signal)) ?? false);
               }
             }))
           });
@@ -7224,13 +7260,15 @@
         }
         const choices2 = currentChoices(doc, record2.node);
         if (!choices2 || !record2.live()) return false;
-        const selected2 = choices2.flatMap((e, i) => e.classList.contains("on") ? [ record2.node.options[i].id ] : []);
-        if (record2.node.type === "multiple" && selected2.some(id2 => !plan.operations.some(op => op.kind === "choose" && op.optionId === id2))) return false;
-        const writes = plan.operations.filter(op => op.kind === "choose" && !selected2.includes(op.optionId)).length;
+        const expected2 = new Set(plan.operations.flatMap(op => op.kind === "choose" ? [ op.optionId ] : []));
+        const writes = choices2.filter((choice, index) => {
+          const selected2 = choice.classList.contains("on");
+          const desired = expected2.has(record2.node.options[index].id);
+          return record2.node.type === "multiple" ? selected2 !== desired : desired && !selected2;
+        }).length;
         if (writes && waitBeforeWrite(doc, record2.node.id.slice(1)) + (writes - 1) * 2100 > 11e3) return false;
         if (!(await environment.writer.applyPlan(plan, signal)) || !(await environment.writer.verifyPlan(plan, signal))) return false;
         const finalChoices = currentChoices(doc, record2.node);
-        const expected2 = new Set(plan.operations.flatMap(op => op.kind === "choose" ? [ op.optionId ] : []));
         return !!finalChoices && record2.live() && finalChoices.every((choice, index) => choice.classList.contains("on") === expected2.has(record2.node.options[index].id));
       }
     });
@@ -7381,20 +7419,17 @@
         if (wanted.size !== plan.operations.length || !wanted.size || parsed.node.type !== "multiple" && wanted.size !== 1 || ![ ...wanted ].every(id2 => parsed.node.options.some(o => o.id === id2))) return false;
         const selected2 = i => parsed.labels[i].classList.contains("active");
         const current = () => !signal.aborted && live();
+        if (plan.multiple) return environment.writer.applyPlan(plan, signal);
         const before = parsed.labels.map((_, i) => selected2(i));
         let success = false;
         try {
-          if (parsed.node.type === "multiple") for (const [i, label] of parsed.labels.entries()) {
-            if (!current()) return false;
-            if (selected2(i) && !wanted.has(parsed.node.options[i].id)) label.click();
-          }
           if (!(await environment.writer.applyPlan(plan, signal)) || !(await environment.writer.verifyPlan(plan, signal))) return false;
           success = current() && parsed.labels.every((_, i) => selected2(i) === wanted.has(parsed.node.options[i].id));
           return success;
         } finally {
           if (!success && current()) for (const [i, label] of parsed.labels.entries()) {
             if (!current()) break;
-            if (selected2(i) !== before[i] && (parsed.node.type === "multiple" || before[i])) label.click();
+            if (selected2(i) !== before[i] && before[i]) label.click();
           }
         }
       }
@@ -7458,6 +7493,7 @@
                 optionId: parsed.node.options[i].id,
                 clickTarget: label,
                 readTarget: label,
+                reversibleChoice: parsed.node.type === "multiple",
                 selected: {
                   kind: "class",
                   name: "active"
@@ -7629,13 +7665,10 @@
           return !signal.aborted && (next == null ? void 0 : next.connected) && next.currentFingerprint === plan.fingerprint && next.capturedFingerprint === plan.fingerprint && inputs.length === choices2.length && choices2.every((c, i) => c.input === inputs[i] && c.input.isConnected && !c.input.disabled);
         };
         if (!current()) return false;
+        if (plan.multiple) return environment.writer.applyPlan(plan, signal);
         const before = choices2.map(c => c.input.checked);
         let success = false;
         try {
-          if (multiple) for (const choice of choices2) {
-            if (!current()) return false;
-            if (choice.input.checked && !wanted.has(choice.id)) choice.input.click();
-          }
           if (!current() || !(await environment.writer.applyPlan(plan, signal)) || !(await core.waitUntil(() => !current() || choices2.every(c => c.input.checked === wanted.has(c.id)), {
             timeout: 400,
             interval: 20,
@@ -7646,7 +7679,7 @@
         } finally {
           if (!success && current()) for (const [i, choice] of choices2.entries()) {
             if (!current()) break;
-            if (choice.input.checked !== before[i] && (multiple || before[i])) choice.input.click();
+            if (choice.input.checked !== before[i] && before[i]) choice.input.click();
           }
         }
       }
@@ -7775,20 +7808,17 @@
         if (wanted.size !== plan.operations.length || !wanted.size || parsed.node.type !== "multiple" && wanted.size !== 1 || ![ ...wanted ].every(id2 => parsed.node.options.some(o => o.id === id2))) return false;
         const selected2 = i => parsed.labels[i].classList.contains(parsed.node.type === "multiple" ? "is-checked" : "is-active");
         const current = () => !signal.aborted && live();
+        if (plan.multiple) return environment.writer.applyPlan(plan, signal);
         const before = parsed.labels.map((_, i) => selected2(i));
         let success = false;
         try {
-          if (parsed.node.type === "multiple") for (const [i, label] of parsed.labels.entries()) {
-            if (!current()) return false;
-            if (selected2(i) && !wanted.has(parsed.node.options[i].id)) label.click();
-          }
           if (!(await environment.writer.applyPlan(plan, signal)) || !(await environment.writer.verifyPlan(plan, signal))) return false;
           success = current() && parsed.labels.every((_, i) => selected2(i) === wanted.has(parsed.node.options[i].id));
           return success;
         } finally {
           if (!success && current()) for (const [i, label] of parsed.labels.entries()) {
             if (!current()) break;
-            if (selected2(i) !== before[i] && (parsed.node.type === "multiple" || before[i])) label.click();
+            if (selected2(i) !== before[i] && before[i]) label.click();
           }
         }
       }
@@ -7853,6 +7883,7 @@
                 optionId: parsed.node.options[i].id,
                 clickTarget: label,
                 readTarget: label,
+                reversibleChoice: parsed.node.type === "multiple",
                 selected: {
                   kind: "class",
                   name: parsed.node.type === "multiple" ? "is-checked" : "is-active"
@@ -8003,13 +8034,10 @@
         };
         const choices2 = current();
         if (!choices2) return false;
+        if (plan.multiple) return environment.writer.applyPlan(plan, signal);
         const before = choices2.map(c => c.input.checked);
         let success = false;
         try {
-          if (node.type === "multiple") for (const choice of choices2) {
-            if (!current()) return false;
-            if (choice.input.checked && !wanted.has(choice.input.value)) choice.label.click();
-          }
           if (!(await environment.writer.applyPlan(plan, signal)) || !(await environment.writer.verifyPlan(plan, signal))) return false;
           const after = current();
           success = !!after && after.every(c => c.input.checked === wanted.has(c.input.value));
@@ -8017,7 +8045,7 @@
         } finally {
           if (!success && current()) for (const [i, choice] of choices2.entries()) {
             if (!current()) break;
-            if (choice.input.checked !== before[i] && (node.type === "multiple" || before[i])) choice.label.click();
+            if (choice.input.checked !== before[i] && before[i]) choice.label.click();
           }
         }
       }
@@ -8112,15 +8140,15 @@
     if (!root) return null;
     let f = root[Object.keys(root).find(k => k.startsWith("__reactFiber$")) ?? ""];
     let controller;
-    let exam;
+    let exam2;
     for (let depth = 0; f && depth < 100; depth++, f = f.return) {
       const n = f.stateNode;
       if (typeof (n == null ? void 0 : n.displayCard) === "function" && Array.isArray((_b = n.props) == null ? void 0 : _b.sections)) controller = n;
-      if (typeof (n == null ? void 0 : n.saveQuiz) === "function" && n.oldSaveData && typeof n.oldSaveData === "object") exam = n;
+      if (typeof (n == null ? void 0 : n.saveQuiz) === "function" && n.oldSaveData && typeof n.oldSaveData === "object") exam2 = n;
     }
-    return exam && ((layout == null ? void 0 : layout.classList.contains("single-quiz")) ? Array.isArray((_d = (_c = exam.props) == null ? void 0 : _c.pageData) == null ? void 0 : _d.sectionArr) : !!controller) ? {
+    return exam2 && ((layout == null ? void 0 : layout.classList.contains("single-quiz")) ? Array.isArray((_d = (_c = exam2.props) == null ? void 0 : _c.pageData) == null ? void 0 : _d.sectionArr) : !!controller) ? {
       controller: controller,
-      exam: exam
+      exam: exam2
     } : null;
   }
 
@@ -8662,6 +8690,265 @@
     }
   }
 
+  const YBU_EXAM_HOOK_IDS = [ "ybu.examReady", "ybu.captureExam", "ybu.applyExamPlan" ];
+
+  const MAX_QUESTIONS = 200;
+
+  const QUESTIONS = ".exam-main > .question-section > .question-item";
+
+  const CHOICES = ".question-options label";
+
+  function exam(document2, review2) {
+    var _a, _b, _c;
+    const location2 = (_a = document2.defaultView) == null ? void 0 : _a.location;
+    if ((location2 == null ? void 0 : location2.origin) !== "https://ybu.edu-gp.com" || location2.pathname !== "/examPaper") return null;
+    const papers = document2.querySelectorAll(".exam-container");
+    if (papers.length !== 1) return null;
+    const paper2 = papers[0];
+    const backs = paper2.querySelectorAll(".exam-title button.back-btn");
+    const submits = paper2.querySelectorAll(".exam-sidebar .submit-btn-wrapper button");
+    const timer = paper2.querySelector(".exam-sidebar .countdown-section");
+    if (review2) return backs.length === 1 && ((_b = backs[0].textContent) == null ? void 0 : _b.trim()) === "\u8fd4\u56de" && submits.length === 0 && !timer ? paper2 : null;
+    return backs.length === 0 && submits.length === 1 && ((_c = submits[0].textContent) == null ? void 0 : _c.trim()) === "\u4ea4\u5377" && !submits[0].matches(":disabled") && timer && /\b(?!00:00:00)\d{2}:\d{2}:\d{2}\b/u.test(timer.textContent ?? "") && !paper2.querySelector(".submit-overlay") ? paper2 : null;
+  }
+
+  function canClaimYbuExam(document2) {
+    return [ false, true ].some(review2 => {
+      var _a;
+      return !!((_a = exam(document2, review2)) == null ? void 0 : _a.querySelector(QUESTIONS));
+    });
+  }
+
+  function choiceType(id2) {
+    if (/^single-\d+$/u.test(id2)) return "single";
+    if (/^multiple-\d+$/u.test(id2)) return "multiple";
+    if (/^judgment-\d+$/u.test(id2)) return "judge";
+  }
+
+  function parseQuestion(root, review2, signal) {
+    if (signal.aborted || !root.isConnected) return null;
+    const type = choiceType(root.id);
+    const view2 = root.ownerDocument.defaultView;
+    const title = root.querySelectorAll(":scope > .question-text > span:not(.question-number)");
+    const labels = [ ...root.querySelectorAll(CHOICES) ];
+    if (!type || !view2 || title.length !== 1 || labels.length < 2 || labels.length > 26 || type === "judge" && labels.length !== 2) return null;
+    const content2 = element => core.serializeDomQuestionContent(element, {
+      signal: signal,
+      maxNodes: 1e3
+    });
+    const options = [];
+    const inputs = [];
+    for (const label of labels) {
+      const input = label.control;
+      const text2 = label.querySelectorAll(".el-radio__label, .el-checkbox__label");
+      if (!(input instanceof view2.HTMLInputElement) || !label.contains(input) || label.querySelectorAll("input").length !== 1 || text2.length !== 1 || input.type !== (type === "multiple" ? "checkbox" : "radio") || input.matches(":disabled") !== review2) return null;
+      const value = type === "judge" ? content2(text2[0]).trim() : core.stripOptionPrefix(content2(text2[0]));
+      if (!value) return null;
+      options.push({
+        id: protocol.semanticContentHash(value),
+        content: value
+      });
+      inputs.push(input);
+    }
+    if (new Set(options.map(option => option.id)).size !== options.length || type === "judge" && !options.every(option => [ "\u5bf9", "\u9519" ].includes(option.content))) return null;
+    if (!review2 && type !== "multiple") {
+      for (const input of inputs) {
+        if (input.name && [ ...root.ownerDocument.getElementsByName(input.name) ].some(other => other instanceof view2.HTMLInputElement && other.type === "radio" && other.form === input.form && !inputs.includes(other))) return null;
+      }
+    }
+    const stem = content2(title[0]);
+    if (!stem.trim()) return null;
+    const node = {
+      kind: "leaf",
+      id: "",
+      path: "/",
+      type: type,
+      stem: stem,
+      options: options,
+      slots: [],
+      fillPolicy: "atomic",
+      metadata: {
+        platform: "ybu",
+        variant: review2 ? "ybu-exam-review" : "ybu-exam-attempt",
+        ruleVersion: "1.0.0"
+      }
+    };
+    const fingerprint = protocol.questionNodeHash(node);
+    node.id = fingerprint;
+    node.path = `/${fingerprint}`;
+    return {
+      node: node,
+      fingerprint: fingerprint,
+      labels: labels,
+      inputs: inputs
+    };
+  }
+
+  function reviewCards(paper2) {
+    var _a;
+    const cards = new Map;
+    const buttons = paper2.querySelectorAll(".answer-card button.answer-num-btn");
+    if (buttons.length > MAX_QUESTIONS) return cards;
+    for (const button of buttons) {
+      const number = (_a = button.textContent) == null ? void 0 : _a.trim();
+      if (number) cards.set(number, cards.has(number) ? null : button);
+    }
+    return cards;
+  }
+
+  function questionNumber(root) {
+    var _a, _b, _c;
+    return (_c = (_b = (_a = root.querySelector(".question-number")) == null ? void 0 : _a.textContent) == null ? void 0 : _b.trim().match(/^(\d+)\.$/u)) == null ? void 0 : _c[1];
+  }
+
+  function approvedAnswer(number, parsed, cards) {
+    if (parsed.node.type === "multiple") return null;
+    const card = cards.get(number);
+    if (!(card == null ? void 0 : card.matches(".answered.correct:not(.wrong)"))) return null;
+    const checked = parsed.inputs.flatMap((input, i) => input.checked ? [ i ] : []);
+    if (checked.length !== 1 || !parsed.labels.every((label, i) => label.classList.contains("option-correct") === parsed.inputs[i].checked && !label.classList.contains("option-wrong"))) return null;
+    return parsed.node.options[checked[0]].content;
+  }
+
+  function registerYbuExamHooks(registry, environment) {
+    const records = new Map;
+    const reviewArg = args => {
+      if (typeof args.review !== "boolean") throw new Error("missing ybu exam state");
+      return args.review;
+    };
+    core.registerLocalHook(registry, {
+      id: "ybu.examReady",
+      phases: [ "match" ],
+      capability: "runtime-read",
+      parseArgs: reviewArg,
+      validateResult: v => typeof v === "boolean",
+      execute: review2 => {
+        var _a;
+        return !!environment && !!((_a = exam(environment.ctx.document, review2)) == null ? void 0 : _a.querySelector(QUESTIONS));
+      }
+    });
+    core.registerLocalHook(registry, {
+      id: "ybu.captureExam",
+      phases: [ "capture" ],
+      capability: "runtime-read",
+      parseArgs: reviewArg,
+      validateResult: v => Number.isInteger(v) && Number(v) >= 0 && Number(v) <= MAX_QUESTIONS,
+      execute: (review2, {signal: signal}) => {
+        records.clear();
+        if (!environment) return 0;
+        const {document: document2, location: location2, signal: sessionSignal} = environment.ctx;
+        const paper2 = exam(document2, review2);
+        const roots2 = paper2 == null ? void 0 : paper2.querySelectorAll(QUESTIONS);
+        if (!paper2 || !(roots2 == null ? void 0 : roots2.length) || roots2.length > MAX_QUESTIONS) return 0;
+        const cards = review2 ? reviewCards(paper2) : new Map;
+        const numbers = new Map;
+        for (const root of roots2) {
+          const number = questionNumber(root);
+          if (number) numbers.set(number, (numbers.get(number) ?? 0) + 1);
+        }
+        const seen = new Map;
+        const deadline = Date.now() + 1500;
+        let count = 0;
+        for (const root of roots2) {
+          if (signal.aborted || Date.now() > deadline) break;
+          try {
+            const number = questionNumber(root);
+            if (!number || numbers.get(number) !== 1) continue;
+            const parsed = parseQuestion(root, review2, signal);
+            if (!parsed) continue;
+            if (review2) {
+              const answer = approvedAnswer(number, parsed, cards);
+              if (answer) {
+                environment.capture.registerHarvestLeaf(parsed.node, [ answer ]);
+                count++;
+              }
+            } else {
+              seen.set(parsed.fingerprint, seen.has(parsed.fingerprint) ? null : parsed);
+            }
+          } catch {}
+        }
+        for (const parsed of seen.values()) {
+          if (signal.aborted || Date.now() > deadline) break;
+          if (!parsed) continue;
+          const {node: node, inputs: inputs, labels: labels, fingerprint: fingerprint} = parsed;
+          const root = inputs[0].closest(".question-item");
+          if (!root) continue;
+          const live = () => {
+            if (sessionSignal.aborted || exam(document2, false) !== paper2 || !paper2.contains(root)) return false;
+            try {
+              const current = parseQuestion(root, false, sessionSignal);
+              return !!current && current.fingerprint === fingerprint && current.inputs.every((input, i) => input === inputs[i] && current.labels[i] === labels[i] && current.node.options[i].id === node.options[i].id);
+            } catch {
+              return false;
+            }
+          };
+          environment.capture.registerLeaf(node, {
+            readCurrentFingerprint: () => live() ? fingerprint : "ybu-exam-changed",
+            targets: inputs.map((input, i) => {
+              const target = core.createDomChoiceBindingTarget({
+                optionId: node.options[i].id,
+                clickTarget: input,
+                selected: {
+                  kind: "checked"
+                },
+                location: location2
+              });
+              return {
+                ...target,
+                apply: (operation, abort) => live() ? target.apply(operation, abort) : Promise.resolve(false),
+                revert: async abort => {
+                  var _a;
+                  return live() && !!(await ((_a = target.revert) == null ? void 0 : _a.call(target, abort)));
+                }
+              };
+            })
+          });
+          records.set(node.path, {
+            parsed: parsed,
+            live: live
+          });
+          count++;
+        }
+        return count;
+      }
+    });
+    core.registerLocalHook(registry, {
+      id: "ybu.applyExamPlan",
+      phases: [ "fill" ],
+      capability: "answer-write",
+      requiresSafetyCapability: true,
+      parseArgs: args => args.safety,
+      validateResult: v => typeof v === "boolean",
+      execute: async (safety, {signal: signal}) => {
+        if (!environment || signal.aborted) return false;
+        const plan = core.safetyPlanForCapability(safety);
+        const record2 = records.get(plan.path);
+        const binding = environment.capture.bindings.get(plan.path);
+        if (!record2 || !(binding == null ? void 0 : binding.connected) || binding.currentFingerprint !== plan.fingerprint) return false;
+        const {parsed: parsed, live: live} = record2;
+        const current = () => !signal.aborted && live();
+        const {node: node, inputs: inputs} = parsed;
+        const wanted = new Set(plan.operations.flatMap(op => op.kind === "choose" ? [ op.optionId ] : []));
+        if (!current() || !wanted.size || wanted.size !== plan.operations.length || node.type !== "multiple" && wanted.size !== 1 || ![ ...wanted ].every(id2 => node.options.some(option => option.id === id2))) return false;
+        if (plan.multiple) return environment.writer.applyPlan(plan, signal);
+        const before = inputs.map(input => input.checked);
+        let success = false;
+        try {
+          success = current() && await environment.writer.applyPlan(plan, signal) && await environment.writer.verifyPlan(plan, signal) && current() && inputs.every((input, i) => input.checked === wanted.has(node.options[i].id));
+          return success;
+        } finally {
+          if (!success) for (const [i, input] of inputs.entries()) {
+            if (!current()) break;
+            if (input.checked !== before[i] && before[i]) {
+              input.click();
+              await Promise.resolve();
+            }
+          }
+        }
+      }
+    });
+  }
+
   const CHA0XING_PRIMITIVE_IDS = Object.freeze([ "chaoxing.normalizeTitle", "chaoxing.decodeFont", "chaoxing.harvestAnswerValues", "chaoxing.readReviewQuestion", "chaoxing.ueditorBodies", "chaoxing.examRegisterQuestion", "chaoxing.examPreparePlan", "chaoxing.examCommitPlan", CHA0XING_PAGE_SAVE_HOOK_IDS.noSubmit, CHA0XING_PAGE_SAVE_HOOK_IDS.saveWork ]);
 
   function registerPageSaveVerificationStub(registry, id2) {
@@ -8683,6 +8970,11 @@
   }
 
   const PLATFORM_PRIVATE_HOOKS = Object.freeze({
+    ybu: Object.freeze({
+      primitiveIds: YBU_EXAM_HOOK_IDS,
+      registerForVerification: registry => registerYbuExamHooks(registry),
+      registerForRuntime: registerYbuExamHooks
+    }),
     learnin: Object.freeze({
       primitiveIds: LEARNIN_HOOK_IDS,
       registerForVerification: registry => registerLearninHooks(registry),
@@ -8770,7 +9062,7 @@
 
   const RULE_EXPRESSION_SERVICES = createRuleExpressionServices();
 
-  const RULE_ENGINE_VERSION = "1.20.0";
+  const RULE_ENGINE_VERSION = "1.21.0";
 
   const RULE_LIMITS = Object.freeze({
     maxSteps: 5e4,
@@ -8808,6 +9100,11 @@
   const CHA0XING_RULE_POLICY = platformRulePolicy("chaoxing");
 
   const TRUSTED_REMOTE_RULE_PLATFORMS = Object.freeze([ Object.freeze({
+    platform: "ybu",
+    packageId: "ybu-exam",
+    hosts: Object.freeze([ "ybu.edu-gp.com" ]),
+    policy: platformRulePolicy("ybu")
+  }), Object.freeze({
     platform: "learnin",
     packageId: "learnin-homework",
     hosts: Object.freeze([ "www.learnin.com.cn" ]),
@@ -8874,7 +9171,7 @@
     policy: GENERIC_DOM_RULE_POLICY
   }) ]);
 
-  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|mooc1\.ceduacad\.ahut\.edu\.cn|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn|learning\.wencaischool\.net|m\.umu\.cn|degree\.qingshuxuetang\.com|www\.mosoteach\.cn|cjzzxylearning\.o-learn\.cn|www\.learnin\.com\.cn)$/u;
+  const SUPPORTED_HOST_PATTERN = /^(?:(?:[^.]+\.)*chaoxing\.com|mooc1\.ceduacad\.ahut\.edu\.cn|xatu\.168wangxiao\.com|os\.open\.com\.cn|ctapp\.hubuzkw\.com|xuexi\.jsou\.cn|lms\.ouchn\.cn|course\.ougd\.cn|jxjynew\.ahjxjy\.cn|learning\.wencaischool\.net|m\.umu\.cn|degree\.qingshuxuetang\.com|www\.mosoteach\.cn|cjzzxylearning\.o-learn\.cn|www\.learnin\.com\.cn|ybu\.edu-gp\.com)$/u;
 
   function trustedRemoteRulePlatformFor(hostname) {
     const host = normalizedHost(hostname);
@@ -8928,6 +9225,7 @@
       store: store,
       policy: CHA0XING_RULE_POLICY,
       services: services,
+      reversibleChoice: isReversibleChaoxingChoice,
       configureRegistry: configureRegistry,
       recheckBudget: ENGINE_RECHECK_BUDGET,
       walk: {
@@ -9016,6 +9314,13 @@
         store: store,
         policy: trustedRemote.policy,
         services: services,
+        reversibleChoice: ({clickTarget: clickTarget, readTarget: readTarget, selected: selected2}) => {
+          var _a;
+          if (trustedRemote.platform === "hubu") {
+            return selected2.kind === "descendant" && selected2.selector === ".el-icon" && clickTarget.matches(".topic_style_box > div") && (readTarget == null ? void 0 : readTarget.matches(".topic_style_box_left")) === true && readTarget.parentElement === clickTarget && clickTarget.querySelectorAll(":scope > .topic_style_box_left").length === 1;
+          }
+          return trustedRemote.platform === "wenhua" && selected2.kind === "class" && selected2.name === "answer-title" && clickTarget.matches(".numberCover") && clickTarget.parentElement === readTarget && readTarget.matches("li.option-title") && /^choose(?:Simple)?Option\(this\);?$/u.test(((_a = clickTarget.getAttribute("onclick")) == null ? void 0 : _a.trim()) ?? "");
+        },
         listener: {
           read: readCapturedSlot,
           allowedSlots: slotsForHosts(trustedRemote.hosts),
@@ -11996,7 +12301,7 @@
   function trustedRatio(items, answerableCount, countAi = true) {
     if (items.length === 0) return 0;
     const denominator = Math.max(items.length, answerableCount ?? 0);
-    const trusted = items.filter(item => item.filled && !item.random && (countAi || !item.aiGenerated)).length;
+    const trusted = items.filter(item => item.filled && !item.verifiedOnly && !item.random && (countAi || !item.aiGenerated)).length;
     return trusted / denominator;
   }
 
@@ -13034,6 +13339,7 @@
         hash: hash,
         item: {
           filled: item.filled,
+          verifiedOnly: item.verifiedOnly,
           random: item.random,
           aiGenerated: item.aiGenerated
         }
@@ -13415,6 +13721,7 @@
   }
 
   const PLATFORM_LABEL = Object.freeze({
+    ybu: "\u5ef6\u8fb9\u5927\u5b66",
     learnin: "Learnin \u6b63\u5728\u5b66",
     olearn: "O-Learn\uff08\u4e0a\u6d77\u57ce\u5efa\u804c\u9662\uff09",
     mosoteach: "\u4e91\u73ed\u8bfe",
@@ -13432,6 +13739,7 @@
   });
 
   const PLATFORM_CEILING = Object.freeze({
+    ybu: Object.freeze([ "answer", "harvest" ]),
     learnin: Object.freeze([ "answer", "harvest", "course-automation" ]),
     olearn: Object.freeze([ "answer", "harvest", "course-automation" ]),
     mosoteach: Object.freeze([ "answer", "harvest", "course-automation" ]),
@@ -18658,7 +18966,7 @@
           const completed = {
             event: "session-complete",
             payload: {
-              filled: items.filter(item => item.filled).length,
+              filled: items.filter(item => item.filled && !item.verifiedOnly).length,
               total: e.total,
               refused: items.filter(item => item.status === "unsafe").length,
               captureFailed: ruleCaptureFailure(adapter) != null
@@ -20431,7 +20739,7 @@
   }
 
   function isScopedLineHost(hostname) {
-    return [ "www.learnin.com.cn", "cjzzxylearning.o-learn.cn", "degree.qingshuxuetang.com", "m.umu.cn", "learning.wencaischool.net", "www.mosoteach.cn" ].includes(hostname);
+    return [ "ybu.edu-gp.com", "www.learnin.com.cn", "cjzzxylearning.o-learn.cn", "degree.qingshuxuetang.com", "m.umu.cn", "learning.wencaischool.net", "www.mosoteach.cn" ].includes(hostname);
   }
 
   function canClaimScopedPage(document2) {
@@ -20442,6 +20750,7 @@
       try {
         const location2 = (_a2 = doc.defaultView) == null ? void 0 : _a2.location;
         if (!location2 || location2.hostname !== host) return false;
+        if (host === "ybu.edu-gp.com") return canClaimYbuExam(doc);
         if (host === "www.mosoteach.cn") return mosoteachReviewLayout(location2) !== null || isCourseStudyUrl("mosoteach", location2) || /^\/web\/cc-detail\/[^/]+\/act\/quiz-answer\/[^/]+\/?$/u.test(location2.pathname);
         if (host === "www.learnin.com.cn") return isLearninTextHomework(doc) || isCourseStudyUrl("learnin", location2);
         if (host === "cjzzxylearning.o-learn.cn") return isOlearnTextHomework(doc) || isCourseStudyUrl("olearn", location2);
